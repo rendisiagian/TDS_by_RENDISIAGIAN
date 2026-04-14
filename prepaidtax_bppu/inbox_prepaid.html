@@ -16,19 +16,19 @@
 
         <main class="main-content">
             <header class="header">
-                <h2>📥 Bank Data Prepaid Tax (BPPU Dipotong Client)</h2>
+                <h2>📥 Antrean Verifikasi - Prepaid Tax</h2>
                 <div class="user-profile"><a href="/dashboard-prepaid" class="nav-back-link" >← Kembali</a></div>
             </header>
 
             <div class="container">
                 <div class="card">
                     <div class="card-header-padding" style="display:flex; justify-content:space-between; align-items:center;">
-                        <h3 class="title-primary" style="border-left-color: #4f46e5; margin: 0;">Daftar Antrean Bukti Potong</h3>
+                        <h3 class="title-primary" style="border-left-color: #4f46e5; margin: 0;">Dokumen Menunggu Verifikasi</h3>
                         
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">🗑️ Hapus Filter</button>
                             <button class="btn-simpan" style="margin:0; background-color: #4f46e5;" onclick="document.getElementById('filePdfUpload').click()">
-                                📁 Upload Bulk PDF BPPU
+                                📁 Unggah Dokumen PDF
                             </button>
                         </div>
                     </div>
@@ -107,7 +107,7 @@
             </div>
             
             <div style="display:flex; gap:10px; margin-top: 15px;">
-                <button class="btn-simpan" style="background-color: #4f46e5; flex: 2;" onclick="simpanFinalPrepaid()">💾 Simpan & Rilis Data</button>
+                <button class="btn-simpan" style="background-color: #4f46e5; flex: 2;" onclick="simpanFinalPrepaid()">💾 Verifikasi & Simpan</button>
                 <button class="btn-simpan btn-cancel" style="flex: 1; margin-top:0;" onclick="document.getElementById('modalReviewPDF').style.display='none'">Batal</button>
             </div>
         </div>
@@ -405,8 +405,14 @@
             document.getElementById('input_invoice_search').value = noFaktur;
             document.getElementById('invoice-dropdown').classList.remove('show');
             var display = document.getElementById('selected-invoice-display');
-            display.textContent = '&#10003; Terpilih: ' + noFaktur + ' (' + namaPembeli + ')';
+            display.innerHTML = '\u2713 Terpilih: <b>' + noFaktur + '</b> (' + namaPembeli + ') <span onclick="clearSelectedInvoice()" style="margin-left:0.75rem; color:var(--danger-500); cursor:pointer; font-weight:700; text-decoration:underline;">Hapus</span>';
             display.style.display = 'block';
+        }
+
+        function clearSelectedInvoice() {
+            document.getElementById('input_invoice_baru').value = '';
+            document.getElementById('input_invoice_search').value = '';
+            document.getElementById('selected-invoice-display').style.display = 'none';
         }
 
         // Close dropdown when clicking outside

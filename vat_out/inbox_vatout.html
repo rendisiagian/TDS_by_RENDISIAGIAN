@@ -16,19 +16,19 @@
 
         <main class="main-content">
             <header class="header">
-                <h2>📥 Bank Data VAT OUT (Antrean Tagihan Client)</h2>
+                <h2>📥 Antrean Verifikasi - Faktur Keluaran</h2>
                 <div class="user-profile"><a href="/dashboard-vatout" class="nav-back-link" >← Kembali</a></div>
             </header>
 
             <div class="container">
                 <div class="card">
                     <div class="card-header-padding" style="display:flex; justify-content:space-between; align-items:center;">
-                        <h3 class="title-primary" style="border-left-color: #ea580c; margin: 0;">Daftar Antrean Faktur Keluaran</h3>
+                        <h3 class="title-primary" style="border-left-color: #ea580c; margin: 0;">Dokumen Menunggu Verifikasi</h3>
                         
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">🗑️ Hapus Filter</button>
                             <button class="btn-simpan" style="margin:0; background-color: #ea580c;" onclick="document.getElementById('filePdfUpload').click()">
-                                📁 Upload Bulk PDF Faktur
+                                📁 Unggah Dokumen PDF
                             </button>
                         </div>
                     </div>
@@ -109,7 +109,7 @@
             <div class="form-group"><label>Nomor Invoice Internal / Tagihan</label><input type="text" id="input_invoice_baru" autocomplete="off" placeholder="Wajib untuk relasi Prepaid!"></div>
             
             <div style="display:flex; gap:10px; margin-top: 15px;">
-                <button class="btn-simpan" style="background-color: #ea580c; flex: 2;" onclick="simpanFinalVatout()">💾 Simpan & Rilis Data</button>
+                <button class="btn-simpan" style="background-color: #ea580c; flex: 2;" onclick="simpanFinalVatout()">💾 Verifikasi & Simpan</button>
                 <button class="btn-simpan btn-cancel" style="flex: 1; margin-top:0;" onclick="document.getElementById('modalReviewPDF').style.display='none'">Batal</button>
             </div>
         </div>
