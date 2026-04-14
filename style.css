@@ -396,8 +396,7 @@ body {
 /* === 9. CONTAINER === */
 .container {
     padding: 1rem 1.5rem;
-    max-width: 98%;
-    margin: 0 auto;
+    width: 100%;
     overflow-y: auto;
     flex: 1;
 }
@@ -1335,21 +1334,71 @@ textarea:focus {
     .btn-logout,
     .btn-aksi,
     .btn-simpan,
-    .btn-manual-trigger {
+    .btn-manual-trigger,
+    .toolbar-actions,
+    .stats-grid,
+    .user-profile,
+    .filter-row,
+    .btn-tbl,
+    .btn-tbl-view,
+    .btn-tbl-edit,
+    .btn-tbl-del,
+    .btn-tbl-pdf {
         display: none !important;
     }
-    
+
+    /* Hide Aksi column (2nd) and Arsip PDF column (3rd) */
+    th:nth-child(1),
+    td:nth-child(1),
+    th:nth-child(2),
+    td:nth-child(2),
+    th:nth-child(3),
+    td:nth-child(3) {
+        display: none !important;
+    }
+
     .main-content {
         width: 100%;
+        height: auto;
+        overflow: visible;
     }
-    
+
+    .table-responsive {
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
     .card {
         box-shadow: none;
-        border: 1px solid #000;
+        border: 1px solid #ccc;
     }
-    
+
+    .header {
+        position: static;
+        box-shadow: none;
+        border-bottom: 2px solid #000;
+    }
+
+    .header h2 {
+        -webkit-text-fill-color: #000 !important;
+        color: #000 !important;
+        background: none !important;
+    }
+
     table {
+        page-break-inside: auto;
+    }
+
+    tr {
         page-break-inside: avoid;
+    }
+
+    body {
+        background: white !important;
+    }
+
+    .container {
+        padding: 0.5rem;
     }
 }
 
@@ -1599,21 +1648,23 @@ textarea:focus {
 .chart-container {
     background: var(--bg-primary);
     border-radius: var(--radius-lg);
-    padding: 1.5rem;
+    padding: 1rem;
     border: 1px solid var(--border-color);
     box-shadow: var(--shadow-md);
-    margin-bottom: 1.5rem;
+    width: 100%;
 }
 
 .chart-container canvas {
-    max-height: 350px;
+    max-height: 300px;
+    width: 100% !important;
 }
 
 .chart-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-    margin-bottom: 1.5rem;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    width: 100%;
 }
 
 @media (max-width: 768px) {
