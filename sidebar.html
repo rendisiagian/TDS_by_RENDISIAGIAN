@@ -1,0 +1,27 @@
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <h3>TAX DATABASE</h3>
+        <p>by Rendi Siagian</p>
+    </div>
+    
+    <div class="sidebar-entity-box">
+        <label class="sidebar-entity-label">🏢 ENTITAS AKTIF</label>
+        <select id="global-entity-select" class="sidebar-entity-select" onchange="localStorage.setItem('lastEntitas', this.value); if(typeof gantiEntitas === 'function') { gantiEntitas(this.value); } else if(typeof loadSummary === 'function') { aktifEntitas = this.value; loadSummary(); } else { window.location.reload(); }">
+            <option value="BBS">Berca Buana Sakti</option>
+            <option value="JO">Berca JO</option>
+        </select>
+    </div>
+
+    <nav class="sidebar-nav">
+        <span style="color:#64748b; padding: 10px 20px; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px;">MODUL PAJAK</span>
+        <a href="/dashboard-vatout" class="sidebar-link">📤 1. Faktur Keluaran</a>
+        <a href="/dashboard-vatin" class="sidebar-link">📥 2. Faktur Masukan</a>
+        <a href="/dashboard-payable" class="sidebar-link">💸 3. Tax Payable (BPPU)</a>
+        <a href="/dashboard-prepaid" class="sidebar-link">🛡️ 4. Prepaid Tax</a>
+
+        <span style="color:#64748b; padding: 10px 20px; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px; margin-top: 15px; display:block;">SISTEM & UTILITAS</span>
+        <a href="/summary" class="sidebar-link">📊 Summary Report</a>
+        <a href="/profile" class="sidebar-link">👤 Profil Saya</a>
+        <a href="/manage-users" class="sidebar-link" id="menu-manage-users">⚙️ Panel Approval</a>
+    </nav>
+</aside>

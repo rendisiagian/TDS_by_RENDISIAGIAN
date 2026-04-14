@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Tax Payable | Tax Upload and Database</title>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+    <div class="app-wrapper">
+        <div id="sidebar-container"></div>
+
+        <main class="main-content">
+            <header class="header" style="background-color: #059669;">
+                <h2 style="color: white;">Dashboard Tax Payable (BPPU Potong Vendor)</h2>
+                <div class="user-profile">
+                    <a href="/logout" class="btn-logout">Logout</a>
+                </div>
+            </header>
+
+            <div class="container">
+                <div class="card">
+                    <div class="card-header-padding" style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3 class="title-primary" style="border-left-color: #059669; margin: 0;">Data Tax Payable</h3>
+                        
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">🗑️ Hapus Filter</button>
+                            <a href="/inbox-payable" class="btn-simpan" style="margin:0; background-color: #059669; text-decoration:none; padding: 8px 15px; font-size: 0.85rem;">
+                                📥 Buka Bank Data Payable
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table id="tabel-data">
+                            <thead>
+                                <tr>
+                                    <th class="col-no text-center">No.</th>
+                                    <th class="text-center">Aksi</th>
+                                    <th class="col-aksi text-center">Arsip PDF</th>
+                                    <th class="text-center">Branch Internal</th>
+                                    <th class="text-center">Masa Pajak</th>
+                                    <th class="text-center">Nama Vendor (Dipotong)</th>
+                                    <th class="text-center">No. BPPU</th>
+                                    <th class="text-center">DPP</th>
+                                    <th class="text-center">Tarif (%)</th>
+                                    <th class="text-center">Nilai PPh Potongan</th>
+                                    <th class="text-center">No. Internal Tagihan (VAT IN)</th>
+                                    <th class="text-center">Diinput Oleh</th>
+                                </tr>
+                                <tr class="filter-row">
+                                    <th></th><th></th><th></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabel-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="modalEditData" class="modal-overlay">
+        <div class="modal-box" style="max-width: 500px;">
+            <h3 style="border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; color: #059669;">✏️ Edit Relasi Internal</h3>
+            <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 15px;">BPPU: <b id="edit-faktur-title"></b></p>
+            <div class="form-group"><label>Branch / Cabang Baru</label><select id="edit_branch" class="form-select"></select></div>
+            <div class="form-group"><label>No. Internal Tagihan (VAT IN)</label><input type="text" id="edit_invoice" autocomplete="off" placeholder="Ketik No Invoice/Faktur..."></div>
+            <div style="display:flex; gap:10px; margin-top: 20px;">
+                <button class="btn-simpan" style="background-color: #059669; flex: 2;" onclick="submitEdit()">💾 Simpan Perubahan</button>
+                <button class="btn-simpan btn-cancel" style="flex: 1; margin-top:0;" onclick="document.getElementById('modalEditData').style.display='none'">Batal</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
+        let currentUser = {};
+        let targetEditFaktur = '';
+
+        fetch('/api/me').then(res => res.json()).then(u => currentUser = u);
+
+        fetch('/sidebar.html')
+            .then(res => res.text())
+            .then(html => {
+                document.getElementById('sidebar-container').innerHTML = html;
+                const currentPath = window.location.pathname;
+                document.querySelectorAll('.sidebar-link').forEach(link => {
+                    if (link.getAttribute('href') === currentPath) link.classList.add('active');
+                });
+                const sidebarSelect = document.getElementById('global-entity-select');
+                if (sidebarSelect) sidebarSelect.value = aktifEntitas;
+            });
+
+        socket.on('data-baru-payable', () => loadData());
+
+        window.gantiEntitas = function(entitas) {
+            aktifEntitas = entitas;
+            localStorage.setItem('lastEntitas', entitas); 
+            const sidebarSelect = document.getElementById('global-entity-select');
+            if (sidebarSelect && sidebarSelect.value !== entitas) sidebarSelect.value = entitas;
+            loadData();
+        };
+
+        async function loadData() {
+            const res = await fetch('/api/data-payable?entitas=' + aktifEntitas);
+            const data = await res.json();
+            const tbody = document.getElementById('tabel-body');
+            tbody.innerHTML = ''; 
+            const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
+
+            data.forEach((baris, index) => {
+                const tr = document.createElement('tr');
+                let curBr = baris.kode_cabang || '';
+                let curInv = baris.no_invoice_internal || '';
+
+                let btnEdit = `<button class="btn-icon-aksi" title="Edit Data" onclick="handleAction('${baris.no_bppu}', 'EDIT', '${curBr}', '${curInv}')">✏️</button>`;
+                let btnDel  = `<button class="btn-icon-aksi" title="Hapus Data" onclick="handleAction('${baris.no_bppu}', 'DELETE')" style="color:#ef4444;">❌</button>`;
+                let btnPdf = baris.link_pdf_lokal ? `<a href="/${baris.link_pdf_lokal}" target="_blank" class="btn-icon-edit" style="text-decoration:none; color:white; background:#059669; padding:5px 10px; border-radius:4px; font-size: 0.8rem;">📄 Arsip</a>` : `-`;
+
+                tr.innerHTML = `
+                    <td class="text-center">${index + 1}</td>
+                    <td class="text-center">${btnEdit} ${btnDel}</td>
+                    <td class="text-center">${btnPdf}</td>
+                    <td class="text-center"><span class="badge-role">${baris.nama_cabang || baris.kode_cabang || '-'}</span></td>
+                    <td class="text-center"><span class="badge-success">${baris.masa_pajak || '-'}</span></td>
+                    <td class="text-bold">${baris.nama_dipotong || '-'}</td>
+                    <td class="text-center" style="color:#059669; font-weight:bold;">${baris.no_bppu || '-'}</td>
+                    <td class="text-right">${formatRupiah(baris.dpp)}</td>
+                    <td class="text-center">${baris.tarif}%</td>
+                    <td class="text-right" style="font-weight:600; color:#059669;">${formatRupiah(baris.nilai_pph)}</td>
+                    <td class="text-center">${baris.no_invoice_internal || '-'}</td>
+                    <td class="text-center">${baris.diinput_oleh || '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            jalankanFilterTabel();
+        }
+
+        async function handleAction(noBppu, actionType, curCabang = '', curInvoice = '') {
+            const userRole = currentUser.role ? currentUser.role.toLowerCase() : '';
+            const isSupervisor = ['supervisor', 'administrator'].includes(userRole);
+            
+            if (actionType === 'DELETE') {
+                if(confirm(isSupervisor ? `Konfirmasi HAPUS BPPU ${noBppu}?` : `Ajukan penghapusan BPPU ${noBppu} ke Supervisor?`)) {
+                    socket.emit('request-action-faktur', { action: 'DELETE', mod: 'payable', faktur: noBppu, id_user: currentUser.id, username: currentUser.username, role: currentUser.role });
+                    if(!isSupervisor) alert("Permintaan hapus diajukan.");
+                }
+            } 
+            else if (actionType === 'EDIT') {
+                targetEditFaktur = noBppu;
+                document.getElementById('edit-faktur-title').innerText = noBppu;
+                document.getElementById('edit_invoice').value = (curInvoice === '-' || curInvoice === 'null') ? '' : curInvoice;
+                
+                const res = await fetch('/api/branches?entitas=' + aktifEntitas);
+                const branches = await res.json();
+                const select = document.getElementById('edit_branch');
+                
+                select.disabled = false; select.style.backgroundColor = '#fff';
+                select.innerHTML = '<option value="">-- Pilih Branch --</option>';
+                branches.forEach(b => {
+                    let isSelected = (b.kode_cabang === curCabang) ? 'selected' : '';
+                    select.innerHTML += `<option value="${b.kode_cabang}" ${isSelected}>${b.kode_cabang} - ${b.nama_cabang}</option>`;
+                });
+                document.getElementById('modalEditData').style.display = 'flex';
+            }
+        }
+
+        function submitEdit() {
+            const isSupervisor = currentUser.role && ['supervisor', 'administrator'].includes(currentUser.role.toLowerCase());
+            const branch = document.getElementById('edit_branch').value;
+            const invoice = document.getElementById('edit_invoice').value;
+
+            if (!branch) return alert("Branch wajib diisi!");
+            socket.emit('request-action-faktur', { action: 'EDIT', mod: 'payable', faktur: targetEditFaktur, id_user: currentUser.id, username: currentUser.username, role: currentUser.role, newData: { branch, invoice, tanggal: '-' } });
+            document.getElementById('modalEditData').style.display = 'none';
+            if(!isSupervisor) alert("Permintaan Edit diajukan ke Panel Approval.");
+        }
+
+        function jalankanFilterTabel() {
+            const filters = document.querySelectorAll('.filter-input');
+            const rows = document.querySelectorAll('#tabel-body tr');
+            let isAnyFilterActive = false;
+
+            rows.forEach(row => {
+                let isMatch = true;
+                filters.forEach((input, index) => {
+                    const filterValue = input.value.toLowerCase();
+                    if (filterValue) {
+                        isAnyFilterActive = true;
+                        const colIndex = index + 3; 
+                        const cellText = row.cells[colIndex] ? row.cells[colIndex].innerText.toLowerCase() : "";
+                        if (!cellText.includes(filterValue)) isMatch = false;
+                    }
+                });
+                row.style.display = isMatch ? '' : 'none';
+            });
+            document.getElementById('btnHapusFilter').style.display = isAnyFilterActive ? 'inline-block' : 'none';
+        }
+
+        function resetSemuaFilter() {
+            document.querySelectorAll('.filter-input').forEach(input => input.value = '');
+            jalankanFilterTabel();
+        }
+
+        document.addEventListener('input', function(e) {
+            if (e.target.classList.contains('filter-input')) jalankanFilterTabel();
+        });
+
+        loadData();
+    </script>
+</body>
+</html>

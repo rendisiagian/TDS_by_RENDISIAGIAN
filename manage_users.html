@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel Approval & Manajemen Akun</title>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+    <div class="app-wrapper">
+        <div id="sidebar-container"></div>
+
+        <main class="main-content">
+            <header class="header">
+                <h2>Panel Kendali (Supervisor & Administrator)</h2>
+                <div class="user-profile">
+                    <span id="user-name-display"></span>
+                    <a href="/logout" class="btn-logout">Logout</a>
+                </div>
+            </header>
+
+            <div class="container">
+                <div class="card mb-2rem">
+                    <div class="card-header-padding">
+                        <h3 class="title-pending">Daftar Menunggu Persetujuan (Pending Requests)</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="col-aksi text-center">Aksi</th>
+                                    <th class="text-center">Waktu Pengajuan</th>
+                                    <th class="text-center">Oleh User</th>
+                                    <th>Detail Perubahan</th>
+                                    <th class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabel-pending">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="admin-section" class="d-none">
+                    <div class="flex-container-gap">
+                        <div class="card flex-1-p20">
+                            <h3 class="title-primary">Buat Pengguna Baru</h3>
+                            <div class="form-group">
+                                <label>Username Login</label>
+                                <input type=\"text\" id=\"new_username\" autocomplete=\"off\">
+                            </div>
+                            <div class="form-group">
+                                <label>Nama Lengkap</label>
+                                <input type=\"text\" id=\"new_nama\" autocomplete=\"off\">
+                            </div>
+                            <div class="form-group">
+                                <label>Role / Hak Akses</label>
+                                <select id=\"new_role\" class=\"form-select\">
+                                    <option value=\"admin\">Admin (Input & Ekstraksi)</option>
+                                    <option value=\"supervisor\">Supervisor (Checker & Eksekutor)</option>
+                                    <option value=\"administrator\">Administrator (Super User)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Password Default</label>
+                                <input type=\"password\" id=\"new_password\">
+                            </div>
+                            <button class="btn-simpan btn-manage" onclick=\"tambahUser()\">➕ Tambahkan Akun</button>
+                        </div>
+
+                        <div class="card flex-2">
+                            <div class="card-header-padding" style="padding-top:0;">
+                                <h3 class="title-success">Daftar Pengguna Sistem</h3>
+                            </div>
+                            <div class="table-responsive">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Username</th>
+                                            <th>Nama Lengkap</th>
+                                            <th>Role</th>
+                                            <th>Aksi Admin</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id=\"tabel-users\"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentUser = {};
+
+        // Sinkronisasi Sidebar
+        let aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
+        fetch('/sidebar.html')
+            .then(res => res.text())
+            .then(html => {
+                document.getElementById('sidebar-container').innerHTML = html;
+                const currentPath = window.location.pathname;
+                document.querySelectorAll('.sidebar-link').forEach(link => {
+                    if (link.getAttribute('href') === currentPath) link.classList.add('active');
+                });
+                const sidebarSelect = document.getElementById('global-entity-select');
+                if (sidebarSelect) sidebarSelect.value = aktifEntitas;
+            });
+
+        window.gantiEntitas = function(entitas) {
+            localStorage.setItem('lastEntitas', entitas);
+            const sidebarSelect = document.getElementById('global-entity-select');
+            if (sidebarSelect) sidebarSelect.value = entitas;
+        };
+
+        function isSuperAdmin(role) {
+            if (!role) return false;
+            return ['administrator', 'superadmin', 'super admin'].includes(role.toLowerCase());
+        }
+
+        async function initPage() {
+            const res = await fetch('/api/me');
+            currentUser = await res.json();
+            document.getElementById('user-name-display').innerText = currentUser.nama || currentUser.username;
+
+            if (isSuperAdmin(currentUser.role)) {
+                document.getElementById('admin-section').classList.remove('d-none');
+                loadUsers();
+            }
+            loadPendingRequests();
+        }
+
+        async function loadPendingRequests() {
+            const res = await fetch('/api/pending-requests');
+            const data = await res.json();
+            const tbody = document.getElementById('tabel-pending');
+            tbody.innerHTML = '';
+
+            if(data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center" style="padding: 20px; color:#64748b;">Tidak ada permintaan persetujuan saat ini.</td></tr>`;
+                return;
+            }
+
+            data.forEach(req => {
+                const tr = document.createElement('tr');
+                
+                let btnAksi = `
+                    <button class="btn-aksi btn-verify" title="Setujui" onclick="prosesRequest('${req.id}', 'Setuju')">✅</button>
+                    <button class="btn-aksi btn-reject" title="Tolak" onclick="prosesRequest('${req.id}', 'Tolak')">❌</button>
+                `;
+
+                // LOGIKA CERDAS: Menerjemahkan Data JSON menjadi Rincian yang Mudah Dibaca
+                let detailText = '';
+                
+                if (req.jenis_request.startsWith('EDIT_')) {
+                    try {
+                        let val = JSON.parse(req.nilai_baru);
+                        let targetMod = req.jenis_request.replace('EDIT_', '');
+                        let isBPPU = (targetMod === 'PAYABLE' || targetMod === 'PREPAID');
+                        let docLabel = isBPPU ? 'No. BPPU' : 'No. Faktur';
+
+                        detailText = `
+                            <div style="font-size:0.85rem; background:#f8fafc; padding:10px; border-radius:6px; border:1px solid #cbd5e1; line-height: 1.6;">
+                                <div style="margin-bottom: 5px;"><b style="color:#2563eb; background:#eff6ff; padding: 2px 6px; border-radius: 4px;">Modul: ${targetMod}</b></div>
+                                <b>${docLabel}:</b> <span style="font-family: monospace; font-size: 0.9rem;">${val.faktur}</span><br>
+                                <span style="color:#059669;"><b>Ubah Branch ➔</b> ${val.branch || '-'}</span><br>
+                                <span style="color:#059669;"><b>Ubah Invoice ➔</b> ${val.invoice || '-'}</span>
+                                ${!isBPPU ? `<br><span style="color:#059669;"><b>Ubah Tgl Tukar ➔</b> ${val.tanggal || '-'}</span>` : ''}
+                            </div>
+                        `;
+                    } catch(e) {
+                        detailText = `<span style="color:#ef4444;">Format data tidak dikenali.</span>`;
+                    }
+                } 
+                else if (req.jenis_request.startsWith('HAPUS_')) {
+                    let targetMod = req.jenis_request.replace('HAPUS_', '');
+                    detailText = `
+                        <div style="font-size:0.85rem; background:#fef2f2; padding:10px; border-radius:6px; border:1px solid #fecaca; line-height: 1.6;">
+                            <span style="color:#b91c1c; font-weight:bold;">⚠️ Permintaan Penghapusan Dokumen!</span><br>
+                            <b>Modul:</b> ${targetMod}<br>
+                            <b>Nomor Dokumen:</b> <span style="font-family: monospace;">${req.nilai_baru}</span>
+                        </div>
+                    `;
+                } 
+                else if (req.jenis_request === 'NAMA') {
+                    detailText = `Ubah Nama Lengkap menjadi: <b style="color:#059669;">${req.nilai_baru}</b>`;
+                } 
+                else if (req.jenis_request === 'PASSWORD') {
+                    detailText = `<span class="text-protected" style="background:#f1f5f9; padding: 4px 8px; border-radius: 4px;"><i>🔐 Mengajukan Perubahan Password</i></span>`;
+                } 
+                else {
+                    detailText = req.nilai_baru;
+                }
+
+                tr.innerHTML = `
+                    <td class="text-center">${btnAksi}</td>
+                    <td class="text-center" style="font-size: 0.8rem; color: #64748b;">${req.waktu_format}</td>
+                    <td class="text-center"><span style="font-weight:600; color:#0f172a;">${req.username}</span></td>
+                    <td style="min-width: 250px;">${detailText}</td>
+                    <td class="text-center"><span class="badge-pending-edit">Menunggu</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function prosesRequest(idReq, action) {
+            if(confirm(`Yakin ingin ${action.toUpperCase()} permintaan ini?`)) {
+                socket.emit('proses-request', { req_id: idReq, action: action });
+            }
+        }
+
+        // --- FUNGSI MANAJEMEN AKUN (SUPER ADMIN) ---
+        async function loadUsers() {
+            const res = await fetch('/api/users');
+            const data = await res.json();
+            const tbody = document.getElementById('tabel-users');
+            tbody.innerHTML = '';
+            
+            data.forEach(u => {
+                const tr = document.createElement('tr');
+                let aksiBtn = isSuperAdmin(u.role) ? `<span class=\"text-protected\" style="font-size:0.75rem; font-weight:bold;">🛡️ Protected</span>` : `<button class=\"btn-aksi btn-reset-pass\" onclick=\"resetPassword('${u.id}', '${u.username}')\">🔑 Reset Pass</button>`;
+                
+                let roleColor = u.role === 'supervisor' ? '#f59e0b' : (u.role === 'admin' ? '#2563eb' : '#0f172a');
+
+                tr.innerHTML = `
+                    <td class="text-center">${u.id}</td>
+                    <td class=\"text-bold\">${u.username}</td>
+                    <td>${u.nama_lengkap}</td>
+                    <td class="text-center"><span class=\"badge-role\" style="background:#f8fafc; border:1px solid #e2e8f0; color:${roleColor};">${u.role.toUpperCase()}</span></td>
+                    <td class="text-center">${aksiBtn}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function tambahUser() {
+            const user = document.getElementById('new_username').value;
+            const nama = document.getElementById('new_nama').value;
+            const role = document.getElementById('new_role').value;
+            const pass = document.getElementById('new_password').value;
+
+            if(!user || !nama || !pass) return alert("Harap isi seluruh kolom dengan lengkap!");
+            
+            socket.emit('tambah-user', { username: user, nama: nama, role: role, password: pass });
+            document.querySelectorAll('#admin-section input').forEach(i => i.value='');
+            alert("Pengguna baru berhasil ditambahkan!");
+        }
+
+        function resetPassword(id, username) {
+            const newPass = prompt(`Masukkan password baru untuk akun '${username}':`);
+            if (newPass) {
+                socket.emit('reset-password-user', { user_id: id, new_password: newPass });
+                alert("Password berhasil direset!");
+            }
+        }
+
+        // Inisialisasi awal
+        initPage();
+
+        // Listeners dari Server
+        socket.on('request-updated', () => loadPendingRequests());
+        socket.on('users-updated', () => { if (isSuperAdmin(currentUser.role)) loadUsers(); });
+    </script>
+</body>
+</html>

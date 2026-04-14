@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Bank Data VAT OUT | Tax Upload and Database</title>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <style>
+        .item-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.75rem; }
+        .item-table th, .item-table td { border: 1px solid #cbd5e1; padding: 6px; }
+        .item-table th { background-color: #e2e8f0; color: #1e293b; font-weight: bold; text-align: center; }
+        .item-table td { background-color: #f8fafc; }
+        .modal-box-scroll { max-height: 90vh; overflow-y: auto; }
+        .btn-clear-filter { background-color: #ef4444; color: white; border: none; padding: 6px 15px; border-radius: 5px; font-size: 0.85rem; cursor: pointer; display: none; font-weight: bold; }
+        .btn-clear-filter:hover { background-color: #dc2626; }
+    </style>
+</head>
+<body>
+
+    <div class="app-wrapper">
+        <div id="sidebar-container"></div>
+
+        <main class="main-content">
+            <header class="header" style="background-color: #ea580c;">
+                <h2 style="color: white;">📥 Bank Data VAT OUT (Antrean Tagihan Client)</h2>
+                <div class="user-profile"><a href="/dashboard-vatout" class="nav-back-link" style="color: white;">← Kembali</a></div>
+            </header>
+
+            <div class="container">
+                <div class="card">
+                    <div class="card-header-padding" style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3 class="title-primary" style="border-left-color: #ea580c; margin: 0;">Daftar Antrean Faktur Keluaran</h3>
+                        
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">🗑️ Hapus Filter</button>
+                            <button class="btn-simpan" style="margin:0; background-color: #ea580c;" onclick="document.getElementById('filePdfUpload').click()">
+                                📁 Upload Bulk PDF Faktur
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table id="tabel-inbox-induk">
+                            <thead>
+                                <tr>
+                                    <th class="text-center" style="width: 40px;">No.</th>
+                                    <th class="text-center">No. Faktur</th>
+                                    <th>Nama Client (Pembeli)</th>
+                                    <th class="text-right">DPP (Rp)</th>
+                                    <th class="text-right">PPN (Rp)</th>
+                                    <th class="text-center">Status Arsip</th>
+                                    <th class="text-center">Aksi</th>
+                                </tr>
+                                <tr class="filter-row">
+                                    <th></th>
+                                    <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari Faktur..."></th>
+                                    <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari Client..."></th>
+                                    <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari DPP..."></th>
+                                    <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari PPN..."></th>
+                                    <th></th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabel-inbox"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="modalReviewPDF" class="modal-overlay">
+        <div class="modal-box modal-box-scroll" style="max-width: 900px;">
+            <h3 style="color:#ea580c; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">📋 Informasi Lengkap Faktur Keluaran</h3>
+            
+            <h4 style="margin-top:15px; color:#475569; font-size:0.9rem; margin-bottom: 5px;">A. Data Faktur & Pihak Pembeli</h4>
+            <div class="grid-2-col">
+                <div class="form-group"><label>Nomor Faktur</label><input type="text" id="rev_faktur" readonly style="background:#f1f5f9; font-weight:bold;"></div>
+                <div class="form-group"><label>Tanggal Faktur</label><input type="text" id="rev_tanggal" readonly style="background:#f1f5f9;"></div>
+                <div class="form-group"><label>Nama Client (Pembeli)</label><input type="text" id="rev_client" readonly style="background:#f1f5f9;"></div>
+                <div class="form-group"><label>NPWP Client</label><input type="text" id="rev_npwp" readonly style="background:#f1f5f9;"></div>
+                <div class="form-group" style="grid-column: span 2;"><label>Alamat Lengkap</label><input type="text" id="rev_alamat" readonly style="background:#f1f5f9; font-size:0.8rem;"></div>
+            </div>
+
+            <h4 style="margin-top:10px; color:#475569; font-size:0.9rem; margin-bottom: 5px;">B. Rincian Item Barang / Jasa</h4>
+            <table class="item-table">
+                <thead>
+                    <tr>
+                        <th style="width: 5%;">No</th>
+                        <th style="width: 40%;">Nama Barang / Jasa</th>
+                        <th style="width: 15%;">Harga Satuan (Rp)</th>
+                        <th style="width: 10%;">Qty</th>
+                        <th style="width: 15%;">Diskon (Rp)</th>
+                        <th style="width: 15%;">Total (Rp)</th>
+                    </tr>
+                </thead>
+                <tbody id="tabel-items-modal">
+                </tbody>
+            </table>
+
+            <h4 style="margin-top:20px; color:#475569; font-size:0.9rem; margin-bottom: 5px;">C. Rekapitulasi Nilai & Pengesahan</h4>
+            <div class="grid-2-col">
+                <div class="form-group"><label>Potongan Harga Total (Rp)</label><input type="text" id="rev_diskon_total" readonly style="background:#f1f5f9;"></div>
+                <div class="form-group"><label>Uang Muka / DP (Rp)</label><input type="text" id="rev_dp" readonly style="background:#f1f5f9;"></div>
+                <div class="form-group"><label>DPP (Rp)</label><input type="text" id="rev_dpp" readonly style="background:#f1f5f9; font-weight:bold;"></div>
+                <div class="form-group"><label>PPN (Rp)</label><input type="text" id="rev_ppn" readonly style="background:#fff7ed; font-weight:bold; color:#ea580c;"></div>
+                <div class="form-group"><label>Referensi / PO</label><input type="text" id="rev_ref" readonly style="background:#f1f5f9;"></div>
+                <div class="form-group"><label>Kota & Penandatangan</label><input type="text" id="rev_kota_ttd" readonly style="background:#f1f5f9;"></div>
+            </div>
+            
+            <div style="border-top: 2px dashed #cbd5e1; margin: 20px 0;"></div>
+            <h4 style="color:#1e293b; font-size:0.95rem; margin-bottom: 10px;">D. Lengkapi Relasi Internal</h4>
+            
+            <div class="form-group"><label>Branch / Cabang Internal</label><select id="input_branch_baru" class="form-select"></select></div>
+            <div class="form-group"><label>Nomor Invoice Internal / Tagihan</label><input type="text" id="input_invoice_baru" autocomplete="off" placeholder="Wajib untuk relasi Prepaid!"></div>
+            
+            <div style="display:flex; gap:10px; margin-top: 15px;">
+                <button class="btn-simpan" style="background-color: #ea580c; flex: 2;" onclick="simpanFinalVatout()">💾 Simpan & Rilis Data</button>
+                <button class="btn-simpan btn-cancel" style="flex: 1; margin-top:0;" onclick="document.getElementById('modalReviewPDF').style.display='none'">Batal</button>
+            </div>
+        </div>
+    </div>
+
+    <input type="file" id="filePdfUpload" accept="application/pdf" multiple class="d-none">
+
+    <script>
+        const socket = io();
+        let currentUserName = "Admin", aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS', tempDataFinal = {}; 
+        let dataInboxLokal = [];
+
+        let uploadStats = { isActive: false, totalFiles: 0, chunksTotal: 0, chunksDone: 0, sukses: 0, duplikat: 0, gagal: 0 };
+
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        fetch('/sidebar.html').then(res => res.text()).then(html => { 
+            document.getElementById('sidebar-container').innerHTML = html; 
+            const sidebarSelect = document.getElementById('global-entity-select');
+            if (sidebarSelect) sidebarSelect.value = aktifEntitas;
+        });
+
+        fetch('/api/me').then(res => res.json()).then(user => { if(user.nama) currentUserName = user.nama; });
+
+        // Fungsi Sinkronisasi Entitas
+        window.gantiEntitas = function(entitas) {
+            aktifEntitas = entitas;
+            localStorage.setItem('lastEntitas', entitas);
+            const sidebarSelect = document.getElementById('global-entity-select');
+            if (sidebarSelect && sidebarSelect.value !== entitas) sidebarSelect.value = entitas;
+            loadInbox(); // Reload data tabel sesuai entitas
+        };
+
+        async function loadInbox() {
+            const res = await fetch('/api/inbox-vatout');
+            const data = await res.json();
+            dataInboxLokal = data;
+
+            const tbody = document.getElementById('tabel-inbox');
+            tbody.innerHTML = '';
+            const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
+
+            // Logika Penyaringan Data berdasarkan Entitas Aktif
+            const filteredData = data.filter(row => row.entitas === aktifEntitas);
+
+            filteredData.forEach((row, index) => {
+                const tr = document.createElement('tr');
+                let parsed = {};
+                try { parsed = JSON.parse(row.data_ekstraksi); } catch(e) {}
+
+                tr.innerHTML = `
+                    <td class="text-center">${index + 1}</td>
+                    <td class="text-center font-bold" style="color:#ea580c;">${parsed.noFaktur || '-'}</td>
+                    <td>${parsed.namaPembeli || '-'}</td>
+                    <td class="text-right">${formatRupiah(parsed.dpp || 0)}</td>
+                    <td class="text-right">${formatRupiah(parsed.ppn || 0)}</td>
+                    <td class="text-center"><span style="color:green;">✔ Tersimpan Lokal</span></td>
+                    <td class="text-center">
+                        <button class="btn-aksi btn-verify" style="background-color: #ea580c;" onclick="bukaJalurManual('${row.id}')">📝 Lengkapi</button>
+                        <button class="btn-aksi btn-reject" style="margin-left:10px;" onclick="hapusInbox('${row.id}')">🗑️ Hapus</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            jalankanFilterInbox();
+        }
+
+        function hapusInbox(id) {
+            if(confirm("Yakin ingin menghapus antrean Faktur Keluaran ini beserta file PDF fisiknya?")) {
+                socket.emit('hapus-inbox-vatout', id);
+            }
+        }
+
+        socket.on('upload-batch-selesai', (res) => {
+            if (res.modul === 'VAT OUT' && uploadStats.isActive) {
+                uploadStats.sukses += res.sukses;
+                uploadStats.duplikat += res.duplikat;
+                uploadStats.gagal += res.gagal;
+                uploadStats.chunksDone++;
+
+                if (uploadStats.chunksDone === uploadStats.chunksTotal) {
+                    uploadStats.isActive = false; 
+                    alert(`✅ PROSES UPLOAD SEMUA SELESAI!\n\nTotal Dibaca: ${uploadStats.totalFiles} Dokumen\nBerhasil Masuk Antrean: ${uploadStats.sukses}\nLewati (Sudah Ada/Duplikat): ${uploadStats.duplikat}\nGagal (Format Salah/Beda PT): ${uploadStats.gagal}`);
+                }
+            }
+        });
+
+        document.getElementById('filePdfUpload').addEventListener('change', async function(e) {
+            const files = e.target.files;
+            if (files.length === 0) return;
+            alert(`Memproses ekstraksi ${files.length} file PDF.\n\nKarena jumlah file banyak, sistem akan membaginya ke dalam beberapa tahap agar browser tidak hang. Mohon tunggu Notifikasi Selesai!`);
+
+            const chunkSize = 5; 
+            uploadStats = { isActive: true, totalFiles: files.length, chunksTotal: Math.ceil(files.length / chunkSize), chunksDone: 0, sukses: 0, duplikat: 0, gagal: 0 };
+
+            for (let i = 0; i < files.length; i += chunkSize) {
+                let payloadFiles = [];
+                let chunk = Array.from(files).slice(i, i + chunkSize);
+
+                for (let file of chunk) {
+                    try {
+                        const arrayBuffer = await file.arrayBuffer();
+                        const loadingTask = pdfjsLib.getDocument(new Uint8Array(arrayBuffer));
+                        const pdf = await loadingTask.promise;
+                        
+                        let fullText = "";
+                        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                            const page = await pdf.getPage(pageNum);
+                            const textContent = await page.getTextContent();
+                            fullText += textContent.items.map(item => item.str).join(" ") + " ";
+                        }
+                        loadingTask.destroy(); 
+                        payloadFiles.push({ teksPDF: fullText, fileBuffer: arrayBuffer });
+                    } catch(err) {
+                        payloadFiles.push({ teksPDF: "ERROR", fileBuffer: await file.arrayBuffer() });
+                    }
+                }
+                socket.emit('upload-pdf-vatout-batch', { entitas: aktifEntitas, username: currentUserName, files: payloadFiles });
+            }
+            this.value = ''; 
+        });
+
+        async function bukaJalurManual(idStr) {
+            const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
+            const rowData = dataInboxLokal.find(r => r.id == idStr);
+            if(!rowData) return alert("Data tidak ditemukan!");
+
+            let parsed = JSON.parse(rowData.data_ekstraksi);
+            tempDataFinal = parsed; tempDataFinal.id_link = idStr; tempDataFinal.username = currentUserName;
+            
+            document.getElementById('rev_faktur').value = parsed.noFaktur || '-';
+            document.getElementById('rev_tanggal').value = parsed.tanggalFaktur || '-';
+            document.getElementById('rev_client').value = parsed.namaPembeli || '-';
+            document.getElementById('rev_npwp').value = parsed.npwpPembeli || '-';
+            document.getElementById('rev_alamat').value = parsed.alamatPembeli || '-';
+            document.getElementById('rev_diskon_total').value = formatRupiah(parsed.diskon || 0);
+            document.getElementById('rev_dp').value = formatRupiah(parsed.uangMuka || 0);
+            document.getElementById('rev_dpp').value = formatRupiah(parsed.dpp || 0);
+            document.getElementById('rev_ppn').value = formatRupiah(parsed.ppn || 0);
+            document.getElementById('rev_ref').value = parsed.referensi || '-';
+            document.getElementById('rev_kota_ttd').value = `${parsed.kotaPenerbit || '-'} | ${parsed.penandatangan || '-'}`;
+
+            const tbodyItems = document.getElementById('tabel-items-modal');
+            tbodyItems.innerHTML = '';
+            if(parsed.items && parsed.items.length > 0) {
+                parsed.items.forEach(it => {
+                    tbodyItems.innerHTML += `<tr><td class="text-center">${it.no}</td><td style="white-space: normal;"><b>${it.kode}</b> - ${it.nama_barang}</td><td class="text-right">${formatRupiah(it.harga_satuan)}</td><td class="text-center">${it.qty} ${it.satuan}</td><td class="text-right">${formatRupiah(it.diskon)}</td><td class="text-right" style="font-weight:bold;">${formatRupiah(it.total_harga)}</td></tr>`;
+                });
+            } else {
+                tbodyItems.innerHTML = `<tr><td colspan="6" class="text-center" style="color:#64748b;">Tidak ada rincian item terbaca.</td></tr>`;
+            }
+            
+            const res = await fetch('/api/branches?entitas=' + rowData.entitas);
+            const branches = await res.json();
+            const select = document.getElementById('input_branch_baru');
+
+            if (rowData.entitas === 'JO') {
+                select.innerHTML = '<option value="Berca JO" selected>Berca JO</option>';
+                select.disabled = true; select.style.backgroundColor = '#f1f5f9'; 
+            } else {
+                select.disabled = false; select.style.backgroundColor = '#fff';
+                select.innerHTML = '<option value="">-- Pilih Branch --</option>';
+                branches.forEach(b => select.innerHTML += `<option value="${b.kode_cabang}">${b.kode_cabang} - ${b.nama_cabang}</option>`);
+            }
+            document.getElementById('modalReviewPDF').style.display = 'flex';
+        }
+
+        function simpanFinalVatout() {
+            tempDataFinal.invoiceInput = document.getElementById('input_invoice_baru').value;
+            tempDataFinal.tglTukarInput = "-"; 
+            tempDataFinal.branchInput = document.getElementById('input_branch_baru').value;
+            tempDataFinal.username = currentUserName;
+
+            if (!tempDataFinal.branchInput) return alert("Branch wajib diisi!");
+            if (!tempDataFinal.invoiceInput) return alert("Nomor Invoice wajib diisi agar bisa ditarik oleh modul Prepaid!");
+
+            socket.emit('simpan-final-vatout', tempDataFinal);
+            document.getElementById('modalReviewPDF').style.display = 'none';
+        }
+
+        function jalankanFilterInbox() {
+            const filters = document.querySelectorAll('.filter-input-inbox');
+            const rows = document.querySelectorAll('#tabel-inbox tr');
+            let isAnyFilterActive = false;
+
+            rows.forEach(row => {
+                let isMatch = true;
+                filters.forEach((input, index) => {
+                    const filterValue = input.value.toLowerCase();
+                    if (filterValue) {
+                        isAnyFilterActive = true;
+                        const cellIndex = index + 1;
+                        const cellText = row.cells[cellIndex] ? row.cells[cellIndex].innerText.toLowerCase() : "";
+                        if (!cellText.includes(filterValue)) isMatch = false;
+                    }
+                });
+                row.style.display = isMatch ? '' : 'none';
+            });
+            document.getElementById('btnHapusFilter').style.display = isAnyFilterActive ? 'inline-block' : 'none';
+        }
+
+        function resetSemuaFilter() {
+            document.querySelectorAll('.filter-input-inbox').forEach(input => input.value = '');
+            jalankanFilterInbox();
+        }
+
+        document.addEventListener('input', function(e) {
+            if (e.target.classList.contains('filter-input-inbox')) jalankanFilterInbox();
+        });
+
+        socket.on('update-tabel-vatout', () => loadInbox());
+        loadInbox();
+    </script>
+</body>
+</html>

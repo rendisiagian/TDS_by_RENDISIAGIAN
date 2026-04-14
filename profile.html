@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Profil Saya</title>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="app-wrapper">
+        <div id="sidebar-container"></div>
+        <main class="main-content">
+            <header class="header"><h2>Pengaturan Profil Akun</h2></header>
+
+            <div class="container flex-container-gap">
+                <div class="card flex-1-p20">
+                    <h3 class="mb-15px">Ajukan Perubahan Data</h3>
+                    <div class="form-group">
+                        <label>Jenis Perubahan</label>
+                        <select id="jenis_req" class="form-select">
+                            <option value="NAMA">Ubah Nama Lengkap</option>
+                            <option value="PASSWORD">Ubah Password</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Nilai / Data Baru</label>
+                        <input type="text" id="nilai_baru" placeholder="Ketik data baru..." autocomplete="off">
+                    </div>
+                    <button id="btn-ajukan" class="btn-simpan" onclick="ajukanPerubahan()">Ajukan ke Administrator</button>
+                </div>
+
+                <div class="card flex-2">
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr><th>Waktu Pengajuan</th><th>Tipe Request</th><th>Status Approval</th></tr>
+                            </thead>
+                            <tbody id="tabel-riwayat"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentUser = {};
+
+        fetch('/sidebar.html').then(res => res.text()).then(html => {
+            document.getElementById('sidebar-container').innerHTML = html;
+            document.querySelectorAll('.sidebar-link').forEach(l => { if(l.getAttribute('href') === window.location.pathname) l.classList.add('active'); });
+        });
+
+        async function initProfile() {
+            const res = await fetch('/api/me');
+            currentUser = await res.json();
+            loadRiwayat();
+            if (['administrator', 'superadmin', 'super admin'].includes(currentUser.role.toLowerCase())) {
+                document.getElementById('btn-ajukan').innerText = "Simpan Perubahan";
+            }
+        }
+
+        function ajukanPerubahan() {
+            const jenis = document.getElementById('jenis_req').value;
+            const nilai = document.getElementById('nilai_baru').value;
+            if(!nilai) return alert("Data baru tidak boleh kosong!");
+            socket.emit('ajukan-perubahan', { id_user: currentUser.id, username: currentUser.username, jenis: jenis, nilai_baru: nilai });
+            document.getElementById('nilai_baru').value = '';
+            alert(isSuperAdmin(currentUser.role) ? "Tersimpan!" : "Diajukan ke Admin!");
+        }
+
+        function isSuperAdmin(role) { return ['administrator', 'superadmin', 'super admin'].includes(role.toLowerCase()); }
+
+        async function loadRiwayat() {
+            const res = await fetch('/api/my-requests');
+            const data = await res.json();
+            const tbody = document.getElementById('tabel-riwayat');
+            tbody.innerHTML = '';
+            data.forEach(req => {
+                const tr = document.createElement('tr');
+                let statusClass = req.status === 'Pending' ? 'status-pending-text' : (req.status === 'Disetujui' ? 'status-approved-text' : 'status-rejected-text');
+                tr.innerHTML = `<td>${req.waktu_format}</td><td class="text-bold">Ubah ${req.jenis_request}</td><td class="status-text ${statusClass}">${req.status}</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+        initProfile();
+        socket.on('request-updated', () => loadRiwayat());
+    </script>
+</body>
+</html>

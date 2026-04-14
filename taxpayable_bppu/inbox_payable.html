@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Bank Data Tax Payable | Tax Upload and Database</title>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <style>
+        .item-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.75rem; }
+        .item-table th, .item-table td { border: 1px solid #cbd5e1; padding: 6px; }
+        .item-table th { background-color: #e2e8f0; color: #1e293b; font-weight: bold; text-align: center; }
+        .item-table td { background-color: #f8fafc; }
+        .modal-box-scroll { max-height: 90vh; overflow-y: auto; }
+        .btn-clear-filter { background-color: #ef4444; color: white; border: none; padding: 6px 15px; border-radius: 5px; font-size: 0.85rem; cursor: pointer; display: none; font-weight: bold; }
+        .btn-clear-filter:hover { background-color: #dc2626; }
+        .checkbox-container { max-height: 150px; overflow-y: auto; border: 1px solid #cbd5e1; padding: 10px; border-radius: 4px; background: #f8fafc; margin-bottom: 10px; }
+        .checkbox-item { display: block; margin-bottom: 6px; font-size: 0.85rem; cursor: pointer; }
+        .checkbox-item input { margin-right: 8px; }
+    </style>
+</head>
+<body>
+
+    <div class="app-wrapper">
+        <div id="sidebar-container"></div>
+
+        <main class="main-content">
+            <header class="header" style="background-color: #059669;">
+                <h2 style="color: white;">📥 Bank Data Tax Payable (BPPU Potong Vendor)</h2>
+                <div class="user-profile"><a href="/dashboard-payable" class="nav-back-link" style="color: white;">← Kembali</a></div>
+            </header>
+
+            <div class="container">
+                <div class="card">
+                    <div class="card-header-padding" style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3 class="title-primary" style="border-left-color: #059669; margin: 0;">Daftar Antrean Bukti Potong</h3>
+                        
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">🗑️ Hapus Filter</button>
+                            <button class="btn-simpan" style="margin:0; background-color: #059669;" onclick="document.getElementById('filePdfUpload').click()">
+                                📁 Upload Bulk PDF BPPU
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table id="tabel-inbox-induk">
+                            <thead>
+                                <tr>
+                                    <th class="text-center" style="width: 40px;">No.</th>
+                                    <th class="text-center">No. BPPU</th>
+                                    <th>Nama Vendor (Dipotong)</th>
+                                    <th class="text-center">Masa Pajak</th>
+                                    <th class="text-right">DPP (Rp)</th>
+                                    <th class="text-right">PPh (Rp)</th>
+                                    <th class="text-center">Status Arsip</th>
+                                    <th class="text-center">Aksi</th>
+                                </tr>
+                                <tr class="filter-row">
+                                    <th></th>
+                                    <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari BPPU..."></th>
+                                    <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari Vendor..."></th>
+                                    <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari Masa..."></th>
+                                    <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari DPP..."></th>
+                                    <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari PPh..."></th>
+                                    <th></th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabel-inbox"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="modalReviewPDF" class="modal-overlay">
+        <div class="modal-box modal-box-scroll" style="max-width: 800px;">
+            <h3 style="color:#059669; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">📋 Informasi Bukti Potong (Payable)</h3>
+            
+            <h4 style="margin-top:15px; color:#475569; font-size:0.9rem; margin-bottom: 5px;">A. Data Dokumen & Vendor</h4>
+            <div class="grid-2-col">
+                <div class="form-group"><label>Nomor BPPU</label><input type="text" id="rev_bppu" readonly style="background:#f1f5f9; font-weight:bold;"></div>
+                <div class="form-group"><label>Masa Pajak</label><input type="text" id="rev_masa" readonly style="background:#f1f5f9;"></div>
+                <div class="form-group"><label>Nama Vendor (Dipotong)</label><input type="text" id="rev_vendor" readonly style="background:#f1f5f9;"></div>
+                <div class="form-group"><label>NPWP Vendor</label><input type="text" id="rev_npwp" readonly style="background:#f1f5f9;"></div>
+                <div class="form-group"><label>Tanggal Dokumen</label><input type="text" id="rev_tanggal" readonly style="background:#f1f5f9;"></div>
+                <div class="form-group"><label>Kode Objek Pajak</label><input type="text" id="rev_kode" readonly style="background:#f1f5f9;"></div>
+            </div>
+
+            <h4 style="margin-top:20px; color:#475569; font-size:0.9rem; margin-bottom: 5px;">B. Rincian Nilai Pajak</h4>
+            <div class="grid-2-col">
+                <div class="form-group"><label>Dasar Pengenaan Pajak (DPP)</label><input type="text" id="rev_dpp" readonly style="background:#f1f5f9; font-weight:bold;"></div>
+                <div class="form-group"><label>Tarif PPh (%)</label><input type="text" id="rev_tarif" readonly style="background:#f1f5f9;"></div>
+                <div class="form-group" style="grid-column: span 2;"><label>Nilai PPh Dipotong (Rp)</label><input type="text" id="rev_pph" readonly style="background:#f5f3ff; font-weight:bold; color:#7c3aed; font-size: 1.1rem;"></div>
+            </div>
+            
+            <div style="border-top: 2px dashed #cbd5e1; margin: 20px 0;"></div>
+            <h4 style="color:#1e293b; font-size:0.95rem; margin-bottom: 10px;">C. Lengkapi Relasi Internal</h4>
+            
+            <div class="form-group"><label>Branch / Cabang Internal</label><select id="input_branch_baru" class="form-select"></select></div>
+            
+            <div class="form-group">
+                <label>Pilih Faktur Masukan (VAT IN) Terkait BPPU ini</label>
+                <div id="checkbox-vatin-container" class="checkbox-container">
+                    <span style="color:#64748b; font-size:0.8rem;">Memuat daftar Faktur Masukan...</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Atau Input Manual (Ketik No Invoice Internal / Faktur Masukan)</label>
+                <textarea id="input_invoice_baru" rows="2" placeholder="Gunakan opsi ini jika faktur tidak ada di daftar atas. Pisahkan dengan koma jika multi-dokumen (Contoh: INV-001, INV-002)..." style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; resize: vertical;"></textarea>
+            </div>
+            
+            <div style="display:flex; gap:10px; margin-top: 15px;">
+                <button class="btn-simpan" style="background-color: #7c3aed; flex: 2;" onclick="simpanFinalPayable()">💾 Simpan & Rilis Data</button>
+                <button class="btn-simpan btn-cancel" style="flex: 1; margin-top:0;" onclick="document.getElementById('modalReviewPDF').style.display='none'">Batal</button>
+            </div>
+        </div>
+    </div>
+
+    <input type="file" id="filePdfUpload" accept="application/pdf" multiple class="d-none">
+
+    <script>
+        const socket = io();
+        let currentUserName = "Admin", aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS', tempDataFinal = {}; 
+        let dataInboxLokal = [];
+
+        let uploadStats = { isActive: false, totalFiles: 0, chunksTotal: 0, chunksDone: 0, sukses: 0, duplikat: 0, gagal: 0 };
+
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        fetch('/sidebar.html').then(res => res.text()).then(html => { 
+            document.getElementById('sidebar-container').innerHTML = html; 
+            const sidebarSelect = document.getElementById('global-entity-select');
+            if (sidebarSelect) sidebarSelect.value = aktifEntitas;
+        });
+
+        fetch('/api/me').then(res => res.json()).then(user => { if(user.nama) currentUserName = user.nama; });
+
+        // Fungsi Sinkronisasi Entitas
+        window.gantiEntitas = function(entitas) {
+            aktifEntitas = entitas;
+            localStorage.setItem('lastEntitas', entitas);
+            const sidebarSelect = document.getElementById('global-entity-select');
+            if (sidebarSelect && sidebarSelect.value !== entitas) sidebarSelect.value = entitas;
+            loadInbox(); 
+        };
+
+        async function loadInbox() {
+            const res = await fetch('/api/inbox-payable');
+            const data = await res.json();
+            dataInboxLokal = data;
+
+            const tbody = document.getElementById('tabel-inbox');
+            tbody.innerHTML = '';
+            const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
+
+            // Logika Penyaringan Data berdasarkan Entitas Aktif
+            const filteredData = data.filter(row => row.entitas === aktifEntitas);
+
+            filteredData.forEach((row, index) => {
+                const tr = document.createElement('tr');
+                let parsed = {};
+                try { parsed = JSON.parse(row.data_ekstraksi); } catch(e) {}
+
+                tr.innerHTML = `
+                    <td class="text-center">${index + 1}</td>
+                    <td class="text-center font-bold" style="color:#7c3aed;">${parsed.noBppu || '-'}</td>
+                    <td>${parsed.namaDipotong || '-'}</td>
+                    <td class="text-center">${parsed.masaPajak || '-'}</td>
+                    <td class="text-right">${formatRupiah(parsed.dpp || 0)}</td>
+                    <td class="text-right font-bold">${formatRupiah(parsed.pph || 0)}</td>
+                    <td class="text-center"><span style="color:green;">✔ Tersimpan Lokal</span></td>
+                    <td class="text-center">
+                        <button class="btn-aksi btn-verify" style="background-color: #7c3aed;" onclick="bukaJalurManual('${row.id}')">📝 Lengkapi</button>
+                        <button class="btn-aksi btn-reject" style="margin-left:10px;" onclick="hapusInbox('${row.id}')">🗑️ Hapus</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            jalankanFilterInbox();
+        }
+
+        function hapusInbox(id) {
+            if(confirm("Yakin ingin menghapus antrean Bukti Potong Payable ini beserta file PDF fisiknya?")) {
+                socket.emit('hapus-inbox-payable', id);
+            }
+        }
+        
+        socket.on('upload-batch-selesai', (res) => {
+            if (res.modul === 'Tax Payable' && uploadStats.isActive) {
+                uploadStats.sukses += res.sukses;
+                uploadStats.duplikat += res.duplikat;
+                uploadStats.gagal += res.gagal;
+                uploadStats.chunksDone++;
+
+                if (uploadStats.chunksDone === uploadStats.chunksTotal) {
+                    uploadStats.isActive = false; 
+                    alert(`✅ PROSES UPLOAD PAYABLE SELESAI!\n\nTotal Dibaca: ${uploadStats.totalFiles} Dokumen\nBerhasil Masuk Antrean: ${uploadStats.sukses}\nLewati (Sudah Ada/Duplikat): ${uploadStats.duplikat}\nGagal Ekstrak: ${uploadStats.gagal}`);
+                }
+            }
+        });
+
+        document.getElementById('filePdfUpload').addEventListener('change', async function(e) {
+            const files = e.target.files;
+            if (files.length === 0) return;
+
+            alert(`Memproses ekstraksi ${files.length} file PDF Bukti Potong.\n\nSistem membaginya ke dalam beberapa tahap. Mohon tunggu Notifikasi Selesai!`);
+
+            const chunkSize = 5; 
+            uploadStats = { isActive: true, totalFiles: files.length, chunksTotal: Math.ceil(files.length / chunkSize), chunksDone: 0, sukses: 0, duplikat: 0, gagal: 0 };
+
+            for (let i = 0; i < files.length; i += chunkSize) {
+                let payloadFiles = [];
+                let chunk = Array.from(files).slice(i, i + chunkSize);
+
+                for (let file of chunk) {
+                    try {
+                        const arrayBuffer = await file.arrayBuffer();
+                        const loadingTask = pdfjsLib.getDocument(new Uint8Array(arrayBuffer));
+                        const pdf = await loadingTask.promise;
+                        
+                        let fullText = "";
+                        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                            const page = await pdf.getPage(pageNum);
+                            const textContent = await page.getTextContent();
+                            fullText += textContent.items.map(item => item.str).join(" ") + " ";
+                        }
+                        
+                        loadingTask.destroy(); 
+                        payloadFiles.push({ teksPDF: fullText, fileBuffer: arrayBuffer });
+                    } catch(err) {
+                        payloadFiles.push({ teksPDF: "ERROR", fileBuffer: await file.arrayBuffer() });
+                    }
+                }
+
+                socket.emit('upload-pdf-payable-batch', { entitas: aktifEntitas, username: currentUserName, files: payloadFiles });
+            }
+            this.value = ''; 
+        });
+
+        async function bukaJalurManual(idStr) {
+            const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
+            const rowData = dataInboxLokal.find(r => r.id == idStr);
+            if(!rowData) return alert("Data tidak ditemukan!");
+
+            let parsed = JSON.parse(rowData.data_ekstraksi);
+            tempDataFinal = parsed;
+            tempDataFinal.id_link = idStr;
+            tempDataFinal.username = currentUserName;
+            
+            document.getElementById('rev_bppu').value = parsed.noBppu || '-';
+            document.getElementById('rev_masa').value = parsed.masaPajak || '-';
+            document.getElementById('rev_vendor').value = parsed.namaDipotong || '-';
+            document.getElementById('rev_npwp').value = parsed.npwpLawan || '-';
+            document.getElementById('rev_tanggal').value = parsed.tanggalDokumen || '-';
+            document.getElementById('rev_kode').value = parsed.kodePajak || '-';
+            
+            document.getElementById('rev_dpp').value = formatRupiah(parsed.dpp || 0);
+            document.getElementById('rev_tarif').value = parsed.tarif ? parsed.tarif + '%' : '0%';
+            document.getElementById('rev_pph').value = formatRupiah(parsed.pph || 0);
+
+            const res = await fetch('/api/branches?entitas=' + rowData.entitas);
+            const branches = await res.json();
+            const select = document.getElementById('input_branch_baru');
+            select.disabled = false; select.style.backgroundColor = '#fff';
+            select.innerHTML = '<option value="">-- Pilih Branch --</option>';
+            branches.forEach(b => select.innerHTML += `<option value="${b.kode_cabang}">${b.kode_cabang} - ${b.nama_cabang}</option>`);
+            
+            // CROSS-MODULE RELATION: Rekomendasi VAT IN berdasarkan Entitas yang sama
+            const cbContainer = document.getElementById('checkbox-vatin-container');
+            cbContainer.innerHTML = '<span style="color:#64748b; font-size:0.8rem;">Mencari referensi...</span>';
+            try {
+                const vatinRes = await fetch('/api/data-vatin?entitas=' + rowData.entitas);
+                const vatinData = await vatinRes.json();
+                
+                const matchedVatin = vatinData.filter(v => {
+                    const npwpCocok = parsed.npwpLawan && v.npwp_penjual && v.npwp_penjual.includes(parsed.npwpLawan);
+                    const namaCocok = parsed.namaDipotong && v.nama_penjual && v.nama_penjual.toUpperCase().includes(parsed.namaDipotong.toUpperCase().substring(0, 10));
+                    return npwpCocok || namaCocok;
+                });
+
+                cbContainer.innerHTML = '';
+                if(matchedVatin.length > 0) {
+                    matchedVatin.forEach(v => {
+                        let idInv = v.no_invoice_internal && v.no_invoice_internal !== '-' ? v.no_invoice_internal : v.no_faktur;
+                        cbContainer.innerHTML += `
+                            <label class="checkbox-item">
+                                <input type="checkbox" class="cb-vatin" value="${idInv}"> 
+                                <b>${idInv}</b> (Faktur: ${v.no_faktur} | DPP: ${formatRupiah(v.dpp)})
+                            </label>
+                        `;
+                    });
+                } else {
+                    cbContainer.innerHTML = '<span style="color:#64748b; font-size:0.8rem;">Tidak ada rincian Faktur Masukan yang terdeteksi mirip dengan vendor ini. Gunakan Input Manual.</span>';
+                }
+            } catch(e) {
+                cbContainer.innerHTML = '<span style="color:#ef4444; font-size:0.8rem;">Gagal memuat rekomendasi VAT IN.</span>';
+            }
+
+            document.getElementById('input_invoice_baru').value = '';
+            document.getElementById('modalReviewPDF').style.display = 'flex';
+        }
+
+        function simpanFinalPayable() {
+            tempDataFinal.branchInput = document.getElementById('input_branch_baru').value;
+            tempDataFinal.username = currentUserName;
+
+            let selectedInvoices = [];
+            document.querySelectorAll('.cb-vatin:checked').forEach(cb => selectedInvoices.push(cb.value));
+            
+            let manualInput = document.getElementById('input_invoice_baru').value.trim();
+            if(manualInput) {
+                let manualArr = manualInput.split(',').map(s => s.trim()).filter(s => s !== '');
+                selectedInvoices.push(...manualArr);
+            }
+
+            tempDataFinal.invoiceInput = selectedInvoices.join(', ');
+
+            if (!tempDataFinal.branchInput) return alert("Branch wajib diisi!");
+            if (!tempDataFinal.invoiceInput) return alert("Harap pilih minimal satu Faktur atau ketik No Invoice/Faktur di kolom manual!");
+
+            socket.emit('simpan-final-payable', tempDataFinal);
+            document.getElementById('modalReviewPDF').style.display = 'none';
+        }
+
+        socket.on('update-tabel-payable', () => loadInbox());
+        
+        function jalankanFilterInbox() {
+            const filters = document.querySelectorAll('.filter-input-inbox');
+            const rows = document.querySelectorAll('#tabel-inbox tr');
+            let isAnyFilterActive = false;
+
+            rows.forEach(row => {
+                let isMatch = true;
+                filters.forEach((input, index) => {
+                    const filterValue = input.value.toLowerCase();
+                    if (filterValue) {
+                        isAnyFilterActive = true;
+                        const cellIndex = index + 1;
+                        const cellText = row.cells[cellIndex] ? row.cells[cellIndex].innerText.toLowerCase() : "";
+                        if (!cellText.includes(filterValue)) {
+                            isMatch = false;
+                        }
+                    }
+                });
+                row.style.display = isMatch ? '' : 'none';
+            });
+            
+            document.getElementById('btnHapusFilter').style.display = isAnyFilterActive ? 'inline-block' : 'none';
+        }
+
+        function resetSemuaFilter() {
+            document.querySelectorAll('.filter-input-inbox').forEach(input => input.value = '');
+            jalankanFilterInbox();
+        }
+
+        document.addEventListener('input', function(e) {
+            if (e.target.classList.contains('filter-input-inbox')) jalankanFilterInbox();
+        });
+
+        loadInbox();
+    </script>
+</body>
+</html>

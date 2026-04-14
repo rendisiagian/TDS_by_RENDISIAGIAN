@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>VAT IN | Tax Upload and Database</title>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+    <div class="app-wrapper">
+        <div id="sidebar-container"></div>
+
+        <main class="main-content">
+            <header class="header" style="background-color: #0f172a;">
+                <h2 style="color: white;">Dashboard Faktur Pajak Masukan (VAT IN)</h2>
+                <div class="user-profile">
+                    <a href="/logout" class="btn-logout">Logout</a>
+                </div>
+            </header>
+
+            <div class="container">
+                <div class="card">
+                    <div class="card-header-padding" style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3 class="title-primary" style="border-left-color: #2563eb; margin: 0;">Data Faktur Masukan</h3>
+                        
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">🗑️ Hapus Filter</button>
+                            <a href="/inbox-vatin" class="btn-simpan" style="margin:0; background-color: #2563eb; text-decoration:none; padding: 8px 15px; font-size: 0.85rem;">
+                                📥 Buka Bank Data VAT IN
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table id="tabel-data">
+                            <thead>
+                                <tr>
+                                    <th class="col-no text-center">No.</th>
+                                    <th class="text-center">Aksi</th>
+                                    <th class="text-center">Arsip PDF</th>
+                                    <th class="text-center">Branch</th>
+                                    <th class="text-center">No. Invoice</th>
+                                    <th class="text-center">Tgl Tukar</th>
+                                    <th class="text-center">Nama Vendor</th>
+                                    <th class="text-center">No. Faktur</th>
+                                    <th class="text-center">Tanggal Faktur</th>
+                                    <th class="text-center">DPP</th>
+                                    <th class="text-center">PPN</th>
+                                    <th class="text-center">Diinput Oleh</th>
+                                </tr>
+                                <tr class="filter-row">
+                                    <th></th><th></th><th></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabel-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="modalViewItem" class="modal-overlay">
+        <div class="modal-box" style="max-width: 750px;">
+            <h3 id="modal-title-faktur" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; color: #2563eb;">Rincian Barang</h3>
+            <div id="container-items" class="table-responsive" style="max-height: 400px;"></div>
+            <button class="btn-simpan btn-cancel mt-15" onclick="document.getElementById('modalViewItem').style.display='none'">Tutup Jendela</button>
+        </div>
+    </div>
+
+    <div id="modalEditData" class="modal-overlay">
+        <div class="modal-box" style="max-width: 500px;">
+            <h3 style="border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; color: #f59e0b;">✏️ Edit Relasi Internal</h3>
+            <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 15px;">Faktur: <b id="edit-faktur-title"></b></p>
+            <div class="form-group"><label>Branch / Cabang Baru</label><select id="edit_branch" class="form-select"></select></div>
+            <div class="form-group"><label>No. Invoice</label><input type="text" id="edit_invoice" autocomplete="off" placeholder="Ketik No Invoice..."></div>
+            <div class="form-group"><label>Tanggal Baru</label><input type="date" id="edit_tanggal"></div>
+            <div style="display:flex; gap:10px; margin-top: 20px;">
+                <button class="btn-simpan" style="background-color: #f59e0b; flex: 2;" onclick="submitEdit()">💾 Simpan Perubahan</button>
+                <button class="btn-simpan btn-cancel" style="flex: 1; margin-top:0;" onclick="document.getElementById('modalEditData').style.display='none'">Batal</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
+        let currentUser = {};
+        let targetEditFaktur = '';
+
+        fetch('/api/me').then(res => res.json()).then(u => currentUser = u);
+
+        fetch('/sidebar.html').then(res => res.text()).then(html => {
+            document.getElementById('sidebar-container').innerHTML = html;
+            const currentPath = window.location.pathname;
+            document.querySelectorAll('.sidebar-link').forEach(link => {
+                if (link.getAttribute('href') === currentPath) link.classList.add('active');
+            });
+            // Sinkronkan visual Dropdown Sidebar
+            const sidebarSelect = document.getElementById('global-entity-select');
+            if (sidebarSelect) sidebarSelect.value = aktifEntitas;
+        });
+
+        socket.on('data-baru-vatin', () => loadData());
+
+        // Dipanggil dari Sidebar Dropdown
+        window.gantiEntitas = function(entitas) {
+            aktifEntitas = entitas;
+            localStorage.setItem('lastEntitas', entitas); 
+            const sidebarSelect = document.getElementById('global-entity-select');
+            if (sidebarSelect && sidebarSelect.value !== entitas) sidebarSelect.value = entitas;
+            loadData();
+        };
+
+        async function loadData() {
+            const res = await fetch('/api/data-vatin?entitas=' + aktifEntitas);
+            const data = await res.json();
+            const tbody = document.getElementById('tabel-body');
+            tbody.innerHTML = ''; 
+            const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
+
+            data.forEach((baris, index) => {
+                const tr = document.createElement('tr');
+                let curBr = baris.kode_cabang || '';
+                let curInv = baris.no_invoice_internal || '';
+                let curTgl = baris.tgl_tukar_faktur || '';
+
+                let btnView = `<button class="btn-icon-aksi" title="Lihat Rincian" onclick="viewItems('${baris.no_faktur}')">👁️</button>`;
+                let btnEdit = `<button class="btn-icon-aksi" title="Edit Data" onclick="handleAction('${baris.no_faktur}', 'EDIT', '${curBr}', '${curInv}', '${curTgl}')">✏️</button>`;
+                let btnDel  = `<button class="btn-icon-aksi" title="Hapus Data" onclick="handleAction('${baris.no_faktur}', 'DELETE')" style="color:#ef4444;">❌</button>`;
+                let btnPdf = baris.link_pdf_lokal ? `<a href="/${baris.link_pdf_lokal}" target="_blank" class="btn-icon-aksi" title="Buka PDF">📄</a>` : `-`;
+
+                tr.innerHTML = `
+                    <td class="text-center">${index + 1}</td>
+                    <td class="text-center">${btnView} ${btnEdit} ${btnDel}</td>
+                    <td class="text-center">${btnPdf}</td>
+                    <td class="text-center"><span class="badge-role">${baris.nama_cabang || baris.kode_cabang || '-'}</span></td>
+                    <td class="text-center"><span class="badge-success">${baris.no_invoice_internal || '-'}</span></td>
+                    <td class="text-center">${baris.tgl_tukar_format || '-'}</td>
+                    <td class="text-bold">${baris.nama_penjual || '-'}</td>
+                    <td class="text-center" style="color:#2563eb; font-weight:bold;">${baris.no_faktur || '-'}</td>
+                    <td class="text-center">${baris.tanggal_format || '-'}</td>
+                    <td class="text-right">${formatRupiah(baris.dpp)}</td>
+                    <td class="text-right">${formatRupiah(baris.ppn)}</td>
+                    <td class="text-center">${baris.diinput_oleh || '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            jalankanFilterTabel();
+        }
+
+        async function viewItems(noFaktur) {
+            try {
+                const res = await fetch(`/api/items/vatin/${noFaktur}`);
+                const items = await res.json();
+                document.getElementById('modal-title-faktur').innerText = "Rincian Faktur: " + noFaktur;
+                const container = document.getElementById('container-items');
+                
+                if (!items || items.length === 0) {
+                    container.innerHTML = "<p class='text-center' style='padding:20px;'>Tidak ada rincian item.</p>";
+                } else {
+                    let tableHtml = `<table class="modal-item-table"><thead><tr><th>Barang/Jasa</th><th class='text-right'>Harga Satuan</th><th class='text-center'>Qty</th><th class='text-right'>Total</th></tr></thead><tbody>`;
+                    items.forEach(it => {
+                        tableHtml += `<tr><td>${it.nama_barang || '-'}</td><td class='text-right'>Rp ${Number(it.harga_satuan || 0).toLocaleString('id-ID')}</td><td class='text-center'>${Number(it.qty || 0)} ${it.satuan || ''}</td><td class='text-right'><b>Rp ${Number(it.total_harga || 0).toLocaleString('id-ID')}</b></td></tr>`;
+                    });
+                    tableHtml += `</tbody></table>`;
+                    container.innerHTML = tableHtml;
+                }
+                document.getElementById('modalViewItem').style.display = 'flex';
+            } catch (err) { alert("Terjadi kesalahan."); }
+        }
+
+        async function handleAction(noFaktur, actionType, curCabang = '', curInvoice = '', curTanggal = '') {
+            const userRole = currentUser.role ? currentUser.role.toLowerCase() : '';
+            const isSupervisor = ['supervisor', 'administrator'].includes(userRole);
+            
+            if (actionType === 'DELETE') {
+                if(confirm(isSupervisor ? `Konfirmasi HAPUS faktur ${noFaktur}?` : `Ajukan penghapusan faktur ${noFaktur} ke Supervisor?`)) {
+                    socket.emit('request-action-faktur', { action: 'DELETE', mod: 'vatin', faktur: noFaktur, id_user: currentUser.id, username: currentUser.username, role: currentUser.role });
+                    if(!isSupervisor) alert("Permintaan hapus diajukan.");
+                }
+            } 
+            else if (actionType === 'EDIT') {
+                targetEditFaktur = noFaktur;
+                document.getElementById('edit-faktur-title').innerText = noFaktur;
+                document.getElementById('edit_invoice').value = (curInvoice === '-' || curInvoice === 'null') ? '' : curInvoice;
+                document.getElementById('edit_tanggal').value = (curTanggal === '-' || curTanggal === 'null') ? '' : curTanggal;
+                
+                const res = await fetch('/api/branches?entitas=' + aktifEntitas);
+                const branches = await res.json();
+                const select = document.getElementById('edit_branch');
+                select.disabled = false; select.style.backgroundColor = '#fff';
+                select.innerHTML = '<option value="">-- Pilih Branch --</option>';
+                branches.forEach(b => {
+                    let isSelected = (b.kode_cabang === curCabang) ? 'selected' : '';
+                    select.innerHTML += `<option value="${b.kode_cabang}" ${isSelected}>${b.kode_cabang} - ${b.nama_cabang}</option>`;
+                });
+                document.getElementById('modalEditData').style.display = 'flex';
+            }
+        }
+
+        function submitEdit() {
+            const isSupervisor = ['supervisor', 'administrator'].includes(currentUser.role.toLowerCase());
+            const branch = document.getElementById('edit_branch').value;
+            const invoice = document.getElementById('edit_invoice').value;
+            const tanggal = document.getElementById('edit_tanggal').value;
+
+            if (!branch) return alert("Branch wajib diisi!");
+            socket.emit('request-action-faktur', { action: 'EDIT', mod: 'vatin', faktur: targetEditFaktur, id_user: currentUser.id, username: currentUser.username, role: currentUser.role, newData: { branch, invoice, tanggal } });
+            document.getElementById('modalEditData').style.display = 'none';
+            if(!isSupervisor) alert("Permintaan Edit diajukan ke Panel Approval.");
+        }
+
+        // Jalankan Pertama Kali
+        loadData();
+
+        function jalankanFilterTabel() {
+            const filters = document.querySelectorAll('.filter-input');
+            const rows = document.querySelectorAll('#tabel-body tr');
+            let isAnyFilterActive = false;
+
+            rows.forEach(row => {
+                let isMatch = true;
+                filters.forEach((input, index) => {
+                    const filterValue = input.value.toLowerCase();
+                    if (filterValue) {
+                        isAnyFilterActive = true;
+                        const colIndex = index + 3; 
+                        const cellText = row.cells[colIndex] ? row.cells[colIndex].innerText.toLowerCase() : "";
+                        if (!cellText.includes(filterValue)) isMatch = false;
+                    }
+                });
+                row.style.display = isMatch ? '' : 'none';
+            });
+            document.getElementById('btnHapusFilter').style.display = isAnyFilterActive ? 'inline-block' : 'none';
+        }
+
+        function resetSemuaFilter() { document.querySelectorAll('.filter-input').forEach(input => input.value = ''); jalankanFilterTabel(); }
+        document.addEventListener('input', function(e) { if (e.target.classList.contains('filter-input')) jalankanFilterTabel(); });
+
+    </script>
+</body>
+</html>

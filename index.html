@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner Faktur - Pro Max</title>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+    <div class="scanner-container">
+        
+        <div id="pairing-warning" class="pairing-warning-box">
+            ⚠️ Belum Terhubung!<br>
+            <span class="pairing-subtext">Klik "Hubungkan HP" di layar PC Anda, lalu scan QR yang muncul.</span>
+        </div>
+
+        <div id="pairing-success" class="pairing-success-box d-none">
+            ✅ Terhubung ke PC!<br>
+            <span class="pairing-subtext">Silakan scan Barcode KANAN (Link Coretax DJP).</span>
+        </div>
+
+        <h2>Scanner e-Faktur</h2>
+        <div id="reader"></div>
+        
+        <div id="panel-kamera" class="ctrl-container d-none">
+            <label>📸 Pilih Modul Kamera</label>
+            <select id="camera-select"></select>
+
+            <div id="zoom-ctrl" class="zoom-ctrl-box d-none">
+                <label>🔍 Geser untuk Zoom</label>
+                <input type="range" id="zoom-range" min="1" max="5" step="0.1" value="1">
+            </div>
+        </div>
+
+        <div id="btn-buka-manual-container" class="mt-15 d-none">
+            <button id="btn-buka-manual" class="btn-manual-trigger" onclick="mintaManualPC()">💻 Faktur Rusak? Input di Layar PC</button>
+        </div>
+
+        <div id="result" class="status">Menghubungkan kamera...</div>
+
+        <div id="success-box" class="d-none">
+            <div class="ok-text" id="ok-msg">✅ Link Masuk Inbox!</div>
+            <button class="btn-lanjut" onclick="lanjutScan()">Lanjut Scan Berikutnya</button>
+        </div>
+
+        <div id="error-box" class="d-none">
+            <div class="err-text" id="pesan-error">❌ Ditolak!</div>
+            <button class="btn-error" onclick="lanjutScanError()">Scan Ulang Barcode Kanan</button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let isPaused = false;
+        let isScanning = false;
+        let html5QrCode = new Html5Qrcode("reader");
+        let videoTrack = null; 
+        let pairedToken = null;
+
+        async function initCameras() {
+            try {
+                const devices = await Html5Qrcode.getCameras();
+                if (devices && devices.length > 0) {
+                    const cameraSelect = document.getElementById('camera-select');
+                    document.getElementById('panel-kamera').classList.remove('d-none');
+                    document.getElementById('btn-buka-manual-container').classList.remove('d-none');
+                    cameraSelect.innerHTML = '';
+                    devices.forEach(d => {
+                        const opt = document.createElement('option');
+                        opt.value = d.id; opt.text = d.label || `Kamera ${cameraSelect.length+1}`;
+                        cameraSelect.appendChild(opt);
+                    });
+                    let defaultCamera = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('belakang'));
+                    let selectedId = defaultCamera ? defaultCamera.id : devices[0].id;
+                    cameraSelect.value = selectedId;
+                    cameraSelect.addEventListener('change', (e) => startScanner(e.target.value));
+                    startScanner(selectedId);
+                }
+            } catch (err) { document.getElementById('result').innerText = "Izin kamera diperlukan."; }
+        }
+
+        async function startScanner(cameraId) {
+            if (isScanning) { await html5QrCode.stop(); isScanning = false; }
+            const config = { fps: 15, qrbox: { width: 250, height: 250 } };
+            const cameraConfig = cameraId ? { deviceId: { exact: cameraId } } : { facingMode: "environment" };
+            try {
+                await html5QrCode.start(cameraConfig, config, onScanSuccess);
+                isScanning = true;
+                document.getElementById('result').innerText = "Siap memindai!";
+                setTimeout(() => {
+                    const videoEl = document.querySelector('#reader video');
+                    if (videoEl && videoEl.srcObject) {
+                        videoTrack = videoEl.srcObject.getVideoTracks()[0];
+                        if (videoTrack && typeof videoTrack.getCapabilities === 'function' && videoTrack.getCapabilities().zoom) {
+                            document.getElementById('zoom-ctrl').classList.remove('d-none');
+                            const zr = document.getElementById('zoom-range');
+                            zr.min = videoTrack.getCapabilities().zoom.min;
+                            zr.max = videoTrack.getCapabilities().zoom.max;
+                            zr.step = videoTrack.getCapabilities().zoom.step;
+                            zr.value = zr.min;
+                            zr.oninput = async (e) => await videoTrack.applyConstraints({advanced: [{zoom: parseFloat(e.target.value)}]});
+                        }
+                    }
+                }, 1000);
+            } catch (err) { }
+        }
+
+        function onScanSuccess(decodedText) {
+            if (isPaused) return;
+            isPaused = true; 
+
+            if (!pairedToken) {
+                if (decodedText.startsWith("PAIR-")) {
+                    pairedToken = decodedText.replace("PAIR-", ""); 
+                    socket.emit('pair-device', pairedToken); 
+                    document.getElementById('pairing-warning').classList.add('d-none');
+                    document.getElementById('pairing-success').classList.remove('d-none');
+                    document.getElementById('result').classList.add('d-none');
+                    document.getElementById('panel-kamera').classList.add('d-none');
+                    document.getElementById('btn-buka-manual-container').classList.add('d-none');
+                    document.getElementById('ok-msg').innerText = "✅ Perangkat Terhubung!";
+                    document.getElementById('success-box').classList.remove('d-none');
+                    if (navigator.vibrate) navigator.vibrate([100, 50]); 
+                } else {
+                    document.getElementById('result').classList.add('d-none');
+                    document.getElementById('panel-kamera').classList.add('d-none');
+                    document.getElementById('btn-buka-manual-container').classList.add('d-none');
+                    document.getElementById('pesan-error').innerText = "❌ BELUM TERHUBUNG KE PC!\n\nKlik tombol 'Hubungkan HP' di layar komputer Anda, lalu scan barcode yang muncul.";
+                    document.getElementById('error-box').classList.remove('d-none');
+                    if (navigator.vibrate) navigator.vibrate([500]); 
+                }
+                return;
+            }
+            document.getElementById('result').innerText = "Memverifikasi Link Coretax DJP...";
+            socket.emit('barcode-scan', { token: pairedToken, qrData: decodedText });
+        }
+
+        function mintaManualPC() {
+            if (!pairedToken) { alert("Harap hubungkan ke PC terlebih dahulu!"); return; }
+            socket.emit('minta-manual-pc', pairedToken);
+            document.getElementById('result').innerText = "Membuka form di PC... Silakan ketik di sana.";
+            if (navigator.vibrate) navigator.vibrate([100, 50]);
+        }
+        
+        socket.on('scan-valid-link-inbox', () => {
+            document.getElementById('result').classList.add('d-none');
+            document.getElementById('panel-kamera').classList.add('d-none');
+            document.getElementById('btn-buka-manual-container').classList.add('d-none');
+            document.getElementById('ok-msg').innerText = "✅ Link Masuk Inbox!\n\nLink Coretax telah tersimpan di antrean PC.";
+            document.getElementById('success-box').classList.remove('d-none');
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]); 
+        });
+
+        socket.on('scan-invalid', (pesan) => {
+            document.getElementById('result').classList.add('d-none');
+            document.getElementById('panel-kamera').classList.add('d-none');
+            document.getElementById('btn-buka-manual-container').classList.add('d-none');
+            document.getElementById('pesan-error').innerText = pesan;
+            document.getElementById('error-box').classList.remove('d-none');
+            if (navigator.vibrate) navigator.vibrate([500, 200, 500]); 
+        });
+
+        socket.on('pc-disconnected', () => {
+            pairedToken = null; 
+            document.getElementById('pairing-success').classList.add('d-none');
+            document.getElementById('pairing-warning').classList.remove('d-none');
+            document.getElementById('result').classList.remove('d-none');
+            document.getElementById('result').innerText = "Koneksi ke PC terputus! Silakan hubungkan ulang.";
+            document.getElementById('panel-kamera').classList.remove('d-none');
+            document.getElementById('btn-buka-manual-container').classList.remove('d-none');
+            document.getElementById('success-box').classList.add('d-none');
+            document.getElementById('error-box').classList.add('d-none');
+            isPaused = false;
+            if (navigator.vibrate) navigator.vibrate([500, 100, 500]); 
+        });
+
+        function lanjutScan() {
+            document.getElementById('success-box').classList.add('d-none');
+            document.getElementById('result').classList.remove('d-none');
+            document.getElementById('result').innerText = "Siap memindai!";
+            document.getElementById('panel-kamera').classList.remove('d-none');
+            document.getElementById('btn-buka-manual-container').classList.remove('d-none');
+            isPaused = false;
+        }
+
+        function lanjutScanError() {
+            document.getElementById('error-box').classList.add('d-none');
+            document.getElementById('result').classList.remove('d-none');
+            document.getElementById('result').innerText = "Siap memindai!";
+            document.getElementById('panel-kamera').classList.remove('d-none');
+            document.getElementById('btn-buka-manual-container').classList.remove('d-none');
+            isPaused = false;
+        }
+
+        initCameras();
+    </script>
+</body>
+</html>

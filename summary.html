@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Summary - Perbandingan Faktur</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="app-wrapper">
+        <div id="sidebar-container"></div>
+        
+        <main class="main-content">
+            <header class="header">
+                <h2>Summary Perbandingan Realisasi vs Tanggal Faktur</h2>
+                <div class="user-profile">
+                    <a href="/logout" class="btn-logout">Logout</a>
+                </div>
+            </header>
+
+            <div class="container">
+                <div class="card">
+                    <div class="card-header-padding">
+                        <h3 class="title-primary" style="border-left-color: #8b5cf6; margin: 0; padding-bottom: 15px;">Rekapitulasi Data Pajak Masukan</h3>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th rowspan="2" class="border-right-middle text-center">Bulan / Periode</th>
+                                    <th colspan="2" class="header-group">Berdasarkan Tanggal Tukar</th>
+                                    <th colspan="2" class="header-group">Berdasarkan Tanggal Faktur</th>
+                                    <th rowspan="2" class="text-center-middle">Selisih PPN (Tukar - Faktur)</th>
+                                </tr>
+                                <tr>
+                                    <th class="text-center">Jml Dokumen</th>
+                                    <th class="text-center border-right-middle">Total PPN</th>
+                                    <th class="text-center">Jml Dokumen</th>
+                                    <th class="text-center border-right-middle">Total PPN</th>
+                                </tr>
+                            </thead>
+                            <tbody id="body-compare">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
+
+        fetch('/sidebar.html')
+            .then(res => res.text())
+            .then(html => {
+                document.getElementById('sidebar-container').innerHTML = html;
+                const currentPath = window.location.pathname;
+                document.querySelectorAll('.sidebar-link').forEach(link => {
+                    if (link.getAttribute('href') === currentPath) link.classList.add('active');
+                });
+                
+                const sidebarSelect = document.getElementById('global-entity-select');
+                if (sidebarSelect) sidebarSelect.value = aktifEntitas;
+            });
+
+        // Fungsi Global untuk Sidebar Dropdown
+        window.gantiEntitas = function(entitas) {
+            aktifEntitas = entitas;
+            localStorage.setItem('lastEntitas', entitas);
+            const sidebarSelect = document.getElementById('global-entity-select');
+            if (sidebarSelect && sidebarSelect.value !== entitas) sidebarSelect.value = entitas;
+            loadSummary();
+        };
+
+        async function loadSummary() {
+            try {
+                const response = await fetch('/api/summary?entitas=' + aktifEntitas);
+                const data = await response.json();
+                const tbody = document.getElementById('body-compare');
+                tbody.innerHTML = '';
+                const formatRupiah = (angka) => "Rp " + Number(angka).toLocaleString('id-ID');
+
+                if(data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="padding: 20px; color: #64748b;">Belum ada data rekapitulasi untuk entitas ini.</td></tr>`;
+                    return;
+                }
+
+                data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    const selisih = row.ppn_tukar - row.ppn_faktur;
+                    const classSelisih = selisih >= 0 ? 'diff-pos' : 'diff-neg';
+
+                    tr.innerHTML = `
+                        <td class="text-bold border-right-middle text-center">${row.periode}</td>
+                        <td class="text-center">${row.jml_tukar} Dokumen</td>
+                        <td class="border-right-middle text-right">${formatRupiah(row.ppn_tukar)}</td>
+                        <td class="text-center">${row.jml_faktur} Dokumen</td>
+                        <td class="border-right-middle text-right">${formatRupiah(row.ppn_faktur)}</td>
+                        <td class="${classSelisih} text-right" style="padding-right: 20px;">${formatRupiah(selisih)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) { 
+                console.error("Gagal memuat summary", err); 
+            }
+        }
+
+        // Jalankan Pertama Kali
+        loadSummary();
+    </script>
+</body>
+</html>
