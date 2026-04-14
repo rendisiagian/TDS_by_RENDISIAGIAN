@@ -1387,10 +1387,20 @@ textarea:focus {
 
     table {
         page-break-inside: auto;
+        white-space: normal !important;
+        font-size: 0.65rem !important;
+        width: 100% !important;
+        table-layout: fixed !important;
     }
 
     tr {
         page-break-inside: avoid;
+    }
+
+    td, th {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        padding: 0.25rem 0.3rem !important;
     }
 
     body {
