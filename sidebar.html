@@ -14,19 +14,19 @@
 
     <nav class="sidebar-nav">
         <span class="sidebar-nav-label">MODUL PAJAK</span>
-        <a href="/dashboard-vatout" class="sidebar-link" data-testid="nav-vatout">&#128228; 1. Faktur Keluaran#128228; Faktur Keluaran (VAT Out)</a>
-        <a href="/dashboard-vatin" class="sidebar-link" data-testid="nav-vatin">&#128229; 2. Faktur Masukan#128229; Faktur Masukan (VAT In)</a>
-        <a href="/dashboard-payable" class="sidebar-link" data-testid="nav-payable">&#128184; 3. Tax Payable (BPPU)#128184; Tax Payable</a>
-        <a href="/dashboard-prepaid" class="sidebar-link" data-testid="nav-prepaid">&#128737;&#65039; 4. Prepaid Tax#128737;&#128737;&#65039; 4. Prepaid Tax#65039; Prepaid Tax</a>
+        <a href="/dashboard-vatout" class="sidebar-link">Faktur Keluaran</a>
+        <a href="/dashboard-vatin" class="sidebar-link">Faktur Masukan</a>
+        <a href="/dashboard-payable" class="sidebar-link">Tax Payable</a>
+        <a href="/dashboard-prepaid" class="sidebar-link">Prepaid Tax</a>
 
-        <span class="sidebar-nav-label">SISTEM & UTILITAS</span>
-        <a href="/summary" class="sidebar-link" data-testid="nav-summary">&#128202; Summary Report#128202; Laporan Rekapitulasi</a>
-        <a href="/profile" class="sidebar-link" data-testid="nav-profile">&#128100; Profil Saya#128100; Pengaturan Akun</a>
-        <a href="/manage-users" class="sidebar-link" id="menu-manage-users" data-testid="nav-manage-users">&#9881;&#65039; Panel Approval#9881;&#9881;&#65039; Panel Approval#65039; Manajemen &amp; Approval</a>
+        <span class="sidebar-nav-label">SISTEM</span>
+        <a href="/summary" class="sidebar-link">Laporan Rekapitulasi</a>
+        <a href="/profile" class="sidebar-link">Pengaturan Akun</a>
+        <a href="/manage-users" class="sidebar-link" id="menu-manage-users">Manajemen &amp; Approval</a>
     </nav>
 
-    <div style="padding: 1rem 1.25rem; border-top: 1px solid rgba(255,255,255,0.1); margin-top: auto;">
-        <button id="btn-dark-mode" data-testid="dark-mode-toggle" onclick="window.__toggleDarkMode()" style="position:static; width:100%; display:flex; justify-content:center; align-items:center; gap:0.5rem; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:white; padding:0.75rem 1rem; border-radius:8px; cursor:pointer; font-size:0.9rem; font-weight:600; transition:all 0.2s;">
+    <div style="padding: 0.75rem 1rem; border-top: 1px solid rgba(255,255,255,0.1); margin-top: auto;">
+        <button id="btn-dark-mode" onclick="window.__toggleDarkMode()" style="position:static; width:100%; display:flex; justify-content:center; align-items:center; gap:0.5rem; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:white; padding:0.5rem 0.75rem; border-radius:6px; cursor:pointer; font-size:0.8rem; font-weight:600; transition:all 0.2s;">
             <span id="dm-icon">&#127769;</span> <span id="dm-text">Dark Mode</span>
         </button>
     </div>
@@ -42,26 +42,17 @@ window.__toggleDarkMode = function() {
     var iconEl = document.getElementById('dm-icon');
     var textEl = document.getElementById('dm-text');
     if (iconEl && textEl) {
-        if (next === 'dark') {
-            iconEl.innerHTML = '&#9728;&#65039;';
-            textEl.textContent = 'Light Mode';
-        } else {
-            iconEl.innerHTML = '&#127769;';
-            textEl.textContent = 'Dark Mode';
-        }
+        if (next === 'dark') { iconEl.innerHTML = '&#9728;&#65039;'; textEl.textContent = 'Light Mode'; }
+        else { iconEl.innerHTML = '&#127769;'; textEl.textContent = 'Dark Mode'; }
     }
 };
-
 (function() {
     var t = localStorage.getItem('theme') || 'light';
     document.documentElement.setAttribute('data-theme', t);
     setTimeout(function() {
         var iconEl = document.getElementById('dm-icon');
         var textEl = document.getElementById('dm-text');
-        if (iconEl && textEl && t === 'dark') {
-            iconEl.innerHTML = '&#9728;&#65039;';
-            textEl.textContent = 'Light Mode';
-        }
+        if (iconEl && textEl && t === 'dark') { iconEl.innerHTML = '&#9728;&#65039;'; textEl.textContent = 'Light Mode'; }
     }, 100);
 })();
 </script>
