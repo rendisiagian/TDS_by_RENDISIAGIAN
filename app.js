@@ -162,6 +162,60 @@ app.get('/api/summary', cekAuth, (req, res) => {
     db.all(`SELECT strftime('%m-%Y', tgl_tukar_faktur) as periode, count(*) as jml_tukar, sum(ppn) as ppn_tukar, count(*) as jml_faktur, sum(ppn) as ppn_faktur FROM data_vatin WHERE entitas = ? GROUP BY periode ORDER BY periode DESC`, [ent], (err, rows) => res.json(rows || []));
 });
 
+// API: Get available VAT OUT invoices for Prepaid Tax linking
+// Returns VAT OUT data filtered by client name, excluding already-used ones
+app.get('/api/available-vatout', cekAuth, (req, res) => {
+    const entitas = req.query.entitas || 'BBS';
+    const clientName = req.query.client || '';
+    
+    // Get all VAT OUT invoices for this entity
+    // Then exclude ones already used in data_prepaid (no_invoice_internal)
+    const sql = `
+        SELECT d.no_faktur, d.nama_pembeli, d.dpp, d.ppn, d.no_invoice_internal, 
+               strftime('%d-%m-%Y', d.tanggal_faktur) AS tanggal_format
+        FROM data_vatout d 
+        WHERE d.entitas = ?
+        ORDER BY d.waktu_input DESC
+    `;
+    
+    db.all(sql, [entitas], (err, vatoutRows) => {
+        if (err) return res.json([]);
+        
+        // Get all invoice numbers already used in prepaid
+        db.all(`SELECT no_invoice_internal FROM data_prepaid WHERE no_invoice_internal IS NOT NULL AND no_invoice_internal != '' AND no_invoice_internal != '-'`, [], (err2, usedRows) => {
+            const usedInvoices = new Set((usedRows || []).map(r => r.no_invoice_internal).filter(Boolean));
+            
+            // Mark each vatout as available or not
+            const result = vatoutRows.map(row => ({
+                no_faktur: row.no_faktur,
+                nama_pembeli: row.nama_pembeli,
+                dpp: row.dpp,
+                ppn: row.ppn,
+                tanggal_format: row.tanggal_format,
+                no_invoice_internal: row.no_invoice_internal,
+                sudah_dipakai: usedInvoices.has(row.no_faktur)
+            }));
+            
+            // If client name provided, filter by matching client
+            if (clientName) {
+                const clientUpper = clientName.toUpperCase();
+                const filtered = result.filter(r => {
+                    const nama = (r.nama_pembeli || '').toUpperCase();
+                    return nama.includes(clientUpper) || clientUpper.includes(nama);
+                });
+                // Return matching first, then all others
+                const others = result.filter(r => {
+                    const nama = (r.nama_pembeli || '').toUpperCase();
+                    return !(nama.includes(clientUpper) || clientUpper.includes(nama));
+                });
+                return res.json({ matching: filtered, others: others });
+            }
+            
+            res.json({ matching: result, others: [] });
+        });
+    });
+});
+
 // ==========================================
 // 4. LOGIKA SOCKET.IO (BULK / BATCH PROCESSING)
 // ==========================================

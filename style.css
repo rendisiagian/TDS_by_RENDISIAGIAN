@@ -1916,3 +1916,132 @@ tbody:empty::after {
     border-color: var(--primary-500);
     color: var(--primary-400);
 }
+
+/* === 36. FIX: Header compact & truly sticky === */
+.header {
+    background: var(--bg-primary) !important;
+    padding: 0.75rem 1.5rem !important;
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+}
+
+.header h2 {
+    font-size: 1.1rem !important;
+    font-weight: 700;
+    margin: 0;
+}
+
+/* Fix: main-content must allow sticky to work */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    height: 100vh;
+}
+
+/* === 37. SEARCHABLE SELECT (VAT OUT Dropdown) === */
+.invoice-select-wrapper {
+    position: relative;
+}
+
+.invoice-select-wrapper input.invoice-search {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    outline: none;
+}
+
+.invoice-select-wrapper input.invoice-search:focus {
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.invoice-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 250px;
+    overflow-y: auto;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-top: none;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    z-index: 100;
+    display: none;
+}
+
+.invoice-dropdown.show {
+    display: block;
+}
+
+.invoice-dropdown-item {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    border-bottom: 1px solid var(--border-color);
+    transition: background var(--transition-fast);
+}
+
+.invoice-dropdown-item:hover {
+    background: var(--primary-50);
+}
+
+[data-theme="dark"] .invoice-dropdown-item:hover {
+    background: rgba(59, 130, 246, 0.15);
+}
+
+.invoice-dropdown-item .inv-faktur {
+    font-weight: 700;
+    color: var(--primary-600);
+}
+
+.invoice-dropdown-item .inv-client {
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+}
+
+.invoice-dropdown-item .inv-amount {
+    font-size: 0.8rem;
+    color: var(--success-600);
+    font-weight: 600;
+}
+
+.invoice-dropdown-item.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: var(--bg-tertiary);
+}
+
+.invoice-dropdown-empty {
+    padding: 1rem;
+    text-align: center;
+    color: var(--text-tertiary);
+    font-style: italic;
+    font-size: 0.85rem;
+}
+
+.invoice-manual-toggle {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--primary-500);
+    cursor: pointer;
+    text-decoration: underline;
+    display: inline-block;
+}
+
+.invoice-manual-toggle:hover {
+    color: var(--primary-700);
+}
