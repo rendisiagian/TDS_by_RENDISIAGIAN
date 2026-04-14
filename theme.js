@@ -17,3 +17,18 @@ window.__toggleDarkMode = function() {
         textEl.textContent = (next === 'dark') ? 'Light Mode' : 'Dark Mode';
     }
 };
+
+// Load user info and display in header
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('/api/me').then(function(r) { return r.json(); }).then(function(user) {
+        var el = document.getElementById('header-user-name');
+        if (el && user && user.nama) {
+            el.textContent = user.nama;
+        }
+        // Also update manage_users page
+        var el2 = document.getElementById('user-name-display');
+        if (el2 && user && user.nama) {
+            el2.textContent = user.nama;
+        }
+    }).catch(function() {});
+});

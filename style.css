@@ -751,13 +751,22 @@ select,
 textarea,
 .form-select {
     width: 100%;
-    padding: 0.875rem 1rem;
+    padding: 0.625rem 0.75rem;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     outline: none;
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    font-size: 0.95rem;
+    font-size: 0.85rem;
+}
+
+/* Override: filter inputs inside tables must be compact */
+.filter-row input,
+.filter-row .filter-input,
+.filter-row .filter-input-inbox {
+    padding: 0.2rem 0.4rem !important;
+    font-size: 0.7rem !important;
+    border-radius: 3px !important;
 }
 
 input:focus,
@@ -1081,18 +1090,19 @@ textarea:focus {
 
 .flex-container-gap {
     display: flex;
-    gap: var(--spacing-xl);
+    gap: 1rem;
     flex-wrap: wrap;
+    align-items: flex-start;
 }
 
 .flex-1-p20 {
     flex: 1;
-    min-width: 300px;
+    min-width: 280px;
 }
 
 .flex-2 {
     flex: 2;
-    min-width: 500px;
+    min-width: 400px;
 }
 
 .col-no {
@@ -1718,8 +1728,8 @@ textarea:focus {
 /* === 35. FIX: Card with padding === */
 .flex-1-p20 {
     flex: 1;
-    padding: 1.5rem;
-    min-width: 300px;
+    padding: 1.25rem;
+    min-width: 280px;
 }
 
 .flex-2 {
@@ -1727,16 +1737,20 @@ textarea:focus {
     min-width: 400px;
 }
 
-/* Fix: Cards inside flex should have proper content padding */
-.card.flex-1-p20,
+.card.flex-1-p20 {
+    padding: 1.25rem;
+}
+
 .card.flex-2 {
-    padding: 1.5rem;
+    padding: 0;
 }
 
 .card.flex-2 .table-responsive {
-    margin: -1.5rem;
-    margin-top: 0;
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.card .table-responsive table {
+    width: 100%;
 }
 
 /* Fix: h3 inside cards */
