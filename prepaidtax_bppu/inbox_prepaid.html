@@ -362,28 +362,21 @@
             var formatRp = function(n) { return 'Rp ' + Number(n || 0).toLocaleString('id-ID'); };
             var html = '';
             
-            var allItems = (vatoutData.matching || []).concat(vatoutData.others || []);
-            var filtered = allItems;
+            // ONLY show matching client - block others completely
+            var matchingItems = vatoutData.matching || [];
+            var filtered = matchingItems;
             if (q) {
-                filtered = allItems.filter(function(r) {
+                filtered = matchingItems.filter(function(r) {
                     return (r.no_faktur || '').toLowerCase().includes(q) || 
                            (r.nama_pembeli || '').toLowerCase().includes(q) ||
                            (r.no_invoice_internal || '').toLowerCase().includes(q);
                 });
             }
 
-            if (vatoutData.matching && vatoutData.matching.length > 0 && !q) {
-                html += '<div style="padding:0.5rem 1rem; font-size:0.75rem; font-weight:700; color:var(--success-600); background:var(--success-50); letter-spacing:0.5px;">COCOK DENGAN CLIENT</div>';
-                vatoutData.matching.forEach(function(r) { html += buildDropdownItem(r, formatRp); });
-                
-                if (vatoutData.others && vatoutData.others.length > 0) {
-                    html += '<div style="padding:0.5rem 1rem; font-size:0.75rem; font-weight:700; color:var(--text-tertiary); background:var(--bg-tertiary); letter-spacing:0.5px;">LAINNYA</div>';
-                    vatoutData.others.forEach(function(r) { html += buildDropdownItem(r, formatRp); });
-                }
-            } else if (filtered.length > 0) {
+            if (filtered.length > 0) {
                 filtered.forEach(function(r) { html += buildDropdownItem(r, formatRp); });
             } else {
-                html = '<div class="invoice-dropdown-empty">Tidak ada faktur VAT OUT ditemukan.</div>';
+                html = '<div class="invoice-dropdown-empty">Tidak ada faktur VAT OUT yang cocok dengan client ini. Gunakan input manual jika diperlukan.</div>';
             }
             
             dd.innerHTML = html;
