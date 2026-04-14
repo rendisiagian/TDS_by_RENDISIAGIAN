@@ -61,15 +61,13 @@ User memiliki sistem web Tax Database (Node.js/Express + SQLite + Socket.IO) den
 
 ## Prioritized Backlog
 ### P0 (High Priority)
-- Export to Excel/CSV functionality
-- Print button on dashboards
-- Charts/Graphs for Summary page
+- Logo/branding customization
+- Toast notifications (replace alert())
 
 ### P1 (Medium Priority)
-- Logo/branding customization
-- Loading spinners/skeleton screens
-- Toast notifications instead of `alert()`
-- Better form validation with inline messages
+- Same VAT OUT dropdown for Tax Payable inbox (if needed)
+- Responsive mobile testing
+- Search across all modules
 
 ### P2 (Nice to Have)
 - Keyboard shortcuts
