@@ -182,17 +182,17 @@
                 let curInv = baris.no_invoice_internal || '';
                 let curTgl = baris.tgl_tukar_faktur || '';
 
-                let btnView = `<button class="btn-icon-aksi" title="Lihat Rincian" onclick="viewItems('${baris.no_faktur}')">👁️</button>`;
-                let btnEdit = `<button class="btn-icon-aksi" title="Edit Data" onclick="handleAction('${baris.no_faktur}', 'EDIT', '${curBr}', '${curInv}', '${curTgl}')">✏️</button>`;
-                let btnDel  = `<button class="btn-icon-aksi" title="Hapus Data" onclick="handleAction('${baris.no_faktur}', 'DELETE')" style="color:#ef4444;">❌</button>`;
-                let btnPdf = baris.link_pdf_lokal ? `<a href="/${baris.link_pdf_lokal}" target="_blank" class="btn-icon-aksi" title="Buka PDF">📄</a>` : `-`;
+                let btnView = `<button class="btn-tbl btn-tbl-view" title="Lihat" onclick="viewItems('${baris.no_faktur}')">Lihat</button>`;
+                let btnEdit = `<button class="btn-tbl btn-tbl-edit" title="Edit" onclick="handleAction('${baris.no_faktur}', 'EDIT', '${curBr}', '${curInv}', '${curTgl}')">Edit</button>`;
+                let btnDel  = `<button class="btn-tbl btn-tbl-del" title="Hapus" onclick="handleAction('${baris.no_faktur}', 'DELETE')">Hapus</button>`;
+                let btnPdf = baris.link_pdf_lokal ? `<a href="/${baris.link_pdf_lokal}" target="_blank" class="btn-tbl btn-tbl-pdf">PDF</a>` : `-`;
 
                 tr.innerHTML = `
                     <td class="text-center">${index + 1}</td>
-                    <td class="text-center">${btnView} ${btnEdit} ${btnDel}</td>
+                    <td class="text-center" style="white-space:nowrap;">${btnView} ${btnEdit} ${btnDel}</td>
                     <td class="text-center">${btnPdf}</td>
-                    <td class="text-center"><span class="badge-role">${baris.nama_cabang || baris.kode_cabang || '-'}</span></td>
-                    <td class="text-center"><span class="badge-success">${baris.no_invoice_internal || '-'}</span></td>
+                    <td class="text-center">${baris.nama_cabang || baris.kode_cabang || '-'}</td>
+                    <td class="text-center">${baris.no_invoice_internal || '-'}</td>
                     <td class="text-center">${baris.tgl_tukar_format || '-'}</td>
                     <td class="text-bold">${baris.nama_penjual || '-'}</td>
                     <td class="text-center" style="color:#2563eb; font-weight:bold;">${baris.no_faktur || '-'}</td>

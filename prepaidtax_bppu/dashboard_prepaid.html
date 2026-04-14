@@ -171,16 +171,16 @@
                 let curBr = baris.kode_cabang || '';
                 let curInv = baris.no_invoice_internal || '';
 
-                let btnEdit = `<button class="btn-icon-aksi" title="Edit Data" onclick="handleAction('${baris.no_bppu}', 'EDIT', '${curBr}', '${curInv}')">✏️</button>`;
-                let btnDel  = `<button class="btn-icon-aksi" title="Hapus Data" onclick="handleAction('${baris.no_bppu}', 'DELETE')" style="color:#ef4444;">❌</button>`;
+                let btnEdit = `<button class="btn-tbl btn-tbl-edit" title="Edit" onclick="handleAction('${baris.no_bppu}', 'EDIT', '${curBr}', '${curInv}')">Edit</button>`;
+                let btnDel  = `<button class="btn-tbl btn-tbl-del" title="Hapus" onclick="handleAction('${baris.no_bppu}', 'DELETE')" >Hapus</button>`;
                 let btnPdf = baris.link_pdf_lokal ? `<a href="/${baris.link_pdf_lokal}" target="_blank" class="btn-icon-edit" style="text-decoration:none; color:white; background:#4f46e5; padding:5px 10px; border-radius:4px; font-size: 0.8rem;">📄 Arsip</a>` : `-`;
 
                 tr.innerHTML = `
                     <td class="text-center">${index + 1}</td>
                     <td class="text-center">${btnEdit} ${btnDel}</td>
                     <td class="text-center">${btnPdf}</td>
-                    <td class="text-center"><span class="badge-role">${baris.nama_cabang || baris.kode_cabang || '-'}</span></td>
-                    <td class="text-center"><span class="badge-success">${baris.masa_pajak || '-'}</span></td>
+                    <td class="text-center">${baris.nama_cabang || baris.kode_cabang || '-'}</td>
+                    <td class="text-center">${baris.masa_pajak || '-'}</td>
                     <td class="text-bold">${baris.nama_pemotong || '-'}</td>
                     <td class="text-center" style="color:#4f46e5; font-weight:bold;">${baris.no_bppu || '-'}</td>
                     <td class="text-right">${formatRupiah(baris.dpp)}</td>

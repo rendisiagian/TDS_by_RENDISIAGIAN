@@ -458,7 +458,8 @@ body {
 
 /* === 12. TABLES === */
 .table-responsive {
-    overflow-x: auto;
+    overflow: auto;
+    max-height: calc(100vh - 250px);
     border-radius: var(--radius-md);
 }
 
@@ -1997,4 +1998,42 @@ tbody:empty::after {
 
 .invoice-manual-toggle:hover {
     color: var(--primary-700);
+}
+
+/* === 38. TABLE ACTION BUTTONS (Professional) === */
+.btn-tbl {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.15s;
+    letter-spacing: 0.3px;
+    color: white;
+    margin: 0 1px;
+}
+
+.btn-tbl:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.15);
+}
+
+.btn-tbl-view {
+    background: var(--primary-600);
+}
+
+.btn-tbl-edit {
+    background: var(--warning-500);
+}
+
+.btn-tbl-del {
+    background: var(--danger-500);
+}
+
+.btn-tbl-pdf {
+    background: var(--gray-600);
+    color: white;
 }
