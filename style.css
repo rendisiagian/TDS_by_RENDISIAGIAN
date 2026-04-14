@@ -325,14 +325,15 @@ body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow-y: auto;
+    height: 100vh;
     background-color: var(--bg-secondary);
 }
 
 /* === 8. HEADER === */
 .header {
-    background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-tertiary) 100%);
-    padding: 1.5rem 2rem;
+    background: var(--bg-primary);
+    padding: 0.75rem 1.5rem;
     border-bottom: 1px solid var(--border-color);
     box-shadow: var(--shadow-sm);
     display: flex;
@@ -341,11 +342,10 @@ body {
     position: sticky;
     top: 0;
     z-index: 40;
-    backdrop-filter: blur(10px);
 }
 
 .header h2 {
-    font-size: 1.5rem;
+    font-size: 1.1rem;
     font-weight: 700;
     color: var(--text-primary);
     margin: 0;
@@ -1917,34 +1917,7 @@ tbody:empty::after {
     color: var(--primary-400);
 }
 
-/* === 36. FIX: Header compact & truly sticky === */
-.header {
-    background: var(--bg-primary) !important;
-    padding: 0.75rem 1.5rem !important;
-    border-bottom: 1px solid var(--border-color);
-    box-shadow: var(--shadow-sm);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 40;
-}
-
-.header h2 {
-    font-size: 1.1rem !important;
-    font-weight: 700;
-    margin: 0;
-}
-
-/* Fix: main-content must allow sticky to work */
-.main-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-    height: 100vh;
-}
+/* === 36. (Merged into section 7 & 8 above) === */
 
 /* === 37. SEARCHABLE SELECT (VAT OUT Dropdown) === */
 .invoice-select-wrapper {
