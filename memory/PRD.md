@@ -11,7 +11,7 @@ User memiliki sistem web Tax Database (Node.js/Express + SQLite + Socket.IO) den
 - **Features:** QR Scanner (mobile), Maker-Checker workflow, User Management, Batch PDF Upload
 
 ## What's Been Implemented (14 Jan 2026)
-1. **Complete CSS Redesign (`style.css`):**
+1. **Complete CSS Redesign (`style.css`) - MAJOR OVERHAUL:**
    - CSS Variables design system for easy theming
    - Modern Professional Blue color scheme
    - Dark Mode support with `[data-theme="dark"]`
@@ -19,8 +19,12 @@ User memiliki sistem web Tax Database (Node.js/Express + SQLite + Socket.IO) den
    - Responsive design (mobile, tablet, desktop)
    - Custom scrollbar styling
    - Print-friendly styles
-   - Better shadows, gradients, and visual depth
-   - Improved table, form, button, card, badge designs
+   - **ENHANCED: Soft modern tables** - removed harsh borders, zebra striping, hover effects, dark blue header
+   - **ENHANCED: Rounded lifted buttons** - gradient backgrounds, hover lift, shadows
+   - **ENHANCED: Filter inputs for inbox** - styled .filter-input-inbox
+   - **ENHANCED: Item tables, modal scroll, nav-back-link** all themed
+   - **CLEANED: Removed ALL inline styles** from headers, buttons in 8 HTML files
+   - **CLEANED: Removed <style> blocks** from 4 inbox HTML files
 
 2. **Dark Mode Toggle:**
    - Added to `sidebar.html` (appears on all dashboard pages)

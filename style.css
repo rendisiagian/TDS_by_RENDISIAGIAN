@@ -1625,3 +1625,185 @@ textarea:focus {
         grid-template-columns: 1fr;
     }
 }
+
+/* === 29. ENHANCED TABLE DESIGN (Soft & Modern) === */
+table {
+    border: none;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+th, td {
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+}
+
+th {
+    background: var(--primary-800);
+    color: #ffffff;
+    font-size: 0.8rem;
+    letter-spacing: 0.8px;
+    padding: 1rem;
+}
+
+[data-theme="dark"] th {
+    background: var(--primary-900);
+}
+
+/* Zebra Striping */
+tbody tr:nth-child(even) {
+    background-color: var(--bg-secondary);
+}
+
+tbody tr:nth-child(odd) {
+    background-color: var(--bg-primary);
+}
+
+tbody tr {
+    transition: all var(--transition-base);
+}
+
+tbody tr:hover td {
+    background-color: var(--primary-100) !important;
+}
+
+[data-theme="dark"] tbody tr:hover td {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+}
+
+td {
+    padding: 0.875rem 1rem;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
+/* Filter Row */
+.filter-row th {
+    background: var(--bg-tertiary);
+    padding: 0.5rem;
+    top: 44px;
+}
+
+[data-theme="dark"] .filter-row th {
+    background: var(--gray-700);
+}
+
+/* Inbox filter inputs */
+.filter-input-inbox {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    outline: none;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    transition: all var(--transition-base);
+}
+
+.filter-input-inbox:focus {
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* === 30. ENHANCED BUTTONS (Rounded & Lifted) === */
+.btn-aksi {
+    padding: 0.625rem 1rem;
+    font-size: 0.8rem;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    border: none;
+    color: white;
+    cursor: pointer;
+}
+
+.btn-verify {
+    background: linear-gradient(135deg, var(--success-500) 0%, var(--success-600) 100%);
+}
+
+.btn-reject {
+    background: linear-gradient(135deg, var(--danger-500) 0%, var(--danger-600) 100%);
+    margin-left: 0.5rem;
+}
+
+.btn-aksi:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    filter: brightness(1.1);
+}
+
+/* === 31. ITEM TABLE (inside modals) === */
+.item-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+}
+
+.item-table th,
+.item-table td {
+    border: 1px solid var(--border-color);
+    padding: 0.625rem;
+}
+
+.item-table th {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-weight: 700;
+    text-align: center;
+    font-size: 0.75rem;
+}
+
+.item-table td {
+    background: var(--bg-primary);
+}
+
+/* === 32. MODAL SCROLL BOX === */
+.modal-box-scroll {
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+/* === 33. FONT-BOLD utility === */
+.font-bold {
+    font-weight: 700;
+}
+
+/* === 34. NAV BACK LINK (for inbox pages) === */
+.nav-back-link {
+    text-decoration: none;
+    color: var(--text-primary);
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    transition: all var(--transition-base);
+}
+
+.nav-back-link:hover {
+    background: var(--bg-tertiary);
+    transform: translateY(-1px);
+}
+
+/* Override any remaining inline btn-clear-filter */
+.btn-clear-filter {
+    background: linear-gradient(135deg, var(--danger-500), var(--danger-600)) !important;
+    color: white !important;
+    border: none !important;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-md);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: none;
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-clear-filter:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
