@@ -26,33 +26,8 @@
     </nav>
 
     <div style="padding: 0.75rem 1rem; border-top: 1px solid rgba(255,255,255,0.1); margin-top: auto;">
-        <button id="btn-dark-mode" onclick="window.__toggleDarkMode()" style="position:static; width:100%; display:flex; justify-content:center; align-items:center; gap:0.5rem; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:white; padding:0.5rem 0.75rem; border-radius:6px; cursor:pointer; font-size:0.8rem; font-weight:600; transition:all 0.2s;">
+        <button id="btn-dark-mode" onclick="window.__toggleDarkMode()" style="position:static; width:100%; display:flex; justify-content:center; align-items:center; gap:0.5rem; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:white; padding:0.5rem 0.75rem; border-radius:6px; cursor:pointer; font-size:0.8rem; font-weight:600;">
             <span id="dm-icon">&#127769;</span> <span id="dm-text">Dark Mode</span>
         </button>
     </div>
 </aside>
-
-<script>
-window.__toggleDarkMode = function() {
-    var html = document.documentElement;
-    var current = html.getAttribute('data-theme') || 'light';
-    var next = (current === 'dark') ? 'light' : 'dark';
-    html.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
-    var iconEl = document.getElementById('dm-icon');
-    var textEl = document.getElementById('dm-text');
-    if (iconEl && textEl) {
-        if (next === 'dark') { iconEl.innerHTML = '&#9728;&#65039;'; textEl.textContent = 'Light Mode'; }
-        else { iconEl.innerHTML = '&#127769;'; textEl.textContent = 'Dark Mode'; }
-    }
-};
-(function() {
-    var t = localStorage.getItem('theme') || 'light';
-    document.documentElement.setAttribute('data-theme', t);
-    setTimeout(function() {
-        var iconEl = document.getElementById('dm-icon');
-        var textEl = document.getElementById('dm-text');
-        if (iconEl && textEl && t === 'dark') { iconEl.innerHTML = '&#9728;&#65039;'; textEl.textContent = 'Light Mode'; }
-    }, 100);
-})();
-</script>
