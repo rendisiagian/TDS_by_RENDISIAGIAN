@@ -27,10 +27,12 @@
                     <div class="stat-card accent-green" data-testid="stat-total-doc">
                         <span class="stat-label">Total Dokumen</span>
                         <span class="stat-value" id="stat-total">0</span>
+                        <div class="stat-mom neutral" id="mom-total">-- vs bulan lalu</div>
                     </div>
                     <div class="stat-card accent-red" data-testid="stat-total-pph">
                         <span class="stat-label">Total PPh</span>
                         <span class="stat-value" id="stat-pph">Rp 0</span>
+                        <div class="stat-mom neutral" id="mom-pph">-- vs bulan lalu</div>
                     </div>
                     <div class="stat-card accent-cyan" data-testid="stat-total-dpp">
                         <span class="stat-label">Total DPP</span>
@@ -44,13 +46,15 @@
                 </div>
 
                 <div class="card">
-                    <div class="card-header-padding" style="display:flex; justify-content:space-between; align-items:center;">
+                    <div class="card-header-padding" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                         <h3 class="title-primary" style="border-left-color: #059669; margin: 0;">Data Tax Payable</h3>
                         
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">🗑️ Hapus Filter</button>
-                            <a href="/inbox-payable" class="btn-simpan" style="margin:0; background-color: #059669; text-decoration:none; padding: 8px 15px; font-size: 0.85rem;">
-                                📥 Buka Bank Data Payable
+                        <div class="toolbar-actions">
+                            <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">&#128465; Hapus Filter</button>
+                            <button class="btn-toolbar btn-toolbar-export" onclick="exportCSV()" data-testid="btn-export">&#128190; Export CSV</button>
+                            <button class="btn-toolbar btn-toolbar-print" onclick="window.print()" data-testid="btn-print">&#128424; Print</button>
+                            <a href="/inbox-payable" class="btn-toolbar btn-toolbar-inbox">
+                                &#128229; Buka Bank Data Payable
                             </a>
                         </div>
                     </div>
@@ -153,6 +157,15 @@
                 document.getElementById('stat-pending').textContent = inbox.length;
             }).catch(() => {});
 
+            // Month-over-Month (using masa_pajak MM-YYYY)
+            var now = new Date(), curPeriod = String(now.getMonth()+1).padStart(2,'0') + '-' + now.getFullYear();
+            var lm = now.getMonth() === 0 ? 11 : now.getMonth()-1, ly = now.getMonth() === 0 ? now.getFullYear()-1 : now.getFullYear();
+            var lastPeriod = String(lm+1).padStart(2,'0') + '-' + ly;
+            var thisM = data.filter(function(d){return d.masa_pajak === curPeriod});
+            var lastM = data.filter(function(d){return d.masa_pajak === lastPeriod});
+            updateMoM('mom-total', thisM.length, lastM.length, ' BPPU');
+            updateMoM('mom-pph', thisM.reduce(function(s,d){return s+Number(d.nilai_pph||0)},0), lastM.reduce(function(s,d){return s+Number(d.nilai_pph||0)},0), '');
+
             data.forEach((baris, index) => {
                 const tr = document.createElement('tr');
                 let curBr = baris.kode_cabang || '';
@@ -250,6 +263,33 @@
         document.addEventListener('input', function(e) {
             if (e.target.classList.contains('filter-input')) jalankanFilterTabel();
         });
+
+        function updateMoM(elId, current, previous, suffix) {
+            var el = document.getElementById(elId); if (!el) return;
+            var diff = current - previous;
+            if (previous === 0 && current === 0) { el.className = 'stat-mom neutral'; el.textContent = 'Belum ada data'; return; }
+            if (previous === 0) { el.className = 'stat-mom up'; el.innerHTML = '&#9650; Baru ' + current + suffix + ' bulan ini'; return; }
+            var pct = ((diff / previous) * 100).toFixed(1);
+            if (diff > 0) { el.className = 'stat-mom up'; el.innerHTML = '&#9650; +' + pct + '% vs bulan lalu'; }
+            else if (diff < 0) { el.className = 'stat-mom down'; el.innerHTML = '&#9660; ' + pct + '% vs bulan lalu'; }
+            else { el.className = 'stat-mom neutral'; el.textContent = 'Sama dengan bulan lalu'; }
+        }
+
+        function exportCSV() {
+            var table = document.getElementById('tabel-data');
+            var rows = table.querySelectorAll('tr:not(.filter-row)');
+            var csv = [];
+            rows.forEach(function(row) {
+                if (row.style.display === 'none') return;
+                var cols = row.querySelectorAll('th, td');
+                var rowData = [];
+                cols.forEach(function(col, i) { if (i === 1 || i === 2) return; var text = col.innerText.replace(/"/g, '""').replace(/\n/g, ' '); rowData.push('"' + text + '"'); });
+                csv.push(rowData.join(','));
+            });
+            var blob = new Blob(['\uFEFF' + csv.join('\n')], {type: 'text/csv;charset=utf-8;'});
+            var link = document.createElement('a'); link.href = URL.createObjectURL(blob);
+            link.download = 'data_payable_' + aktifEntitas + '_' + new Date().toISOString().slice(0,10) + '.csv'; link.click();
+        }
 
         loadData();
     </script>
