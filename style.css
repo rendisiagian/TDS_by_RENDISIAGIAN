@@ -395,7 +395,7 @@ body {
 
 /* === 9. CONTAINER === */
 .container {
-    padding: var(--spacing-xl);
+    padding: 1rem 1.5rem;
     max-width: 98%;
     margin: 0 auto;
     overflow-y: auto;
@@ -417,7 +417,7 @@ body {
 }
 
 .card-header-padding {
-    padding: var(--spacing-xl) var(--spacing-xl) var(--spacing-md) var(--spacing-xl);
+    padding: 0.75rem 1rem;
 }
 
 /* === 11. TITLES === */
@@ -425,10 +425,10 @@ body {
 .title-success,
 .title-pending {
     color: var(--text-primary);
-    padding-left: 1rem;
+    padding-left: 0.75rem;
     margin: 0;
     font-weight: 700;
-    font-size: 1.25rem;
+    font-size: 0.95rem;
     position: relative;
 }
 
@@ -510,10 +510,10 @@ tr:hover td {
 .filter-input {
     width: 100%;
     box-sizing: border-box;
-    padding: 0.5rem 0.75rem;
+    padding: 0.25rem 0.5rem;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     outline: none;
     background-color: var(--bg-primary);
     color: var(--text-primary);
@@ -1291,40 +1291,18 @@ textarea:focus {
         position: relative;
     }
     
-    .header {
-        padding: 1rem;
-    }
-    
-    .header h2 {
-        font-size: 1.25rem;
-    }
-    
     .container {
-        padding: 1rem;
+        padding: 0.75rem;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
     
     .user-profile {
         flex-direction: column;
         gap: 0.5rem;
         align-items: flex-end;
-    }
-    
-    .dark-mode-toggle {
-        top: 0.5rem;
-        right: 0.5rem;
-    }
-    
-    table {
-        font-size: 0.75rem;
-    }
-    
-    th, td {
-        padding: 0.5rem;
-    }
-    
-    .login-card {
-        padding: 2rem;
-        margin: 1rem;
     }
     
     .grid-2-col {
@@ -1437,15 +1415,15 @@ textarea:focus {
 /* === 25. DASHBOARD STATISTICS CARDS === */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1.25rem;
-    margin-bottom: 1.5rem;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1rem;
 }
 
 .stat-card {
     background: var(--bg-primary);
-    border-radius: var(--radius-lg);
-    padding: 1.5rem;
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1rem;
     border: 1px solid var(--border-color);
     box-shadow: var(--shadow-sm);
     transition: all var(--transition-base);
@@ -1458,42 +1436,42 @@ textarea:focus {
     position: absolute;
     top: 0;
     left: 0;
-    width: 4px;
+    width: 3px;
     height: 100%;
     border-radius: var(--radius-sm);
 }
 
 .stat-card:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
 }
 
 .stat-card .stat-icon {
-    font-size: 2rem;
-    margin-bottom: 0.5rem;
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
     display: block;
 }
 
 .stat-card .stat-label {
-    font-size: 0.8rem;
-    font-weight: 600;
+    font-size: 0.65rem;
+    font-weight: 700;
     color: var(--text-tertiary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    margin-bottom: 0.375rem;
+    margin-bottom: 0.125rem;
 }
 
 .stat-card .stat-value {
-    font-size: 1.5rem;
+    font-size: 1.1rem;
     font-weight: 800;
     color: var(--text-primary);
     line-height: 1.2;
 }
 
 .stat-card .stat-sub {
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     color: var(--text-tertiary);
-    margin-top: 0.25rem;
+    margin-top: 0.125rem;
 }
 
 /* Card accent colors */
@@ -1577,10 +1555,10 @@ textarea:focus {
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     font-weight: 600;
-    margin-top: 0.375rem;
-    padding: 0.2rem 0.5rem;
+    margin-top: 0.25rem;
+    padding: 0.125rem 0.375rem;
     border-radius: var(--radius-sm);
 }
 
@@ -1641,9 +1619,9 @@ th, td {
 th {
     background: var(--primary-800);
     color: #ffffff;
-    font-size: 0.8rem;
-    letter-spacing: 0.8px;
-    padding: 1rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.5px;
+    padding: 0.5rem 0.625rem;
 }
 
 [data-theme="dark"] th {
@@ -1672,16 +1650,16 @@ tbody tr:hover td {
 }
 
 td {
-    padding: 0.875rem 1rem;
+    padding: 0.5rem 0.625rem;
     color: var(--text-primary);
-    font-size: 0.875rem;
+    font-size: 0.8rem;
 }
 
 /* Filter Row */
 .filter-row th {
     background: var(--bg-tertiary);
-    padding: 0.5rem;
-    top: 44px;
+    padding: 0.25rem 0.375rem;
+    top: 30px;
 }
 
 [data-theme="dark"] .filter-row th {
@@ -1692,10 +1670,10 @@ td {
 .filter-input-inbox {
     width: 100%;
     box-sizing: border-box;
-    padding: 0.5rem 0.75rem;
+    padding: 0.25rem 0.5rem;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     outline: none;
     background-color: var(--bg-primary);
     color: var(--text-primary);
@@ -1834,12 +1812,12 @@ td {
 
 /* Fix: h3 inside cards */
 .card h3 {
-    font-size: 1.25rem;
+    font-size: 1rem;
     font-weight: 700;
     color: var(--text-primary);
-    margin-bottom: 1.25rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 2px solid var(--border-color);
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
 }
 
 /* Fix: Empty table state */
