@@ -5,7 +5,7 @@
     </div>
     
     <div class="sidebar-entity-box">
-        <label class="sidebar-entity-label">🏢 ENTITAS AKTIF</label>
+        <label class="sidebar-entity-label">ENTITAS AKTIF</label>
         <select id="global-entity-select" class="sidebar-entity-select" onchange="localStorage.setItem('lastEntitas', this.value); if(typeof gantiEntitas === 'function') { gantiEntitas(this.value); } else if(typeof loadSummary === 'function') { aktifEntitas = this.value; loadSummary(); } else { window.location.reload(); }">
             <option value="BBS">Berca Buana Sakti</option>
             <option value="JO">Berca JO</option>
@@ -13,15 +13,37 @@
     </div>
 
     <nav class="sidebar-nav">
-        <span style="color:#64748b; padding: 10px 20px; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px;">MODUL PAJAK</span>
-        <a href="/dashboard-vatout" class="sidebar-link">📤 1. Faktur Keluaran</a>
-        <a href="/dashboard-vatin" class="sidebar-link">📥 2. Faktur Masukan</a>
-        <a href="/dashboard-payable" class="sidebar-link">💸 3. Tax Payable (BPPU)</a>
-        <a href="/dashboard-prepaid" class="sidebar-link">🛡️ 4. Prepaid Tax</a>
+        <span class="sidebar-nav-label">MODUL PAJAK</span>
+        <a href="/dashboard-vatout" class="sidebar-link" data-testid="nav-vatout">&#128228; 1. Faktur Keluaran</a>
+        <a href="/dashboard-vatin" class="sidebar-link" data-testid="nav-vatin">&#128229; 2. Faktur Masukan</a>
+        <a href="/dashboard-payable" class="sidebar-link" data-testid="nav-payable">&#128184; 3. Tax Payable (BPPU)</a>
+        <a href="/dashboard-prepaid" class="sidebar-link" data-testid="nav-prepaid">&#128737;&#65039; 4. Prepaid Tax</a>
 
-        <span style="color:#64748b; padding: 10px 20px; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px; margin-top: 15px; display:block;">SISTEM & UTILITAS</span>
-        <a href="/summary" class="sidebar-link">📊 Summary Report</a>
-        <a href="/profile" class="sidebar-link">👤 Profil Saya</a>
-        <a href="/manage-users" class="sidebar-link" id="menu-manage-users">⚙️ Panel Approval</a>
+        <span class="sidebar-nav-label">SISTEM & UTILITAS</span>
+        <a href="/summary" class="sidebar-link" data-testid="nav-summary">&#128202; Summary Report</a>
+        <a href="/profile" class="sidebar-link" data-testid="nav-profile">&#128100; Profil Saya</a>
+        <a href="/manage-users" class="sidebar-link" id="menu-manage-users" data-testid="nav-manage-users">&#9881;&#65039; Panel Approval</a>
     </nav>
+
+    <!-- Dark Mode Toggle di bawah sidebar -->
+    <div style="padding: 1rem 1.25rem; border-top: 1px solid rgba(255,255,255,0.1);">
+        <button class="dark-mode-toggle" onclick="toggleDarkMode()" data-testid="dark-mode-toggle" style="position:static; width:100%; justify-content:center; background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white;">
+            <span class="moon-icon icon">&#127769; Dark Mode</span>
+            <span class="sun-icon icon">&#9728;&#65039; Light Mode</span>
+        </button>
+    </div>
 </aside>
+
+<script>
+    function toggleDarkMode() {
+        var html = document.documentElement;
+        var current = html.getAttribute('data-theme');
+        var next = current === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+    }
+    (function() {
+        var t = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', t);
+    })();
+</script>
