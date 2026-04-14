@@ -1433,3 +1433,92 @@ textarea:focus {
 }
 
 /* === END OF STYLES === */
+
+/* === 25. DASHBOARD STATISTICS CARDS === */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.stat-card {
+    background: var(--bg-primary);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition-base);
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    border-radius: var(--radius-sm);
+}
+
+.stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+}
+
+.stat-card .stat-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.stat-card .stat-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.375rem;
+}
+
+.stat-card .stat-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.stat-card .stat-sub {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    margin-top: 0.25rem;
+}
+
+/* Card accent colors */
+.stat-card.accent-blue::before { background: linear-gradient(180deg, var(--primary-500), var(--primary-700)); }
+.stat-card.accent-green::before { background: linear-gradient(180deg, var(--success-500), var(--success-700)); }
+.stat-card.accent-orange::before { background: linear-gradient(180deg, var(--warning-500), var(--warning-600)); }
+.stat-card.accent-purple::before { background: linear-gradient(180deg, #8b5cf6, #6d28d9); }
+.stat-card.accent-cyan::before { background: linear-gradient(180deg, var(--accent-400), var(--accent-600)); }
+.stat-card.accent-red::before { background: linear-gradient(180deg, var(--danger-500), var(--danger-600)); }
+
+.btn-clear-filter {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-md);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-base);
+    display: none;
+}
+
+.btn-clear-filter:hover {
+    background: var(--danger-50);
+    color: var(--danger-600);
+    border-color: var(--danger-500);
+}

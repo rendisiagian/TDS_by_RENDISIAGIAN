@@ -22,6 +22,27 @@
             </header>
 
             <div class="container">
+                <!-- Statistics Cards -->
+                <div class="stats-grid" id="stats-cards" data-testid="stats-cards">
+                    <div class="stat-card accent-orange" data-testid="stat-total-doc">
+                        <span class="stat-label">Total Dokumen</span>
+                        <span class="stat-value" id="stat-total">0</span>
+                    </div>
+                    <div class="stat-card accent-green" data-testid="stat-total-ppn">
+                        <span class="stat-label">Total PPN</span>
+                        <span class="stat-value" id="stat-ppn">Rp 0</span>
+                    </div>
+                    <div class="stat-card accent-cyan" data-testid="stat-total-dpp">
+                        <span class="stat-label">Total DPP</span>
+                        <span class="stat-value" id="stat-dpp">Rp 0</span>
+                    </div>
+                    <div class="stat-card accent-blue" data-testid="stat-pending">
+                        <span class="stat-label">Pending di Inbox</span>
+                        <span class="stat-value" id="stat-pending">0</span>
+                        <span class="stat-sub">Menunggu Dilengkapi</span>
+                    </div>
+                </div>
+
                 <div class="card">
                     <div class="card-header-padding" style="display:flex; justify-content:space-between; align-items:center;">
                         <h3 class="title-primary" style="border-left-color: #ea580c; margin: 0;">Data Faktur Keluaran</h3>
@@ -128,6 +149,16 @@
             const tbody = document.getElementById('tabel-body');
             tbody.innerHTML = ''; 
             const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
+
+            // Update Statistics Cards
+            let totalDPP = 0, totalPPN = 0;
+            data.forEach(d => { totalDPP += Number(d.dpp || 0); totalPPN += Number(d.ppn || 0); });
+            document.getElementById('stat-total').textContent = data.length + ' Faktur';
+            document.getElementById('stat-ppn').textContent = formatRupiah(totalPPN);
+            document.getElementById('stat-dpp').textContent = formatRupiah(totalDPP);
+            fetch('/api/inbox-vatout').then(r => r.json()).then(inbox => {
+                document.getElementById('stat-pending').textContent = inbox.length;
+            }).catch(() => {});
 
             data.forEach((baris, index) => {
                 const tr = document.createElement('tr');

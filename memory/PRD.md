@@ -32,6 +32,14 @@ User memiliki sistem web Tax Database (Node.js/Express + SQLite + Socket.IO) den
 3. **Viewport Meta Tags:**
    - Added `<meta name="viewport">` to all HTML files for mobile responsiveness
 
+4. **Dashboard Statistics Cards (NEW):**
+   - 4 stat cards on each of the 4 module dashboards
+   - VAT IN/OUT: Total Dokumen, Total PPN, Total DPP, Pending Inbox
+   - Payable/Prepaid: Total Dokumen, Total PPh, Total DPP, Pending Inbox
+   - Auto-calculated from loaded data
+   - Hover animations with accent color variants
+   - Responsive grid layout
+
 ## Prioritized Backlog
 ### P0 (High Priority)
 - Export to Excel/CSV functionality
