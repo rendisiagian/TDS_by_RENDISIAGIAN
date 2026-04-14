@@ -50,25 +50,25 @@
                             <h3 class="title-primary">Buat Pengguna Baru</h3>
                             <div class="form-group">
                                 <label>Username Login</label>
-                                <input type=\"text\" id=\"new_username\" autocomplete=\"off\">
+                                <input type="text" id="new_username" autocomplete="off">
                             </div>
                             <div class="form-group">
                                 <label>Nama Lengkap</label>
-                                <input type=\"text\" id=\"new_nama\" autocomplete=\"off\">
+                                <input type="text" id="new_nama" autocomplete="off">
                             </div>
                             <div class="form-group">
                                 <label>Role / Hak Akses</label>
-                                <select id=\"new_role\" class=\"form-select\">
-                                    <option value=\"admin\">Admin (Input & Ekstraksi)</option>
-                                    <option value=\"supervisor\">Supervisor (Checker & Eksekutor)</option>
-                                    <option value=\"administrator\">Administrator (Super User)</option>
+                                <select id="new_role" class="form-select">
+                                    <option value="admin">Admin (Input & Ekstraksi)</option>
+                                    <option value="supervisor">Supervisor (Checker & Eksekutor)</option>
+                                    <option value="administrator">Administrator (Super User)</option>
                                 </select>
                             </div>
                             <div class="form-group">
                                 <label>Password Default</label>
-                                <input type=\"password\" id=\"new_password\">
+                                <input type="password" id="new_password">
                             </div>
-                            <button class="btn-simpan btn-manage" onclick=\"tambahUser()\">➕ Tambahkan Akun</button>
+                            <button class="btn-simpan btn-manage" onclick="tambahUser()">➕ Tambahkan Akun</button>
                         </div>
 
                         <div class="card flex-2">
@@ -86,7 +86,7 @@
                                             <th>Aksi Admin</th>
                                         </tr>
                                     </thead>
-                                    <tbody id=\"tabel-users\"></tbody>
+                                    <tbody id="tabel-users"></tbody>
                                 </table>
                             </div>
                         </div>
@@ -225,15 +225,15 @@
             
             data.forEach(u => {
                 const tr = document.createElement('tr');
-                let aksiBtn = isSuperAdmin(u.role) ? `<span class=\"text-protected\" style="font-size:0.75rem; font-weight:bold;">🛡️ Protected</span>` : `<button class=\"btn-aksi btn-reset-pass\" onclick=\"resetPassword('${u.id}', '${u.username}')\">🔑 Reset Pass</button>`;
+                let aksiBtn = isSuperAdmin(u.role) ? `<span class="text-protected" style="font-size:0.75rem; font-weight:bold;">🛡️ Protected</span>` : `<button class="btn-aksi btn-reset-pass" onclick="resetPassword('${u.id}', '${u.username}')>🔑 Reset Pass</button>`;
                 
                 let roleColor = u.role === 'supervisor' ? '#f59e0b' : (u.role === 'admin' ? '#2563eb' : '#0f172a');
 
                 tr.innerHTML = `
                     <td class="text-center">${u.id}</td>
-                    <td class=\"text-bold\">${u.username}</td>
+                    <td class=text-bold>${u.username}</td>
                     <td>${u.nama_lengkap}</td>
-                    <td class="text-center"><span class=\"badge-role\" style="background:#f8fafc; border:1px solid #e2e8f0; color:${roleColor};">${u.role.toUpperCase()}</span></td>
+                    <td class="text-center"><span class="badge-role" style="background:#f8fafc; border:1px solid #e2e8f0; color:${roleColor};">${u.role.toUpperCase()}</span></td>
                     <td class="text-center">${aksiBtn}</td>
                 `;
                 tbody.appendChild(tr);

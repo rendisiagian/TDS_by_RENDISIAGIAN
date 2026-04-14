@@ -7,9 +7,12 @@
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <button class="dark-mode-toggle" onclick="toggleDarkMode()" title="Toggle Dark Mode">
-        <span class="moon-icon icon">&#127769;</span>
-        <span class="sun-icon icon">&#9728;&#65039;</span>
+    <script>
+        (function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <button class="dark-mode-toggle" onclick="(function(){var h=document.documentElement,c=h.getAttribute('data-theme')||'light',n=c==='dark'?'light':'dark';h.setAttribute('data-theme',n);localStorage.setItem('theme',n);document.getElementById('dm-login-icon').innerHTML=n==='dark'?'&#9728;&#65039;':'&#127769;'})()" title="Toggle Dark Mode" data-testid="login-dark-toggle" style="z-index:100;">
+        <span id="dm-login-icon">&#127769;</span>
     </button>
 
     <div class="login-container">
@@ -31,16 +34,10 @@
     </div>
 
     <script>
-        function toggleDarkMode() {
-            const html = document.documentElement;
-            const current = html.getAttribute('data-theme');
-            const next = current === 'dark' ? 'light' : 'dark';
-            html.setAttribute('data-theme', next);
-            localStorage.setItem('theme', next);
-        }
-        (function() {
+        (function(){
             var t = localStorage.getItem('theme') || 'light';
-            document.documentElement.setAttribute('data-theme', t);
+            var icon = document.getElementById('dm-login-icon');
+            if (icon && t === 'dark') icon.innerHTML = '&#9728;&#65039;';
         })();
     </script>
 </body>

@@ -1807,3 +1807,112 @@ td {
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);
 }
+
+/* === 35. FIX: Card with padding === */
+.flex-1-p20 {
+    flex: 1;
+    padding: 1.5rem;
+    min-width: 300px;
+}
+
+.flex-2 {
+    flex: 2;
+    min-width: 400px;
+}
+
+/* Fix: Cards inside flex should have proper content padding */
+.card.flex-1-p20,
+.card.flex-2 {
+    padding: 1.5rem;
+}
+
+.card.flex-2 .table-responsive {
+    margin: -1.5rem;
+    margin-top: 0;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* Fix: h3 inside cards */
+.card h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+/* Fix: Empty table state */
+tbody:empty::after {
+    content: 'Belum ada data.';
+    display: block;
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
+/* Fix: Select dropdown dark mode */
+[data-theme="dark"] select,
+[data-theme="dark"] .form-select,
+[data-theme="dark"] .sidebar-entity-select {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] select option {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+/* Fix: Sidebar in dark mode */
+[data-theme="dark"] .sidebar {
+    background: linear-gradient(180deg, #0a0f1a 0%, #111827 100%);
+}
+
+[data-theme="dark"] .sidebar-entity-box {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* Fix: Modal in dark mode */
+[data-theme="dark"] .modal-box {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .modal-box input[readonly] {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+/* Fix: Card hover in dark mode */
+[data-theme="dark"] .card {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+/* Fix: Login in dark mode */
+[data-theme="dark"] .login-container {
+    background: linear-gradient(135deg, #0a0f1a 0%, #111827 50%, #0c4a6e 100%);
+}
+
+[data-theme="dark"] .login-card {
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+/* Fix: Info faktur dark mode */
+[data-theme="dark"] .info-faktur {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+    color: var(--text-secondary);
+}
+
+/* Fix: Drop zone in dark mode */
+[data-theme="dark"] .drop-zone {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: var(--primary-500);
+    color: var(--primary-400);
+}

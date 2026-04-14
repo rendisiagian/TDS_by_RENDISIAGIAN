@@ -8,37 +8,42 @@
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-    <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t)})()</script>
     <div class="app-wrapper">
         <div id="sidebar-container"></div>
         <main class="main-content">
             <header class="header"><h2>Pengaturan Profil Akun</h2></header>
 
-            <div class="container flex-container-gap">
-                <div class="card flex-1-p20">
-                    <h3 class="mb-15px">Ajukan Perubahan Data</h3>
-                    <div class="form-group">
-                        <label>Jenis Perubahan</label>
-                        <select id="jenis_req" class="form-select">
-                            <option value="NAMA">Ubah Nama Lengkap</option>
-                            <option value="PASSWORD">Ubah Password</option>
-                        </select>
+            <div class="container">
+                <div class="flex-container-gap">
+                    <div class="card flex-1-p20">
+                        <h3>Ajukan Perubahan Data</h3>
+                        <div class="form-group">
+                            <label>Jenis Perubahan</label>
+                            <select id="jenis_req" class="form-select">
+                                <option value="NAMA">Ubah Nama Lengkap</option>
+                                <option value="PASSWORD">Ubah Password</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Nilai / Data Baru</label>
+                            <input type="text" id="nilai_baru" placeholder="Ketik data baru..." autocomplete="off">
+                        </div>
+                        <button id="btn-ajukan" class="btn-simpan" onclick="ajukanPerubahan()">Ajukan ke Administrator</button>
                     </div>
-                    <div class="form-group">
-                        <label>Nilai / Data Baru</label>
-                        <input type="text" id="nilai_baru" placeholder="Ketik data baru..." autocomplete="off">
-                    </div>
-                    <button id="btn-ajukan" class="btn-simpan" onclick="ajukanPerubahan()">Ajukan ke Administrator</button>
-                </div>
 
-                <div class="card flex-2">
-                    <div class="table-responsive">
-                        <table>
-                            <thead>
-                                <tr><th>Waktu Pengajuan</th><th>Tipe Request</th><th>Status Approval</th></tr>
-                            </thead>
-                            <tbody id="tabel-riwayat"></tbody>
-                        </table>
+                    <div class="card flex-2" style="padding: 0;">
+                        <div style="padding: 1.5rem 1.5rem 0.75rem 1.5rem;">
+                            <h3 style="margin-bottom: 0; border: none;">Riwayat Pengajuan</h3>
+                        </div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr><th>Waktu Pengajuan</th><th>Tipe Request</th><th>Status Approval</th></tr>
+                                </thead>
+                                <tbody id="tabel-riwayat"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -79,10 +84,14 @@
             const data = await res.json();
             const tbody = document.getElementById('tabel-riwayat');
             tbody.innerHTML = '';
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:2rem; color:var(--text-tertiary); font-style:italic;">Belum ada riwayat pengajuan.</td></tr>';
+                return;
+            }
             data.forEach(req => {
                 const tr = document.createElement('tr');
                 let statusClass = req.status === 'Pending' ? 'status-pending-text' : (req.status === 'Disetujui' ? 'status-approved-text' : 'status-rejected-text');
-                tr.innerHTML = `<td>${req.waktu_format}</td><td class="text-bold">Ubah ${req.jenis_request}</td><td class="status-text ${statusClass}">${req.status}</td>`;
+                tr.innerHTML = '<td>' + req.waktu_format + '</td><td class="text-bold">Ubah ' + req.jenis_request + '</td><td class="status-text ' + statusClass + '">' + req.status + '</td>';
                 tbody.appendChild(tr);
             });
         }
