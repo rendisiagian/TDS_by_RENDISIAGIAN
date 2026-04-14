@@ -25,25 +25,43 @@
         <a href="/manage-users" class="sidebar-link" id="menu-manage-users" data-testid="nav-manage-users">&#9881;&#65039; Panel Approval</a>
     </nav>
 
-    <!-- Dark Mode Toggle di bawah sidebar -->
-    <div style="padding: 1rem 1.25rem; border-top: 1px solid rgba(255,255,255,0.1);">
-        <button class="dark-mode-toggle" onclick="toggleDarkMode()" data-testid="dark-mode-toggle" style="position:static; width:100%; justify-content:center; background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white;">
-            <span class="moon-icon icon">&#127769; Dark Mode</span>
-            <span class="sun-icon icon">&#9728;&#65039; Light Mode</span>
+    <div style="padding: 1rem 1.25rem; border-top: 1px solid rgba(255,255,255,0.1); margin-top: auto;">
+        <button id="btn-dark-mode" data-testid="dark-mode-toggle" onclick="window.__toggleDarkMode()" style="position:static; width:100%; display:flex; justify-content:center; align-items:center; gap:0.5rem; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:white; padding:0.75rem 1rem; border-radius:8px; cursor:pointer; font-size:0.9rem; font-weight:600; transition:all 0.2s;">
+            <span id="dm-icon">&#127769;</span> <span id="dm-text">Dark Mode</span>
         </button>
     </div>
 </aside>
 
 <script>
-    function toggleDarkMode() {
-        var html = document.documentElement;
-        var current = html.getAttribute('data-theme');
-        var next = current === 'dark' ? 'light' : 'dark';
-        html.setAttribute('data-theme', next);
-        localStorage.setItem('theme', next);
+window.__toggleDarkMode = function() {
+    var html = document.documentElement;
+    var current = html.getAttribute('data-theme') || 'light';
+    var next = (current === 'dark') ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    var iconEl = document.getElementById('dm-icon');
+    var textEl = document.getElementById('dm-text');
+    if (iconEl && textEl) {
+        if (next === 'dark') {
+            iconEl.innerHTML = '&#9728;&#65039;';
+            textEl.textContent = 'Light Mode';
+        } else {
+            iconEl.innerHTML = '&#127769;';
+            textEl.textContent = 'Dark Mode';
+        }
     }
-    (function() {
-        var t = localStorage.getItem('theme') || 'light';
-        document.documentElement.setAttribute('data-theme', t);
-    })();
+};
+
+(function() {
+    var t = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', t);
+    setTimeout(function() {
+        var iconEl = document.getElementById('dm-icon');
+        var textEl = document.getElementById('dm-text');
+        if (iconEl && textEl && t === 'dark') {
+            iconEl.innerHTML = '&#9728;&#65039;';
+            textEl.textContent = 'Light Mode';
+        }
+    }, 100);
+})();
 </script>

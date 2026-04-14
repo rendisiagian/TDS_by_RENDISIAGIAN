@@ -7,15 +7,6 @@
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-    <style>
-        .item-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.75rem; }
-        .item-table th, .item-table td { border: 1px solid #cbd5e1; padding: 6px; }
-        .item-table th { background-color: #e2e8f0; color: #1e293b; font-weight: bold; text-align: center; }
-        .item-table td { background-color: #f8fafc; }
-        .modal-box-scroll { max-height: 90vh; overflow-y: auto; }
-        .btn-clear-filter { background-color: #ef4444; color: white; border: none; padding: 6px 15px; border-radius: 5px; font-size: 0.85rem; cursor: pointer; display: none; font-weight: bold; }
-        .btn-clear-filter:hover { background-color: #dc2626; }
-    </style>
 </head>
 <body>
     <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
@@ -24,9 +15,9 @@
         <div id="sidebar-container"></div>
 
         <main class="main-content">
-            <header class="header" style="background-color: #ea580c;">
-                <h2 style="color: white;">📥 Bank Data VAT OUT (Antrean Tagihan Client)</h2>
-                <div class="user-profile"><a href="/dashboard-vatout" class="nav-back-link" style="color: white;">← Kembali</a></div>
+            <header class="header">
+                <h2>📥 Bank Data VAT OUT (Antrean Tagihan Client)</h2>
+                <div class="user-profile"><a href="/dashboard-vatout" class="nav-back-link" >← Kembali</a></div>
             </header>
 
             <div class="container">

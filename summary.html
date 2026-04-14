@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Summary - Perbandingan Faktur</title>
     <link rel="stylesheet" href="/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
@@ -15,18 +16,35 @@
             <header class="header">
                 <h2>Summary Perbandingan Realisasi vs Tanggal Faktur</h2>
                 <div class="user-profile">
+                    <div class="toolbar-actions">
+                        <button class="btn-toolbar btn-toolbar-export" onclick="exportSummaryCSV()" data-testid="btn-export-summary">&#128190; Export CSV</button>
+                        <button class="btn-toolbar btn-toolbar-print" onclick="window.print()" data-testid="btn-print-summary">&#128424; Print</button>
+                    </div>
                     <a href="/logout" class="btn-logout">Logout</a>
                 </div>
             </header>
 
             <div class="container">
+                <!-- Charts -->
+                <div class="chart-grid" data-testid="chart-grid">
+                    <div class="chart-container">
+                        <h3 class="title-primary" style="margin-bottom: 1rem; font-size: 1rem;">Tren PPN per Periode</h3>
+                        <canvas id="chartPPN"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3 class="title-success" style="margin-bottom: 1rem; font-size: 1rem;">Jumlah Dokumen per Periode</h3>
+                        <canvas id="chartDokumen"></canvas>
+                    </div>
+                </div>
+
+                <!-- Table -->
                 <div class="card">
                     <div class="card-header-padding">
                         <h3 class="title-primary" style="border-left-color: #8b5cf6; margin: 0; padding-bottom: 15px;">Rekapitulasi Data Pajak Masukan</h3>
                     </div>
                     
                     <div class="table-responsive">
-                        <table>
+                        <table id="tabel-summary">
                             <thead>
                                 <tr>
                                     <th rowspan="2" class="border-right-middle text-center">Bulan / Periode</th>
@@ -41,8 +59,7 @@
                                     <th class="text-center border-right-middle">Total PPN</th>
                                 </tr>
                             </thead>
-                            <tbody id="body-compare">
-                                </tbody>
+                            <tbody id="body-compare"></tbody>
                         </table>
                     </div>
                 </div>
@@ -52,6 +69,7 @@
 
     <script>
         let aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
+        let chartPPN = null, chartDokumen = null;
 
         fetch('/sidebar.html')
             .then(res => res.text())
@@ -61,12 +79,10 @@
                 document.querySelectorAll('.sidebar-link').forEach(link => {
                     if (link.getAttribute('href') === currentPath) link.classList.add('active');
                 });
-                
                 const sidebarSelect = document.getElementById('global-entity-select');
                 if (sidebarSelect) sidebarSelect.value = aktifEntitas;
             });
 
-        // Fungsi Global untuk Sidebar Dropdown
         window.gantiEntitas = function(entitas) {
             aktifEntitas = entitas;
             localStorage.setItem('lastEntitas', entitas);
@@ -74,6 +90,18 @@
             if (sidebarSelect && sidebarSelect.value !== entitas) sidebarSelect.value = entitas;
             loadSummary();
         };
+
+        function getChartColors() {
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            return {
+                text: isDark ? '#cbd5e1' : '#334155',
+                grid: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                ppnTukar: '#3b82f6',
+                ppnFaktur: '#10b981',
+                docTukar: '#f59e0b',
+                docFaktur: '#8b5cf6'
+            };
+        }
 
         async function loadSummary() {
             try {
@@ -83,32 +111,105 @@
                 tbody.innerHTML = '';
                 const formatRupiah = (angka) => "Rp " + Number(angka).toLocaleString('id-ID');
 
-                if(data.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="padding: 20px; color: #64748b;">Belum ada data rekapitulasi untuk entitas ini.</td></tr>`;
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="padding: 20px; color: var(--text-tertiary);">Belum ada data rekapitulasi untuk entitas ini.</td></tr>';
+                    if (chartPPN) { chartPPN.destroy(); chartPPN = null; }
+                    if (chartDokumen) { chartDokumen.destroy(); chartDokumen = null; }
                     return;
                 }
 
+                // Populate table
                 data.forEach(row => {
                     const tr = document.createElement('tr');
                     const selisih = row.ppn_tukar - row.ppn_faktur;
                     const classSelisih = selisih >= 0 ? 'diff-pos' : 'diff-neg';
-
-                    tr.innerHTML = `
-                        <td class="text-bold border-right-middle text-center">${row.periode}</td>
-                        <td class="text-center">${row.jml_tukar} Dokumen</td>
-                        <td class="border-right-middle text-right">${formatRupiah(row.ppn_tukar)}</td>
-                        <td class="text-center">${row.jml_faktur} Dokumen</td>
-                        <td class="border-right-middle text-right">${formatRupiah(row.ppn_faktur)}</td>
-                        <td class="${classSelisih} text-right" style="padding-right: 20px;">${formatRupiah(selisih)}</td>
-                    `;
+                    tr.innerHTML = 
+                        '<td class="text-bold border-right-middle text-center">' + row.periode + '</td>' +
+                        '<td class="text-center">' + row.jml_tukar + ' Dokumen</td>' +
+                        '<td class="border-right-middle text-right">' + formatRupiah(row.ppn_tukar) + '</td>' +
+                        '<td class="text-center">' + row.jml_faktur + ' Dokumen</td>' +
+                        '<td class="border-right-middle text-right">' + formatRupiah(row.ppn_faktur) + '</td>' +
+                        '<td class="' + classSelisih + ' text-right" style="padding-right: 20px;">' + formatRupiah(selisih) + '</td>';
                     tbody.appendChild(tr);
                 });
-            } catch (err) { 
-                console.error("Gagal memuat summary", err); 
+
+                // Build charts
+                var labels = data.map(function(r) { return r.periode; }).reverse();
+                var ppnTukar = data.map(function(r) { return r.ppn_tukar; }).reverse();
+                var ppnFaktur = data.map(function(r) { return r.ppn_faktur; }).reverse();
+                var docTukar = data.map(function(r) { return r.jml_tukar; }).reverse();
+                var docFaktur = data.map(function(r) { return r.jml_faktur; }).reverse();
+                var colors = getChartColors();
+
+                // PPN Chart
+                if (chartPPN) chartPPN.destroy();
+                chartPPN = new Chart(document.getElementById('chartPPN'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: 'PPN (Tgl Tukar)', data: ppnTukar, borderColor: colors.ppnTukar, backgroundColor: colors.ppnTukar + '20', tension: 0.3, fill: true },
+                            { label: 'PPN (Tgl Faktur)', data: ppnFaktur, borderColor: colors.ppnFaktur, backgroundColor: colors.ppnFaktur + '20', tension: 0.3, fill: true }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { labels: { color: colors.text } } },
+                        scales: {
+                            x: { ticks: { color: colors.text }, grid: { color: colors.grid } },
+                            y: { ticks: { color: colors.text, callback: function(v) { return 'Rp ' + (v/1000000).toFixed(0) + 'jt'; } }, grid: { color: colors.grid } }
+                        }
+                    }
+                });
+
+                // Dokumen Chart
+                if (chartDokumen) chartDokumen.destroy();
+                chartDokumen = new Chart(document.getElementById('chartDokumen'), {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: 'Dok (Tgl Tukar)', data: docTukar, backgroundColor: colors.docTukar + 'cc', borderRadius: 6 },
+                            { label: 'Dok (Tgl Faktur)', data: docFaktur, backgroundColor: colors.docFaktur + 'cc', borderRadius: 6 }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { labels: { color: colors.text } } },
+                        scales: {
+                            x: { ticks: { color: colors.text }, grid: { color: colors.grid } },
+                            y: { ticks: { color: colors.text }, grid: { color: colors.grid } }
+                        }
+                    }
+                });
+
+            } catch (err) {
+                console.error("Gagal memuat summary", err);
             }
         }
 
-        // Jalankan Pertama Kali
+        function exportSummaryCSV() {
+            var table = document.getElementById('tabel-summary');
+            var rows = table.querySelectorAll('tr');
+            var csv = [];
+            csv.push('"Periode","Jml Dok (Tukar)","PPN (Tukar)","Jml Dok (Faktur)","PPN (Faktur)","Selisih PPN"');
+            var dataRows = document.querySelectorAll('#body-compare tr');
+            dataRows.forEach(function(row) {
+                var cols = row.querySelectorAll('td');
+                var rowData = [];
+                cols.forEach(function(col) {
+                    var text = col.innerText.replace(/"/g, '""');
+                    rowData.push('"' + text + '"');
+                });
+                csv.push(rowData.join(','));
+            });
+            var blob = new Blob(['\uFEFF' + csv.join('\n')], {type: 'text/csv;charset=utf-8;'});
+            var link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'summary_' + aktifEntitas + '_' + new Date().toISOString().slice(0,10) + '.csv';
+            link.click();
+        }
+
         loadSummary();
     </script>
 </body>

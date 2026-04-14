@@ -11,7 +11,7 @@ User memiliki sistem web Tax Database (Node.js/Express + SQLite + Socket.IO) den
 - **Features:** QR Scanner (mobile), Maker-Checker workflow, User Management, Batch PDF Upload
 
 ## What's Been Implemented (14 Jan 2026)
-1. **Complete CSS Redesign (`style.css`):**
+1. **Complete CSS Redesign (`style.css`) - MAJOR OVERHAUL:**
    - CSS Variables design system for easy theming
    - Modern Professional Blue color scheme
    - Dark Mode support with `[data-theme="dark"]`
@@ -19,8 +19,12 @@ User memiliki sistem web Tax Database (Node.js/Express + SQLite + Socket.IO) den
    - Responsive design (mobile, tablet, desktop)
    - Custom scrollbar styling
    - Print-friendly styles
-   - Better shadows, gradients, and visual depth
-   - Improved table, form, button, card, badge designs
+   - **ENHANCED: Soft modern tables** - removed harsh borders, zebra striping, hover effects, dark blue header
+   - **ENHANCED: Rounded lifted buttons** - gradient backgrounds, hover lift, shadows
+   - **ENHANCED: Filter inputs for inbox** - styled .filter-input-inbox
+   - **ENHANCED: Item tables, modal scroll, nav-back-link** all themed
+   - **CLEANED: Removed ALL inline styles** from headers, buttons in 8 HTML files
+   - **CLEANED: Removed <style> blocks** from 4 inbox HTML files
 
 2. **Dark Mode Toggle:**
    - Added to `sidebar.html` (appears on all dashboard pages)
@@ -32,13 +36,28 @@ User memiliki sistem web Tax Database (Node.js/Express + SQLite + Socket.IO) den
 3. **Viewport Meta Tags:**
    - Added `<meta name="viewport">` to all HTML files for mobile responsiveness
 
-4. **Dashboard Statistics Cards (NEW):**
+4. **Dashboard Statistics Cards:**
    - 4 stat cards on each of the 4 module dashboards
    - VAT IN/OUT: Total Dokumen, Total PPN, Total DPP, Pending Inbox
    - Payable/Prepaid: Total Dokumen, Total PPh, Total DPP, Pending Inbox
-   - Auto-calculated from loaded data
-   - Hover animations with accent color variants
-   - Responsive grid layout
+   - **Month-over-Month (MoM) indicators** with green arrow up / red arrow down
+   - Auto-calculated from loaded data, responsive grid layout
+
+5. **Export CSV (NEW):**
+   - Export button on all 4 dashboards + Summary page
+   - Exports visible table data (respects active filters)
+   - UTF-8 BOM for Excel compatibility
+   - Auto-named with module + entity + date
+
+6. **Print Button (NEW):**
+   - Print button on all 4 dashboards + Summary page
+   - Print-friendly CSS hides sidebar, buttons, non-essential elements
+
+7. **Chart.js on Summary Page (NEW):**
+   - Line chart: Tren PPN per Periode (Tukar vs Faktur)
+   - Bar chart: Jumlah Dokumen per Periode
+   - Responsive, dark-mode aware colors
+   - Chart.js 4.4.1 via CDN
 
 ## Prioritized Backlog
 ### P0 (High Priority)
