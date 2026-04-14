@@ -23,12 +23,12 @@
             <div class="container">
                 <div class="card">
                     <div class="card-header-padding" style="display:flex; justify-content:space-between; align-items:center;">
-                        <h3 class="title-primary" style="border-left-color: #2563eb; margin: 0;">Daftar Antrean Faktur Masukan</h3>
+                        <h3 class="title-primary" style="border-left-color: #2563eb; margin: 0;">Dokumen Menunggu Verifikasi</h3>
                         
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">🗑️ Hapus Filter</button>
                             <button class="btn-simpan" style="margin:0; background-color: #2563eb;" onclick="document.getElementById('filePdfUpload').click()">
-                                📁 Upload Bulk PDF Faktur
+                                📁 Unggah Dokumen PDF
                             </button>
                         </div>
                     </div>
@@ -110,7 +110,7 @@
             </div>
             
             <div style="display:flex; gap:10px; margin-top: 15px;">
-                <button class="btn-simpan" style="background-color: #2563eb; flex: 2;" onclick="simpanFinalVatin()">💾 Simpan & Rilis Data</button>
+                <button class="btn-simpan" style="background-color: #2563eb; flex: 2;" onclick="simpanFinalVatin()">💾 Verifikasi & Simpan</button>
                 <button class="btn-simpan btn-cancel" style="flex: 1; margin-top:0;" onclick="document.getElementById('modalReviewPDF').style.display='none'">Batal</button>
             </div>
         </div>
