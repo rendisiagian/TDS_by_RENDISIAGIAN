@@ -98,6 +98,15 @@
         </main>
     </div>
 
+    <!-- Comparison Modal -->
+    <div id="modalComparison" class="modal-overlay">
+        <div class="modal-box" style="max-width: 700px;">
+            <h3 style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1rem;">Perbandingan Nilai Bukti Potong vs Faktur Keluaran</h3>
+            <div id="comparison-content"></div>
+            <button class="btn-simpan btn-cancel" style="margin-top: 1rem;" onclick="document.getElementById('modalComparison').style.display='none'">Tutup</button>
+        </div>
+    </div>
+
     <div id="modalEditData" class="modal-overlay">
         <div class="modal-box" style="max-width: 500px;">
             <h3 style="border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; color: #4f46e5;">✏️ Edit Relasi Internal</h3>
@@ -173,12 +182,13 @@
                 let curInv = baris.no_invoice_internal || '';
 
                 let btnEdit = `<button class="btn-tbl btn-tbl-edit" title="Edit" onclick="handleAction('${baris.no_bppu}', 'EDIT', '${curBr}', '${curInv}')">Edit</button>`;
-                let btnDel  = `<button class="btn-tbl btn-tbl-del" title="Hapus" onclick="handleAction('${baris.no_bppu}', 'DELETE')" >Hapus</button>`;
-                let btnPdf = baris.link_pdf_lokal ? `<a href="/${baris.link_pdf_lokal}" target="_blank" class="btn-icon-edit" style="text-decoration:none; color:white; background:#4f46e5; padding:5px 10px; border-radius:4px; font-size: 0.8rem;">📄 Arsip</a>` : `-`;
+                let btnDel  = `<button class="btn-tbl btn-tbl-del" title="Hapus" onclick="handleAction('${baris.no_bppu}', 'DELETE')">Hapus</button>`;
+                let btnCompare = baris.no_invoice_internal && baris.no_invoice_internal !== '-' ? `<button class="btn-tbl btn-tbl-view" title="Bandingkan" onclick="showComparison('${baris.no_bppu}')">Rincian</button>` : '';
+                let btnPdf = baris.link_pdf_lokal ? `<a href="/${baris.link_pdf_lokal}" target="_blank" class="btn-tbl btn-tbl-pdf">PDF</a>` : `-`;
 
                 tr.innerHTML = `
                     <td class="text-center">${index + 1}</td>
-                    <td class="text-center">${btnEdit} ${btnDel}</td>
+                    <td class="text-center" style="white-space:nowrap;">${btnCompare} ${btnEdit} ${btnDel}</td>
                     <td class="text-center">${btnPdf}</td>
                     <td class="text-center">${baris.nama_cabang || baris.kode_cabang || '-'}</td>
                     <td class="text-center">${baris.masa_pajak || '-'}</td>
@@ -296,6 +306,44 @@
             var blob = new Blob(['\uFEFF' + csv.join('\n')], {type: 'text/csv;charset=utf-8;'});
             var link = document.createElement('a'); link.href = URL.createObjectURL(blob);
             link.download = 'data_prepaid_' + aktifEntitas + '_' + new Date().toISOString().slice(0,10) + '.csv'; link.click();
+        }
+
+        async function showComparison(noBppu) {
+            var container = document.getElementById('comparison-content');
+            container.innerHTML = '<div class="loading-spinner"></div>';
+            document.getElementById('modalComparison').style.display = 'flex';
+            
+            try {
+                var res = await fetch('/api/prepaid-comparison/' + noBppu);
+                var data = await res.json();
+                var fRp = function(n) { return 'Rp ' + Number(n || 0).toLocaleString('id-ID'); };
+                
+                if (!data.prepaid) { container.innerHTML = '<p>Data tidak ditemukan.</p>'; return; }
+                
+                var html = '<table style="width:100%; border-collapse:collapse; font-size:0.85rem;">';
+                html += '<thead><tr><th style="text-align:left; padding:0.5rem;">Keterangan</th><th style="text-align:right; padding:0.5rem;">Bukti Potong (Prepaid)</th><th style="text-align:right; padding:0.5rem;">Faktur Keluaran (VAT Out)</th></tr></thead>';
+                html += '<tbody>';
+                html += '<tr><td style="padding:0.5rem;">No. Dokumen</td><td style="text-align:right; padding:0.5rem; font-weight:700;">' + data.prepaid.no_bppu + '</td><td style="text-align:right; padding:0.5rem; font-weight:700;">' + (data.vatout ? data.vatout.no_faktur : '-') + '</td></tr>';
+                html += '<tr><td style="padding:0.5rem;">Nama Pihak</td><td style="text-align:right; padding:0.5rem;">' + (data.prepaid.nama_pemotong || '-') + '</td><td style="text-align:right; padding:0.5rem;">' + (data.vatout ? data.vatout.nama_pembeli : '-') + '</td></tr>';
+                
+                var dppBP = Number(data.prepaid.dpp || 0);
+                var dppVO = data.vatout ? Number(data.vatout.harga_jual || data.vatout.dpp || 0) : 0;
+                var selisih = dppBP - dppVO;
+                var selisihClass = selisih === 0 ? '' : (selisih > 0 ? 'color:var(--success-600)' : 'color:var(--danger-600)');
+                
+                html += '<tr style="font-weight:700; background:var(--bg-secondary);"><td style="padding:0.5rem;">DPP / Harga Jual</td><td style="text-align:right; padding:0.5rem;">' + fRp(dppBP) + '</td><td style="text-align:right; padding:0.5rem;">' + fRp(dppVO) + '</td></tr>';
+                html += '<tr><td style="padding:0.5rem;">PPh / PPN</td><td style="text-align:right; padding:0.5rem;">' + fRp(data.prepaid.nilai_pph) + '</td><td style="text-align:right; padding:0.5rem;">' + (data.vatout ? fRp(data.vatout.ppn) : '-') + '</td></tr>';
+                html += '<tr style="background:var(--bg-tertiary);"><td style="padding:0.5rem; font-weight:700;">Selisih DPP</td><td colspan="2" style="text-align:right; padding:0.5rem; font-weight:700; font-size:1rem; ' + selisihClass + '">' + fRp(selisih) + '</td></tr>';
+                html += '</tbody></table>';
+                
+                if (!data.vatout) {
+                    html += '<p style="margin-top:1rem; color:var(--text-tertiary); font-style:italic;">Faktur Keluaran (VAT Out) terkait tidak ditemukan dalam database.</p>';
+                }
+                
+                container.innerHTML = html;
+            } catch(e) {
+                container.innerHTML = '<p style="color:var(--danger-500);">Gagal memuat data perbandingan.</p>';
+            }
         }
 
         loadData();

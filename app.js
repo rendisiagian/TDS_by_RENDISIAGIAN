@@ -129,6 +129,21 @@ app.get('/api/items/:mod/:faktur', cekAuth, (req, res) => {
     db.all(`SELECT * FROM item_${req.params.mod} WHERE no_faktur = ?`, [req.params.faktur], (err, rows) => res.json(rows || []));
 });
 
+// API: Compare Prepaid Tax DPP vs VAT OUT Harga Jual
+app.get('/api/prepaid-comparison/:noBppu', cekAuth, (req, res) => {
+    db.get(`SELECT * FROM data_prepaid WHERE no_bppu = ?`, [req.params.noBppu], (err, prepaid) => {
+        if (!prepaid) return res.json({ prepaid: null, vatout: null });
+        
+        const invoiceRef = prepaid.no_invoice_internal;
+        if (!invoiceRef || invoiceRef === '-') return res.json({ prepaid, vatout: null });
+        
+        // Find the linked VAT OUT by no_faktur
+        db.get(`SELECT * FROM data_vatout WHERE no_faktur = ?`, [invoiceRef], (err2, vatout) => {
+            res.json({ prepaid, vatout: vatout || null });
+        });
+    });
+});
+
 modules.forEach(mod => {
     app.get(`/dashboard-${mod.id}`, cekAuth, (req, res) => res.sendFile(path.join(__dirname, mod.path, `dashboard_${mod.id}.html`)));
     app.get(`/inbox-${mod.id}`, cekAuth, (req, res) => res.sendFile(path.join(__dirname, mod.path, `inbox_${mod.id}.html`)));
@@ -159,7 +174,34 @@ app.get('/api/my-requests', cekAuth, (req, res) => db.all(`SELECT *, strftime('%
 app.get('/api/pending-requests', cekAuth, (req, res) => db.all(`SELECT *, strftime('%d-%m-%Y %H:%M', waktu, 'localtime') AS waktu_format FROM user_requests WHERE status = 'Pending'`, (err, rows) => res.json(rows || [])));
 app.get('/api/summary', cekAuth, (req, res) => {
     const ent = req.query.entitas || 'BBS';
-    db.all(`SELECT strftime('%m-%Y', tgl_tukar_faktur) as periode, count(*) as jml_tukar, sum(ppn) as ppn_tukar, count(*) as jml_faktur, sum(ppn) as ppn_faktur FROM data_vatin WHERE entitas = ? GROUP BY periode ORDER BY periode DESC`, [ent], (err, rows) => res.json(rows || []));
+    
+    // Query 1: Group by Tanggal Tukar Faktur (TTF)
+    const sqlTTF = `SELECT strftime('%m-%Y', tgl_tukar_faktur) as periode, count(*) as jml, sum(ppn) as total_ppn FROM data_vatin WHERE entitas = ? AND tgl_tukar_faktur IS NOT NULL AND tgl_tukar_faktur != '' AND tgl_tukar_faktur != '-' GROUP BY periode`;
+    
+    // Query 2: Group by Tanggal Faktur
+    const sqlFaktur = `SELECT strftime('%m-%Y', tanggal_faktur) as periode, count(*) as jml, sum(ppn) as total_ppn FROM data_vatin WHERE entitas = ? GROUP BY periode`;
+    
+    db.all(sqlTTF, [ent], (err1, ttfRows) => {
+        db.all(sqlFaktur, [ent], (err2, fakturRows) => {
+            // Merge both into one result set
+            const periodeSet = new Set();
+            const ttfMap = {};
+            const fakturMap = {};
+            
+            (ttfRows || []).forEach(r => { periodeSet.add(r.periode); ttfMap[r.periode] = r; });
+            (fakturRows || []).forEach(r => { periodeSet.add(r.periode); fakturMap[r.periode] = r; });
+            
+            const result = Array.from(periodeSet).sort().reverse().map(p => ({
+                periode: p,
+                jml_tukar: ttfMap[p] ? ttfMap[p].jml : 0,
+                ppn_tukar: ttfMap[p] ? ttfMap[p].total_ppn : 0,
+                jml_faktur: fakturMap[p] ? fakturMap[p].jml : 0,
+                ppn_faktur: fakturMap[p] ? fakturMap[p].total_ppn : 0
+            }));
+            
+            res.json(result);
+        });
+    });
 });
 
 // API: Get available VAT OUT invoices for Prepaid Tax linking

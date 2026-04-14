@@ -1977,3 +1977,17 @@ tbody:empty::after {
     background: var(--gray-600);
     color: white;
 }
+
+/* === 39. FIX: Full-width cards in container === */
+.container > .card,
+.container > .mb-2rem {
+    width: 100%;
+}
+
+.container > .chart-grid {
+    width: 100%;
+}
+
+.container > .chart-container {
+    width: 100%;
+}
