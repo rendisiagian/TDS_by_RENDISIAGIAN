@@ -149,13 +149,76 @@ modules.forEach(mod => {
     app.get(`/inbox-${mod.id}`, cekAuth, (req, res) => res.sendFile(path.join(__dirname, mod.path, `inbox_${mod.id}.html`)));
     
     app.get(`/api/data-${mod.id}`, cekAuth, (req, res) => {
-        let sql = mod.id.startsWith('vat') 
-            ? `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_faktur) AS tanggal_format, strftime('%d-%m-%Y', d.tgl_tukar_faktur) AS tgl_tukar_format FROM data_${mod.id} d LEFT JOIN master_cabang c ON d.kode_cabang = c.kode_cabang WHERE d.entitas = ? ORDER BY d.waktu_input DESC`
-            : `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_dokumen) AS tgl_dokumen_format FROM data_${mod.id} d LEFT JOIN master_cabang c ON d.kode_cabang = c.kode_cabang WHERE d.entitas = ? ORDER BY d.waktu_input DESC`;
-        db.all(sql, [req.query.entitas || 'BBS'], (err, rows) => res.json(rows || []));
+        const entitas = req.query.entitas || 'BBS';
+        const page = parseInt(req.query.page) || 1;
+        const limit = req.query.limit === 'all' ? null : (parseInt(req.query.limit) || 50);
+        const search = (req.query.search || '').trim();
+        
+        let baseSql = mod.id.startsWith('vat') 
+            ? `FROM data_${mod.id} d LEFT JOIN master_cabang c ON d.kode_cabang = c.kode_cabang WHERE d.entitas = ?`
+            : `FROM data_${mod.id} d LEFT JOIN master_cabang c ON d.kode_cabang = c.kode_cabang WHERE d.entitas = ?`;
+        
+        let params = [entitas];
+        
+        if (search) {
+            if (mod.id.startsWith('vat')) {
+                baseSql += ` AND (d.no_faktur LIKE ? OR d.nama_penjual LIKE ? OR d.nama_pembeli LIKE ? OR d.no_invoice_internal LIKE ? OR c.nama_cabang LIKE ?)`;
+                const s = '%' + search + '%';
+                params.push(s, s, s, s, s);
+            } else {
+                baseSql += ` AND (d.no_bppu LIKE ? OR d.nama_pemotong LIKE ? OR d.nama_dipotong LIKE ? OR d.no_invoice_internal LIKE ? OR c.nama_cabang LIKE ?)`;
+                const s = '%' + search + '%';
+                params.push(s, s, s, s, s);
+            }
+        }
+        
+        // Count total
+        db.get(`SELECT count(*) as total ${baseSql}`, params, (err, countRow) => {
+            const total = countRow ? countRow.total : 0;
+            
+            let selectSql = mod.id.startsWith('vat')
+                ? `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_faktur) AS tanggal_format, strftime('%d-%m-%Y', d.tgl_tukar_faktur) AS tgl_tukar_format ${baseSql} ORDER BY d.waktu_input DESC`
+                : `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_dokumen) AS tgl_dokumen_format ${baseSql} ORDER BY d.waktu_input DESC`;
+            
+            if (limit) {
+                selectSql += ` LIMIT ? OFFSET ?`;
+                params.push(limit, (page - 1) * limit);
+            }
+            
+            db.all(selectSql, params, (err2, rows) => {
+                res.json({ data: rows || [], total, page, limit: limit || total });
+            });
+        });
     });
 
-    app.get(`/api/inbox-${mod.id}`, cekAuth, (req, res) => db.all(`SELECT * FROM inbox_${mod.id} ORDER BY id DESC`, [], (err, rows) => res.json(rows || [])));
+    app.get(`/api/inbox-${mod.id}`, cekAuth, (req, res) => {
+        const page = parseInt(req.query.page) || 1;
+        const limit = req.query.limit === 'all' ? null : (parseInt(req.query.limit) || 50);
+        const search = (req.query.search || '').trim();
+        
+        let baseSql = `FROM inbox_${mod.id} WHERE 1=1`;
+        let params = [];
+        
+        if (search) {
+            baseSql += ` AND (data_ekstraksi LIKE ? OR diinput_oleh LIKE ?)`;
+            const s = '%' + search + '%';
+            params.push(s, s);
+        }
+        
+        db.get(`SELECT count(*) as total ${baseSql}`, params, (err, countRow) => {
+            const total = countRow ? countRow.total : 0;
+            let selectSql = `SELECT * ${baseSql} ORDER BY id DESC`;
+            
+            if (limit) {
+                selectSql += ` LIMIT ? OFFSET ?`;
+                params.push(limit, (page - 1) * limit);
+            }
+            
+            db.all(selectSql, params, (err2, rows) => {
+                res.json({ data: rows || [], total, page, limit: limit || total });
+            });
+        });
+    });
 });
 
 app.post('/login', (req, res) => {

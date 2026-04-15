@@ -93,6 +93,13 @@
             loadSummary();
         };
 
+        // Re-render charts when dark mode toggles
+        var _origToggle = window.__toggleDarkMode;
+        window.__toggleDarkMode = function() {
+            if (_origToggle) _origToggle();
+            setTimeout(function() { loadSummary(); }, 200);
+        };
+
         function getChartColors() {
             var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
             return {

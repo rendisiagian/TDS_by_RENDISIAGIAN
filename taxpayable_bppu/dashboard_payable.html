@@ -6,6 +6,7 @@
     <title>Tax Payable | Tax Upload and Database</title>
     <script src="/theme.js"></script>
     <script src="/export.js"></script>
+    <script src="/pagination.js"></script>
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
 </head>
@@ -94,6 +95,7 @@
                             <tbody id="tabel-body"></tbody>
                         </table>
                     </div>
+                    <div id="pg-container"></div>
                 </div>
             </div>
         </main>
@@ -142,9 +144,17 @@
             loadData();
         };
 
-        async function loadData() {
-            const res = await fetch('/api/data-payable?entitas=' + aktifEntitas);
-            const data = await res.json();
+        // Pagination init
+        initPagination('pg-container', function(page, limit) { loadData(page, limit); }, 50);
+
+        async function loadData(page, limit) {
+            page = page || 1;
+            limit = limit || 50;
+            var url = '/api/data-payable?entitas=' + aktifEntitas + '&page=' + page + '&limit=' + limit;
+            const res = await fetch(url);
+            const result = await res.json();
+            const data = result.data || [];
+            const total = result.total || 0;
             const tbody = document.getElementById('tabel-body');
             tbody.innerHTML = ''; 
             const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
@@ -152,11 +162,11 @@
             // Update Statistics Cards
             let totalDPP = 0, totalPPh = 0;
             data.forEach(d => { totalDPP += Number(d.dpp || 0); totalPPh += Number(d.nilai_pph || 0); });
-            document.getElementById('stat-total').textContent = data.length + ' BPPU';
+            document.getElementById('stat-total').textContent = total + ' BPPU';
             document.getElementById('stat-pph').textContent = formatRupiah(totalPPh);
             document.getElementById('stat-dpp').textContent = formatRupiah(totalDPP);
             fetch('/api/inbox-payable').then(r => r.json()).then(inbox => {
-                document.getElementById('stat-pending').textContent = inbox.length;
+                document.getElementById('stat-pending').textContent = (inbox.total || inbox.length || 0);
             }).catch(() => {});
 
             // Month-over-Month (using masa_pajak MM-YYYY)
@@ -194,6 +204,7 @@
                 tbody.appendChild(tr);
             });
             jalankanFilterTabel();
+            renderPagination('pg-container', total, page, limit === 'all' ? total : limit);
         }
 
         async function handleAction(noBppu, actionType, curCabang = '', curInvoice = '') {
