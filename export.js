@@ -37,8 +37,6 @@ function exportTableData(tableId, filename, format) {
 }
 
 function exportExcel(data, filename) {
-    // Simple XLSX generation without external library
-    // Using HTML table to Excel trick
     var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
     html += '<head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Data</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>';
     html += '<body><table border="1">';
@@ -47,7 +45,13 @@ function exportExcel(data, filename) {
         html += '<tr>';
         row.forEach(function(cell) {
             var tag = rowIdx === 0 ? 'th' : 'td';
-            html += '<' + tag + ' style="' + (rowIdx === 0 ? 'background:#1e40af; color:white; font-weight:bold;' : '') + '">' + cell + '</' + tag + '>';
+            var style = rowIdx === 0 ? 'background:#1e40af; color:white; font-weight:bold;' : '';
+            // Force long numbers (>12 digits) as text to prevent Excel precision loss
+            var isLongNumber = /^\d{12,}$/.test(cell.trim());
+            if (isLongNumber && rowIdx > 0) {
+                style += "mso-number-format:'\\@';";
+            }
+            html += '<' + tag + ' style="' + style + '">' + (isLongNumber && rowIdx > 0 ? "'" + cell : cell) + '</' + tag + '>';
         });
         html += '</tr>';
     });
