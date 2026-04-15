@@ -1170,7 +1170,6 @@ textarea:focus {
 
 /* Table Specific */
 .header-group {
-    background: linear-gradient(180deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
     text-align: center;
     font-weight: 700;
     border-right: 2px solid var(--border-color);
@@ -2459,4 +2458,30 @@ tbody:empty::after {
 
 @media print {
     .pg-bar { display: none !important; }
+}
+
+.sidebar-links-container {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out; /* Memberikan efek animasi halus */
+}
+
+.sidebar-group.expanded .sidebar-links-container {
+    max-height: 500px; /* Nilai besar agar semua menu terlihat */
+}
+
+.sidebar-group .chevron {
+    font-size: 0.7rem;
+    transition: transform 0.3s;
+}
+
+.sidebar-group.expanded .chevron {
+    transform: rotate(180deg); /* Panah berputar saat terbuka */
+}
+
+.sidebar-nav-label.collapsible {
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }

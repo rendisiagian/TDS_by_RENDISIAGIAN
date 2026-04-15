@@ -9,6 +9,17 @@
     <script src="/pagination.js"></script>
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
+    <style>
+        .modal-item-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
+        .modal-item-table th, .modal-item-table td { border: 1px solid var(--border-color); padding: 10px; text-align: left; }
+        .modal-item-table th { background-color: var(--bg-secondary); font-weight: 600; }
+        .btn-icon-aksi { cursor: pointer; border: none; background: none; font-size: 1.1rem; padding: 5px; transition: 0.2s; text-decoration: none; }
+        .btn-icon-aksi:hover { transform: scale(1.2); }
+        .mt-15 { margin-top: 15px; }
+        .btn-clear-filter { background-color: var(--danger-500); color: white; border: none; padding: 6px 15px; border-radius: 5px; font-size: 0.85rem; cursor: pointer; display: none; font-weight: bold; }
+        .btn-clear-filter:hover { background-color: var(--danger-600); }
+        .table-responsive { max-height: calc(100vh - 320px); }
+    </style>
 </head>
 <body>
     <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
@@ -18,24 +29,23 @@
 
         <main class="main-content">
             <header class="header">
-                <h2>Prepaid Tax - Bukti Potong</h2>
+                <h2>Prepaid Tax (BPPU Dipotong Client)</h2>
                 <div class="user-profile"><span id="header-user-name"></span>
                     <a href="/logout" class="btn-logout">Logout</a>
                 </div>
             </header>
 
             <div class="container">
-                <!-- Statistics Cards -->
                 <div class="stats-grid" id="stats-cards" data-testid="stats-cards">
                     <div class="stat-card accent-purple" data-testid="stat-total-doc">
-                        <span class="stat-label">Total Dokumen</span>
+                        <span class="stat-label">Total Dokumen BPPU</span>
                         <span class="stat-value" id="stat-total">0</span>
                         <div class="stat-mom neutral" id="mom-total">-- vs bulan lalu</div>
                     </div>
-                    <div class="stat-card accent-red" data-testid="stat-total-pph">
-                        <span class="stat-label">Total PPh</span>
-                        <span class="stat-value" id="stat-pph">Rp 0</span>
-                        <div class="stat-mom neutral" id="mom-pph">-- vs bulan lalu</div>
+                    <div class="stat-card accent-blue" data-testid="stat-total-ppn">
+                        <span class="stat-label">Total PPh Dipotong</span>
+                        <span class="stat-value" id="stat-ppn">Rp 0</span>
+                        <div class="stat-mom neutral" id="mom-ppn">-- vs bulan lalu</div>
                     </div>
                     <div class="stat-card accent-cyan" data-testid="stat-total-dpp">
                         <span class="stat-label">Total DPP</span>
@@ -50,7 +60,7 @@
 
                 <div class="card">
                     <div class="card-header-padding" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                        <h3 class="title-primary" style="border-left-color: #4f46e5; margin: 0;">Register Prepaid Tax</h3>
+                        <h3 class="title-primary" style="border-left-color: var(--primary-500); margin: 0;">Register Bukti Potong Prepaid</h3>
                         
                         <div class="toolbar-actions">
                             <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">&#128465; Hapus Filter</button>
@@ -81,43 +91,43 @@
                                 </tr>
                                 <tr class="filter-row">
                                     <th></th><th></th><th></th>
-                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="c.nama_cabang" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.masa_pajak" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.nama_pemotong" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.no_bppu" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.dpp" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.tarif" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.nilai_pph" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.no_invoice_internal" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.diinput_oleh" placeholder="🔍 Cari..."></th>
                                 </tr>
                             </thead>
                             <tbody id="tabel-body"></tbody>
                         </table>
                     </div>
+                    
                     <div id="pg-container"></div>
                 </div>
             </div>
         </main>
     </div>
 
-    <!-- Comparison Modal -->
-    <div id="modalComparison" class="modal-overlay">
-        <div class="modal-box" style="max-width: 700px;">
-            <h3 style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1rem;">Perbandingan Nilai Bukti Potong vs Faktur Keluaran</h3>
-            <div id="comparison-content"></div>
-            <button class="btn-simpan btn-cancel" style="margin-top: 1rem;" onclick="document.getElementById('modalComparison').style.display='none'">Tutup</button>
+    <div id="modalViewItem" class="modal-overlay">
+        <div class="modal-box" style="max-width: 750px;">
+            <h3 id="modal-title-faktur" style="border-bottom: 2px solid var(--border-color); padding-bottom: 10px; color: var(--primary-600);">Komparasi Data Tagihan</h3>
+            <div id="container-items" class="table-responsive" style="max-height: 400px;"></div>
+            <button class="btn-simpan btn-cancel mt-15" onclick="document.getElementById('modalViewItem').style.display='none'">Tutup Jendela</button>
         </div>
     </div>
 
     <div id="modalEditData" class="modal-overlay">
         <div class="modal-box" style="max-width: 500px;">
-            <h3 style="border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; color: #4f46e5;">✏️ Edit Relasi Internal</h3>
-            <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 15px;">BPPU: <b id="edit-faktur-title"></b></p>
+            <h3 style="border-bottom: 2px solid var(--border-color); padding-bottom: 10px; color: var(--warning-600);">✏️ Edit Relasi Internal</h3>
+            <p style="font-size: 0.85rem; color: var(--text-tertiary); margin-bottom: 15px;">BPPU: <b id="edit-faktur-title"></b></p>
             <div class="form-group"><label>Branch / Cabang Baru</label><select id="edit_branch" class="form-select"></select></div>
             <div class="form-group"><label>No. Internal Tagihan (VAT OUT)</label><input type="text" id="edit_invoice" autocomplete="off" placeholder="Ketik No Invoice/Faktur..."></div>
             <div style="display:flex; gap:10px; margin-top: 20px;">
-                <button class="btn-simpan" style="background-color: #4f46e5; flex: 2;" onclick="submitEdit()">💾 Simpan Perubahan</button>
+                <button class="btn-simpan" style="background-color: var(--warning-600); flex: 2;" onclick="submitEdit()">💾 Simpan Perubahan</button>
                 <button class="btn-simpan btn-cancel" style="flex: 1; margin-top:0;" onclick="document.getElementById('modalEditData').style.display='none'">Batal</button>
             </div>
         </div>
@@ -129,41 +139,56 @@
         let currentUser = {};
         let targetEditFaktur = '';
 
+        // STATE UNTUK SERVER-SIDE
+        let currentPage = 1;
+        let currentLimit = 50;
+        let currentSearch = {};
+
         fetch('/api/me').then(res => res.json()).then(u => currentUser = u);
 
-        fetch('/sidebar.html')
-            .then(res => res.text())
-            .then(html => {
-                document.getElementById('sidebar-container').innerHTML = html;
-                const currentPath = window.location.pathname;
-                document.querySelectorAll('.sidebar-link').forEach(link => {
-                    if (link.getAttribute('href') === currentPath) link.classList.add('active');
-                });
-                const sidebarSelect = document.getElementById('global-entity-select');
-                if (sidebarSelect) sidebarSelect.value = aktifEntitas;
+        fetch('/sidebar.html').then(res => res.text()).then(html => {
+            document.getElementById('sidebar-container').innerHTML = html;
+            const currentPath = window.location.pathname;
+            document.querySelectorAll('.sidebar-link').forEach(link => {
+                if (link.getAttribute('href') === currentPath) link.classList.add('active');
             });
+            const sidebarSelect = document.getElementById('global-entity-select');
+            if (sidebarSelect) sidebarSelect.value = aktifEntitas;
+        });
 
-        socket.on('data-baru-prepaid', () => loadData());
+        socket.on('data-baru-prepaid', () => loadData(currentPage, currentLimit));
 
         window.gantiEntitas = function(entitas) {
             aktifEntitas = entitas;
             localStorage.setItem('lastEntitas', entitas); 
             const sidebarSelect = document.getElementById('global-entity-select');
             if (sidebarSelect && sidebarSelect.value !== entitas) sidebarSelect.value = entitas;
-            loadData();
+            currentPage = 1;
+            currentSearch = {};
+            document.querySelectorAll('.filter-input').forEach(input => input.value = '');
+            loadData(currentPage, currentLimit);
         };
 
         // Pagination init
-        initPagination('pg-container', function(page, limit) { loadData(page, limit); }, 50);
+        initPagination('pg-container', function(page, limit) { 
+            loadData(page, limit); 
+        }, 50);
 
         async function loadData(page, limit) {
-            page = page || 1;
-            limit = limit || 50;
-            var url = '/api/data-prepaid?entitas=' + aktifEntitas + '&page=' + page + '&limit=' + limit;
+            currentPage = page || 1;
+            currentLimit = limit || 50;
+            
+            let url = '/api/data-prepaid?entitas=' + aktifEntitas + '&page=' + currentPage + '&limit=' + currentLimit;
+            if (Object.keys(currentSearch).length > 0) {
+                url += `&search=${encodeURIComponent(JSON.stringify(currentSearch))}`;
+            }
+
             const res = await fetch(url);
             const result = await res.json();
             const data = result.data || [];
             const total = result.total || 0;
+            const offset = (currentPage - 1) * currentLimit;
+            
             const tbody = document.getElementById('tabel-body');
             tbody.innerHTML = ''; 
             const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
@@ -172,51 +197,134 @@
             let totalDPP = 0, totalPPh = 0;
             data.forEach(d => { totalDPP += Number(d.dpp || 0); totalPPh += Number(d.nilai_pph || 0); });
             document.getElementById('stat-total').textContent = total + ' BPPU';
-            document.getElementById('stat-pph').textContent = formatRupiah(totalPPh);
+            document.getElementById('stat-ppn').textContent = formatRupiah(totalPPh);
             document.getElementById('stat-dpp').textContent = formatRupiah(totalDPP);
+            
             fetch('/api/inbox-prepaid').then(r => r.json()).then(inbox => {
-                document.getElementById('stat-pending').textContent = (inbox.total || inbox.length || 0);
+                const pendingEl = document.getElementById('stat-pending');
+                if (pendingEl) pendingEl.textContent = (inbox.total || inbox.length || 0);
             }).catch(() => {});
 
-            // Month-over-Month
-            var now = new Date(), curPeriod = String(now.getMonth()+1).padStart(2,'0') + '-' + now.getFullYear();
-            var lm = now.getMonth() === 0 ? 11 : now.getMonth()-1, ly = now.getMonth() === 0 ? now.getFullYear()-1 : now.getFullYear();
-            var lastPeriod = String(lm+1).padStart(2,'0') + '-' + ly;
-            var thisM = data.filter(function(d){return d.masa_pajak === curPeriod});
-            var lastM = data.filter(function(d){return d.masa_pajak === lastPeriod});
-            updateMoM('mom-total', thisM.length, lastM.length, ' BPPU');
-            updateMoM('mom-pph', thisM.reduce(function(s,d){return s+Number(d.nilai_pph||0)},0), lastM.reduce(function(s,d){return s+Number(d.nilai_pph||0)},0), '');
+            // Month-over-Month calculation (Menggunakan tanggal_dokumen)
+            var now = new Date(), curMonth = now.getMonth(), curYear = now.getFullYear();
+            var thisMonthData = data.filter(function(d) { var dt = new Date(d.tanggal_dokumen); return dt.getMonth() === curMonth && dt.getFullYear() === curYear; });
+            var lastMonth = curMonth === 0 ? 11 : curMonth - 1, lastYear = curMonth === 0 ? curYear - 1 : curYear;
+            var lastMonthData = data.filter(function(d) { var dt = new Date(d.tanggal_dokumen); return dt.getMonth() === lastMonth && dt.getFullYear() === lastYear; });
+            
+            updateMoM('mom-total', thisMonthData.length, lastMonthData.length, ' BPPU');
+            var thisMonthPPh = thisMonthData.reduce(function(s,d){return s+Number(d.nilai_pph||0)},0);
+            var lastMonthPPh = lastMonthData.reduce(function(s,d){return s+Number(d.nilai_pph||0)},0);
+            updateMoM('mom-ppn', thisMonthPPh, lastMonthPPh, '');
+
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="12" class="text-center" style="padding:20px; color:var(--text-tertiary);">Data tidak ditemukan.</td></tr>`;
+            }
 
             data.forEach((baris, index) => {
                 const tr = document.createElement('tr');
                 let curBr = baris.kode_cabang || '';
                 let curInv = baris.no_invoice_internal || '';
+                let barisNo = offset + index + 1; 
 
-                let btnEdit = `<button class="btn-tbl btn-tbl-edit" title="Edit" onclick="handleAction('${baris.no_bppu}', 'EDIT', '${curBr}', '${curInv}')">Edit</button>`;
-                let btnDel  = `<button class="btn-tbl btn-tbl-del" title="Hapus" onclick="handleAction('${baris.no_bppu}', 'DELETE')">Hapus</button>`;
-                let btnCompare = baris.no_invoice_internal && baris.no_invoice_internal !== '-' ? `<button class="btn-tbl btn-tbl-view" title="Bandingkan" onclick="showComparison('${baris.no_bppu}')">Rincian</button>` : '';
+                let btnView = `<button class="btn-tbl btn-tbl-view" title="Komparasi Faktur" onclick="viewItems('${baris.no_bppu}')">Lihat</button>`;
+                let btnEdit = `<button class="btn-tbl btn-tbl-edit" title="Edit Data" onclick="handleAction('${baris.no_bppu}', 'EDIT', '${curBr}', '${curInv}')">Edit</button>`;
+                let btnDel  = `<button class="btn-tbl btn-tbl-del" title="Hapus Data" onclick="handleAction('${baris.no_bppu}', 'DELETE')">Hapus</button>`;
                 let btnPdf = baris.link_pdf_lokal ? `<a href="/${baris.link_pdf_lokal}" target="_blank" class="btn-tbl btn-tbl-pdf">PDF</a>` : `-`;
 
                 tr.innerHTML = `
-                    <td class="text-center">${index + 1}</td>
-                    <td class="text-center" style="white-space:nowrap;">${btnCompare} ${btnEdit} ${btnDel}</td>
+                    <td class="text-center">${barisNo}</td>
+                    <td class="text-center" style="white-space:nowrap;">${btnView} ${btnEdit} ${btnDel}</td>
                     <td class="text-center">${btnPdf}</td>
-                    <td class="text-center">${baris.nama_cabang || baris.kode_cabang || '-'}</td>
-                    <td class="text-center">${baris.masa_pajak || '-'}</td>
+                    <td class="text-center"><span class="badge-role">${baris.nama_cabang || baris.kode_cabang || '-'}</span></td>
+                    <td class="text-center"><span class="badge-success">${baris.masa_pajak || '-'}</span></td>
                     <td class="text-bold">${baris.nama_pemotong || '-'}</td>
-                    <td class="text-center" style="color:#4f46e5; font-weight:bold;">${baris.no_bppu || '-'}</td>
+                    <td class="text-center" style="color:var(--primary-600); font-weight:bold;">${baris.no_bppu || '-'}</td>
                     <td class="text-right">${formatRupiah(baris.dpp)}</td>
                     <td class="text-center">${baris.tarif}%</td>
-                    <td class="text-right" style="font-weight:600; color:#4f46e5;">${formatRupiah(baris.nilai_pph)}</td>
+                    <td class="text-right" style="font-weight:600; color:var(--primary-600);">${formatRupiah(baris.nilai_pph)}</td>
                     <td class="text-center">${baris.no_invoice_internal || '-'}</td>
-                    <td class="text-center">${baris.diinput_oleh || '-'}</td>
+                    <td class="text-center text-diinput">${baris.diinput_oleh || '-'}</td>
                 `;
                 tbody.appendChild(tr);
             });
-            jalankanFilterTabel();
-            renderPagination('pg-container', total, page, limit === 'all' ? total : limit);
+            
+            // Render pagination
+            renderPagination('pg-container', total, currentPage, currentLimit === 'all' ? total : currentLimit);
         }
 
+        // FUNGSI PENCARIAN SERVER-SIDE (DEBOUNCE)
+        let searchTimeout;
+        document.addEventListener('input', function(e) {
+            if (e.target.classList.contains('filter-input')) {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => { jalankanFilterTabel(); }, 500);
+            }
+        });
+
+        function jalankanFilterTabel() {
+            const filters = document.querySelectorAll('.filter-input');
+            let isAnyFilterActive = false;
+            currentSearch = {};
+
+            filters.forEach((input) => {
+                const val = input.value;
+                const colName = input.getAttribute('data-col'); 
+                if (val && colName) {
+                    isAnyFilterActive = true;
+                    currentSearch[colName] = val;
+                }
+            });
+
+            document.getElementById('btnHapusFilter').style.display = isAnyFilterActive ? 'inline-block' : 'none';
+            loadData(1, currentLimit); 
+        }
+
+        function resetSemuaFilter() { 
+            document.querySelectorAll('.filter-input').forEach(input => input.value = ''); 
+            currentSearch = {};
+            jalankanFilterTabel(); 
+        }
+
+        // MODAL VIEW (KOMPARASI PREPAID vs VAT OUT)
+        async function viewItems(noBppu) {
+            try {
+                const res = await fetch(`/api/prepaid-comparison/${noBppu}`);
+                const data = await res.json();
+                document.getElementById('modal-title-faktur').innerText = "Komparasi Data Tagihan: " + noBppu;
+                const container = document.getElementById('container-items');
+                
+                if (!data.prepaid) {
+                    container.innerHTML = "<p class='text-center' style='padding:20px;'>Data tidak ditemukan.</p>";
+                    document.getElementById('modalViewItem').style.display = 'flex';
+                    return;
+                }
+
+                const fRp = (n) => "Rp " + Number(n || 0).toLocaleString('id-ID');
+                let dppBP = data.prepaid.dpp || 0;
+                let dppVO = data.vatout ? data.vatout.dpp : 0;
+                let selisih = dppBP - dppVO;
+                let selisihClass = selisih === 0 ? '' : (selisih > 0 ? 'color:var(--success-600)' : 'color:var(--danger-600)');
+
+                let html = '<table class="modal-item-table">';
+                html += '<thead><tr><th>Keterangan</th><th class="text-right">Nilai di BPPU</th><th class="text-right">Nilai di Faktur (VAT OUT)</th></tr></thead><tbody>';
+                html += '<tr style="font-weight:700; background:var(--bg-secondary);"><td style="padding:0.5rem;">DPP / Harga Jual</td><td style="text-align:right; padding:0.5rem;">' + fRp(dppBP) + '</td><td style="text-align:right; padding:0.5rem;">' + (data.vatout ? fRp(dppVO) : '-') + '</td></tr>';
+                html += '<tr><td style="padding:0.5rem;">PPh / PPN</td><td style="text-align:right; padding:0.5rem;">' + fRp(data.prepaid.nilai_pph) + '</td><td style="text-align:right; padding:0.5rem;">' + (data.vatout ? fRp(data.vatout.ppn) : '-') + '</td></tr>';
+                html += '<tr style="background:var(--bg-tertiary);"><td style="padding:0.5rem; font-weight:700;">Selisih DPP</td><td colspan="2" style="text-align:right; padding:0.5rem; font-weight:700; font-size:1rem; ' + selisihClass + '">' + fRp(selisih) + '</td></tr>';
+                html += '</tbody></table>';
+
+                if (!data.vatout) {
+                    html += '<p style="margin-top:1rem; color:var(--danger-600); font-size:0.85rem;">⚠️ Faktur Keluaran (VAT OUT) terkait tidak ditemukan. Pastikan Nomor Invoice Internal sudah Anda tautkan dengan benar di menu Edit Relasi.</p>';
+                }
+
+                container.innerHTML = html;
+                document.getElementById('modalViewItem').style.display = 'flex';
+            } catch (err) { 
+                alert("Terjadi kesalahan."); 
+                console.error(err);
+            }
+        }
+
+        // AKSI & MAKER CHECKER
         async function handleAction(noBppu, actionType, curCabang = '', curInvoice = '') {
             const userRole = currentUser.role ? currentUser.role.toLowerCase() : '';
             const isSupervisor = ['supervisor', 'administrator'].includes(userRole);
@@ -226,8 +334,7 @@
                     socket.emit('request-action-faktur', { action: 'DELETE', mod: 'prepaid', faktur: noBppu, id_user: currentUser.id, username: currentUser.username, role: currentUser.role });
                     if(!isSupervisor) alert("Permintaan hapus diajukan.");
                 }
-            } 
-            else if (actionType === 'EDIT') {
+            } else if (actionType === 'EDIT') {
                 targetEditFaktur = noBppu;
                 document.getElementById('edit-faktur-title').innerText = noBppu;
                 document.getElementById('edit_invoice').value = (curInvoice === '-' || curInvoice === 'null') ? '' : curInvoice;
@@ -239,9 +346,9 @@
                 // Penguncian Branch Khusus JO di Modul Prepaid
                 if (aktifEntitas === 'JO') {
                     select.innerHTML = '<option value="Berca JO" selected>Berca JO</option>';
-                    select.disabled = true; select.style.backgroundColor = '#f1f5f9';
+                    select.disabled = true; select.style.backgroundColor = 'var(--bg-secondary)';
                 } else {
-                    select.disabled = false; select.style.backgroundColor = '#fff';
+                    select.disabled = false; select.style.backgroundColor = 'var(--bg-primary)';
                     select.innerHTML = '<option value="">-- Pilih Branch --</option>';
                     branches.forEach(b => {
                         let isSelected = (b.kode_cabang === curCabang) ? 'selected' : '';
@@ -263,38 +370,9 @@
             if(!isSupervisor) alert("Permintaan Edit diajukan ke Panel Approval.");
         }
 
-        function jalankanFilterTabel() {
-            const filters = document.querySelectorAll('.filter-input');
-            const rows = document.querySelectorAll('#tabel-body tr');
-            let isAnyFilterActive = false;
-
-            rows.forEach(row => {
-                let isMatch = true;
-                filters.forEach((input, index) => {
-                    const filterValue = input.value.toLowerCase();
-                    if (filterValue) {
-                        isAnyFilterActive = true;
-                        const colIndex = index + 3; 
-                        const cellText = row.cells[colIndex] ? row.cells[colIndex].innerText.toLowerCase() : "";
-                        if (!cellText.includes(filterValue)) isMatch = false;
-                    }
-                });
-                row.style.display = isMatch ? '' : 'none';
-            });
-            document.getElementById('btnHapusFilter').style.display = isAnyFilterActive ? 'inline-block' : 'none';
-        }
-
-        function resetSemuaFilter() {
-            document.querySelectorAll('.filter-input').forEach(input => input.value = '');
-            jalankanFilterTabel();
-        }
-
-        document.addEventListener('input', function(e) {
-            if (e.target.classList.contains('filter-input')) jalankanFilterTabel();
-        });
-
         function updateMoM(elId, current, previous, suffix) {
-            var el = document.getElementById(elId); if (!el) return;
+            var el = document.getElementById(elId);
+            if (!el) return;
             var diff = current - previous;
             if (previous === 0 && current === 0) { el.className = 'stat-mom neutral'; el.textContent = 'Belum ada data'; return; }
             if (previous === 0) { el.className = 'stat-mom up'; el.innerHTML = '&#9650; Baru ' + current + suffix + ' bulan ini'; return; }
@@ -304,61 +382,9 @@
             else { el.className = 'stat-mom neutral'; el.textContent = 'Sama dengan bulan lalu'; }
         }
 
-        function exportCSV() {
-            var table = document.getElementById('tabel-data');
-            var rows = table.querySelectorAll('tr:not(.filter-row)');
-            var csv = [];
-            rows.forEach(function(row) {
-                if (row.style.display === 'none') return;
-                var cols = row.querySelectorAll('th, td');
-                var rowData = [];
-                cols.forEach(function(col, i) { if (i === 1 || i === 2) return; var text = col.innerText.replace(/"/g, '""').replace(/\n/g, ' '); rowData.push('"' + text + '"'); });
-                csv.push(rowData.join(','));
-            });
-            var blob = new Blob(['\uFEFF' + csv.join('\n')], {type: 'text/csv;charset=utf-8;'});
-            var link = document.createElement('a'); link.href = URL.createObjectURL(blob);
-            link.download = 'data_prepaid_' + aktifEntitas + '_' + new Date().toISOString().slice(0,10) + '.csv'; link.click();
-        }
+        // Jalankan Pertama Kali
+        loadData(1, 50);
 
-        async function showComparison(noBppu) {
-            var container = document.getElementById('comparison-content');
-            container.innerHTML = '<div class="loading-spinner"></div>';
-            document.getElementById('modalComparison').style.display = 'flex';
-            
-            try {
-                var res = await fetch('/api/prepaid-comparison/' + noBppu);
-                var data = await res.json();
-                var fRp = function(n) { return 'Rp ' + Number(n || 0).toLocaleString('id-ID'); };
-                
-                if (!data.prepaid) { container.innerHTML = '<p>Data tidak ditemukan.</p>'; return; }
-                
-                var html = '<table style="width:100%; border-collapse:collapse; font-size:0.85rem;">';
-                html += '<thead><tr><th style="text-align:left; padding:0.5rem;">Keterangan</th><th style="text-align:right; padding:0.5rem;">Bukti Potong (Prepaid)</th><th style="text-align:right; padding:0.5rem;">Faktur Keluaran (VAT Out)</th></tr></thead>';
-                html += '<tbody>';
-                html += '<tr><td style="padding:0.5rem;">No. Dokumen</td><td style="text-align:right; padding:0.5rem; font-weight:700;">' + data.prepaid.no_bppu + '</td><td style="text-align:right; padding:0.5rem; font-weight:700;">' + (data.vatout ? data.vatout.no_faktur : '-') + '</td></tr>';
-                html += '<tr><td style="padding:0.5rem;">Nama Pihak</td><td style="text-align:right; padding:0.5rem;">' + (data.prepaid.nama_pemotong || '-') + '</td><td style="text-align:right; padding:0.5rem;">' + (data.vatout ? data.vatout.nama_pembeli : '-') + '</td></tr>';
-                
-                var dppBP = Number(data.prepaid.dpp || 0);
-                var dppVO = data.vatout ? Number(data.vatout.harga_jual || data.vatout.dpp || 0) : 0;
-                var selisih = dppBP - dppVO;
-                var selisihClass = selisih === 0 ? '' : (selisih > 0 ? 'color:var(--success-600)' : 'color:var(--danger-600)');
-                
-                html += '<tr style="font-weight:700; background:var(--bg-secondary);"><td style="padding:0.5rem;">DPP / Harga Jual</td><td style="text-align:right; padding:0.5rem;">' + fRp(dppBP) + '</td><td style="text-align:right; padding:0.5rem;">' + fRp(dppVO) + '</td></tr>';
-                html += '<tr><td style="padding:0.5rem;">PPh / PPN</td><td style="text-align:right; padding:0.5rem;">' + fRp(data.prepaid.nilai_pph) + '</td><td style="text-align:right; padding:0.5rem;">' + (data.vatout ? fRp(data.vatout.ppn) : '-') + '</td></tr>';
-                html += '<tr style="background:var(--bg-tertiary);"><td style="padding:0.5rem; font-weight:700;">Selisih DPP</td><td colspan="2" style="text-align:right; padding:0.5rem; font-weight:700; font-size:1rem; ' + selisihClass + '">' + fRp(selisih) + '</td></tr>';
-                html += '</tbody></table>';
-                
-                if (!data.vatout) {
-                    html += '<p style="margin-top:1rem; color:var(--text-tertiary); font-style:italic;">Faktur Keluaran (VAT Out) terkait tidak ditemukan dalam database.</p>';
-                }
-                
-                container.innerHTML = html;
-            } catch(e) {
-                container.innerHTML = '<p style="color:var(--danger-500);">Gagal memuat data perbandingan.</p>';
-            }
-        }
-
-        loadData();
     </script>
 </body>
 </html>

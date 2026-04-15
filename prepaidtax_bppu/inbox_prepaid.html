@@ -101,7 +101,7 @@
                     <div id="invoice-dropdown" class="invoice-dropdown"></div>
                 </div>
                 <input type="hidden" id="input_invoice_baru" value="">
-                <span id="selected-invoice-display" style="display:none; margin-top:0.5rem; padding:0.5rem 0.75rem; background:var(--success-50); border:1px solid var(--success-500); border-radius:6px; font-size:0.85rem; font-weight:600; color:var(--success-700);"></span>
+                <div id="selected-invoice-display" style="display:none; margin-top:0.5rem; padding:0.5rem 0.75rem; background:var(--success-50); border:1px solid var(--success-500); border-radius:6px; font-size:0.85rem; font-weight:600; color:var(--success-700);"></div>
                 <span class="invoice-manual-toggle" id="btn-manual-toggle" onclick="toggleManualInput()">&#9998; Input manual (jika tidak ada di daftar)</span>
                 <div id="manual-input-area" style="display:none; margin-top:0.5rem;">
                     <textarea id="input_invoice_manual" rows="2" placeholder="Ketik nomor faktur/invoice manual..." style="width:100%; padding:0.75rem; border:1px solid var(--border-color); border-radius:6px; font-family:inherit; resize:vertical; background:var(--bg-primary); color:var(--text-primary);"></textarea>
@@ -122,6 +122,7 @@
         const socket = io();
         let currentUserName = "Admin", aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS', tempDataFinal = {}; 
         let dataInboxLokal = [];
+        let arraySelectedInvoice = [];
 
         let uploadStats = { isActive: false, totalFiles: 0, chunksTotal: 0, chunksDone: 0, sukses: 0, duplikat: 0, gagal: 0 };
 
@@ -281,6 +282,8 @@
             
             document.getElementById('input_invoice_search').value = '';
             document.getElementById('input_invoice_baru').value = '';
+            arraySelectedInvoice = [];
+            renderSelectedInvoices();
             document.getElementById('selected-invoice-display').style.display = 'none';
             document.getElementById('manual-input-area').style.display = 'none';
             document.getElementById('input_invoice_search').style.display = 'block';
@@ -404,18 +407,41 @@
         }
 
         function selectInvoice(noFaktur, namaPembeli) {
-            document.getElementById('input_invoice_baru').value = noFaktur;
-            document.getElementById('input_invoice_search').value = noFaktur;
+            if(arraySelectedInvoice.includes(noFaktur)) return;
+            arraySelectedInvoice.push(noFaktur);
+            document.getElementById('input_invoice_baru').value = arraySelectedInvoice.join(', ');
+            
+            document.getElementById('input_invoice_search').value = '';
             document.getElementById('invoice-dropdown').classList.remove('show');
+            
+            renderSelectedInvoices();
+        }
+
+        function renderSelectedInvoices() {
             var display = document.getElementById('selected-invoice-display');
-            display.innerHTML = '\u2713 Terpilih: <b>' + noFaktur + '</b> (' + namaPembeli + ') <span onclick="clearSelectedInvoice()" style="margin-left:0.75rem; color:var(--danger-500); cursor:pointer; font-weight:700; text-decoration:underline;">Hapus</span>';
+            if(arraySelectedInvoice.length === 0) {
+                display.style.display = 'none';
+                document.getElementById('input_invoice_baru').value = '';
+                return;
+            }
             display.style.display = 'block';
+            let html = `<strong>Terpilih (${arraySelectedInvoice.length}):</strong><div style="margin-top:5px; display:flex; gap:5px; flex-wrap:wrap;">`;
+            arraySelectedInvoice.forEach(inv => {
+                html += `<span style="background:#fff; border:1px solid var(--success-500); color:var(--success-700); padding:2px 8px; border-radius:12px; font-size:0.8rem;">${inv} <span onclick="removeInvoice('${inv}')" style="margin-left:5px;cursor:pointer;color:var(--danger-500);">✖</span></span>`;
+            });
+            html += `</div>`;
+            display.innerHTML = html;
+        }
+
+        function removeInvoice(inv) {
+            arraySelectedInvoice = arraySelectedInvoice.filter(i => i !== inv);
+            document.getElementById('input_invoice_baru').value = arraySelectedInvoice.join(', ');
+            renderSelectedInvoices();
         }
 
         function clearSelectedInvoice() {
-            document.getElementById('input_invoice_baru').value = '';
-            document.getElementById('input_invoice_search').value = '';
-            document.getElementById('selected-invoice-display').style.display = 'none';
+            arraySelectedInvoice = [];
+            renderSelectedInvoices();
         }
 
         // Close dropdown when clicking outside

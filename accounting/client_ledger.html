@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Ledger | Accounting Module</title>
+    <script src="/theme.js"></script>
+    <script src="/export.js"></script>
+    <script src="/pagination.js"></script>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        #tabel-data th { vertical-align: middle; line-height: 1.3; padding: 0.75rem 0.5rem; text-align: center; }
+        .selected-badge { background: var(--success-50); color: var(--success-700); border: 1px solid var(--success-500); padding: 8px 12px; border-radius: 6px; font-size: 0.9rem; font-weight: 700; display: inline-block; margin-bottom: 15px; width: 100%; text-align: center; }
+        .inv-badge { background: var(--primary-50); color: var(--primary-700); border: 1px solid var(--primary-300); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .input-rp { text-align: right; font-family: monospace; font-size: 1.05rem; letter-spacing: 0.5px; }
+        .table-responsive { max-height: calc(100vh - 320px); }
+    </style>
+</head>
+<body>
+    <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
+
+    <div class="app-wrapper">
+        <div id="sidebar-container"></div>
+
+        <main class="main-content">
+            <header class="header">
+                <h2>Data Client Ledger (Project Billing)</h2>
+                <div class="user-profile"><span id="header-user-name"></span>
+                    <a href="/logout" class="btn-logout">Logout</a>
+                </div>
+            </header>
+
+            <div class="container">
+                <div class="stats-grid" id="stats-cards">
+                    <div class="stat-card accent-blue">
+                        <span class="stat-label">Total Contract Income</span>
+                        <div class="stat-value" id="stat-income">Rp 0</div>
+                    </div>
+                    <div class="stat-card accent-green">
+                        <span class="stat-label">Total Net Receipt (Diterima)</span>
+                        <div class="stat-value" id="stat-receipt">Rp 0</div>
+                    </div>
+                    <div class="stat-card accent-orange">
+                        <span class="stat-label">Total Contract Debtor (Piutang)</span>
+                        <div class="stat-value" id="stat-debtor">Rp 0</div>
+                    </div>
+                    <div class="stat-card accent-cyan">
+                        <span class="stat-label">Total Sertifikat/Termin</span>
+                        <div class="stat-value" id="stat-transaksi">0</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header-padding" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                        <h3 class="title-primary" style="border-left-color: #06b6d4; margin: 0;">Rincian Client Ledger</h3>
+                        <div class="toolbar-actions">
+                            <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">🗑️ Hapus Filter</button>
+                            <button class="btn-toolbar btn-toolbar-export" onclick="showExportMenu(event, 'tabel-data', 'client_ledger_' + aktifEntitas)">Export</button>
+                            <button class="btn-toolbar btn-toolbar-print" onclick="window.print()">Print</button>
+                            <button class="btn-toolbar btn-toolbar-inbox" onclick="bukaModalTambah()">➕ Tambah Jurnal</button>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table id="tabel-data">
+                            <thead>
+                                <tr>
+                                    <th class="col-no">No.</th>
+                                    <th class="col-aksi">Aksi</th>
+                                    <th style="width:100px;">PROJECT /<br>BRANCH</th>
+                                    <th>NAMA<br>CLIENT</th>
+                                    <th>INV<br>NO.</th>
+                                    <th>CONTRACT<br>INCOME</th>
+                                    <th>DISCOUNT<br>Rp</th>
+                                    <th>ADVANCE<br>Rp</th>
+                                    <th>RETENTION<br>Rp</th>
+                                    <th>NET<br>CERTIFICATE</th>
+                                    <th>VAT<br>&nbsp;</th>
+                                    <th>GROSS<br>CERTIFICATE</th>
+                                    <th>GROSS PAYM.<br>RECEIVED</th>
+                                    <th>CONTRACT<br>DEBTOR (IDR)</th>
+                                    <th>GROSS PAYM. RCPT<br>THIS MONTH</th>
+                                    <th>WITHHOLDING TAX<br>3% / 2.65%</th>
+                                    <th>BACK / BANK<br>CHARGE</th>
+                                    <th>NET<br>RECEIPT</th>
+                                    <th>REF<br>BUPOT PREPAID</th>
+                                    <th>REMARKS<br>&nbsp;</th>
+                                </tr>
+                                <tr class="filter-row">
+                                    <th></th><th></th><th><input type="text" class="filter-input" data-col="d.inv_no" placeholder="🔍 Inv. No..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.nama_client" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.inv_no" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.contract_income" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.discount" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.advance" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.retention" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.net_certificate" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.vat" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.gross_certificate" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.gross_paym_received" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.contract_debtor" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.gross_paym_rcpt" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.withholding_tax" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.bank_charge" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.net_receipt" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.ref_bppu" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.remarks" placeholder="🔍 Cari..."></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabel-body"></tbody>
+                        </table>
+                    </div>
+                    <div id="pg-container"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="modalFormJurnal" class="modal-overlay">
+        <div class="modal-box" style="max-width: 800px; width: 95%;">
+            <h3 style="border-bottom: 2px solid var(--border-color); padding-bottom: 10px; color: #06b6d4; margin-bottom: 15px;">📝 Entri Jurnal Project Billing</h3>
+            
+            <div class="form-group" id="step-select-invoice">
+                <label>1. Cari & Pilih Faktur Pajak Keluaran (VAT OUT)</label>
+                <div class="invoice-select-wrapper">
+                    <input type="text" id="inv_search" class="invoice-search" placeholder="Ketik No Faktur, No Invoice, atau Client..." onfocus="toggleInvoiceList(true)" oninput="renderInvoiceList()">
+                    <div id="inv_dropdown" class="invoice-dropdown"></div>
+                </div>
+                <div style="margin-top: 15px; display: flex; justify-content: flex-end;">
+                    <button class="btn-simpan btn-cancel" style="width: auto; padding: 0.5rem 1.5rem; margin: 0;" onclick="resetForm()">Tutup Formulir</button>
+                </div>
+            </div>
+
+            <div id="form-details" style="display: none;">
+                <div id="selected-invoice-display" class="selected-badge"></div>
+                
+                <div class="form-group" style="margin-top:10px; margin-bottom:15px;">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:700; color:var(--warning-600); background:var(--warning-50); padding:10px; border-radius:6px; border:1px solid var(--warning-300);">
+                        <input type="checkbox" id="f_is_advance" onchange="toggleAdvanceMode(this.checked)" style="width:18px; height:18px; accent-color:var(--warning-600);">
+                        Tandai Jurnal ini sebagai Piutang Uang Muka (Advance DP)
+                    </label>
+                </div>
+
+                <div class="grid-2-col">
+                    <div class="form-group"><label>Contract Income</label><input type="text" class="input-rp" id="f_contract_income" value="0"></div>
+                    <div class="form-group"><label>Discount (Rp)</label><input type="text" class="input-rp" id="f_discount" value="0"></div>
+                </div>
+                <div class="grid-2-col">
+                    <div class="form-group">
+                        <label>Advance (Deduction)</label>
+                        <div style="display:flex; gap:10px;">
+                            <input type="text" class="input-rp" id="f_advance" value="0" style="flex:2;">
+                            <button class="btn-aksi btn-verify" id="btn-tarik-advance" style="flex:1; margin:0; background-color:var(--warning-500);" onclick="bukaModalCariAdvance('f')">🔍 Tarik Saldo DP</button>
+                            <input type="hidden" id="f_ref_advance">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label style="display:flex; justify-content:space-between; align-items:center;">
+                            <span>Retention (Rp)</span>
+                            <span style="display:flex; gap:5px;">
+                                <button type="button" class="btn-aksi" style="padding:2px 8px; cursor:pointer; background:var(--primary-100); color:var(--primary-700);" onclick="kalkulasiRetention(5, 'f')">5%</button>
+                                <button type="button" class="btn-aksi" style="padding:2px 8px; cursor:pointer; background:var(--primary-100); color:var(--primary-700);" onclick="kalkulasiRetention(10, 'f')">10%</button>
+                            </span>
+                        </label>
+                        <input type="text" class="input-rp" id="f_retention" value="0">
+                    </div>
+                </div>
+                <hr style="margin: 10px 0; border: 0.5px solid var(--border-color);">
+                <div class="grid-2-col">
+                    <div class="form-group"><label>Net Certificate (DPP)</label><input type="text" id="f_net_cert" class="input-rp" readonly style="background:#f1f5f9;"></div>
+                    <div class="form-group"><label>VAT (PPN)</label><input type="text" id="f_vat" class="input-rp" readonly style="background:#f1f5f9;"></div>
+                </div>
+                <div class="form-group"><label>Gross Certificate</label><input type="text" id="f_gross_cert" class="input-rp" readonly style="background:#f1f5f9; font-weight:700;"></div>
+                <hr style="margin: 10px 0; border: 0.5px solid var(--border-color);">
+                <div class="grid-2-col">
+                    <div class="form-group"><label>Withholding Tax</label><input type="text" class="input-rp" id="f_wht" value="0"></div>
+                    <div class="form-group"><label>Bank Charge</label><input type="text" class="input-rp" id="f_bank_charge" value="0"></div>
+                </div>
+                <div class="form-group">
+                    <label>Referensi Bukti Potong WHT (Prepaid Tax)</label>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" id="f_ref_bppu" placeholder="Otomatis terisi jika menarik bukti potong..." readonly style="background:#f1f5f9; flex:2;">
+                        <button class="btn-aksi btn-verify" style="flex:1; margin:0;" onclick="bukaModalCariBupot('f')">🔍 Tarik Bupot</button>
+                    </div>
+                </div>
+                <div class="form-group"><label>Remarks</label><input type="text" id="f_remarks" placeholder="Catatan tambahan..."></div>
+                
+                <div style="display:flex; gap:10px; margin-top: 10px;">
+                    <button class="btn-simpan" style="background: linear-gradient(135deg, #06b6d4, #0891b2); flex: 2;" onclick="simpanJurnal()">💾 Simpan Jurnal</button>
+                    <button class="btn-simpan btn-cancel" style="flex: 1; margin-top:0;" onclick="resetForm()">Batal</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalEditJurnal" class="modal-overlay" style="display: none;">
+        <div class="modal-box" style="max-width: 600px; width: 95%;">
+            <h3 style="border-bottom: 2px solid var(--border-color); padding-bottom: 10px; color: #06b6d4; margin-bottom: 15px;">📝 Edit Pelunasan & Pembayaran</h3>
+            
+            <p id="edit-jurnal-info" style="font-weight: bold; margin-bottom: 15px; color: var(--text-secondary); line-height: 1.4;"></p>
+            
+            <input type="hidden" id="e_id">
+            <input type="hidden" id="e_inv_no">
+            <input type="hidden" id="e_gross_cert">
+            
+            <div class="form-group"><label>Contract Income (Rp)</label><input type="text" class="input-rp" id="e_contract_income" value="0"></div>
+
+            <div class="form-group">
+                <label>Advance (Deduction)</label>
+                <div style="display:flex; gap:10px;">
+                    <input type="text" class="input-rp" id="e_advance" value="0" style="flex:2;">
+                    <button class="btn-aksi btn-verify" id="btn-tarik-advance-edit" style="flex:1; margin:0; background-color:var(--warning-500);" onclick="bukaModalCariAdvance('e')">🔍 Tarik Saldo DP</button>
+                    <input type="hidden" id="e_ref_advance">
+                </div>
+            </div>
+
+            <div class="grid-2-col">
+                <div class="form-group"><label>Gross Paym. Received (Rp)</label><input type="text" class="input-rp" id="e_gross_paym_received" value="0" oninput="kalkulasiEdit()"></div>
+                <div class="form-group"><label>Gross Paym. Rcpt This Month</label><input type="text" class="input-rp" id="e_gross_paym_rcpt" value="0"></div>
+            </div>
+            
+            <hr style="margin: 10px 0; border: 0.5px solid var(--border-color);">
+            
+            <div class="grid-2-col">
+                <div class="form-group"><label>Withholding Tax (Rp)</label><input type="text" class="input-rp" id="e_wht" value="0" oninput="kalkulasiEdit()"></div>
+                <div class="form-group"><label>Bank Charge (Rp)</label><input type="text" class="input-rp" id="e_bank_charge" value="0" oninput="kalkulasiEdit()"></div>
+            </div>
+            
+            <div class="form-group">
+                <label>Referensi Bukti Potong WHT (Prepaid Tax)</label>
+                <div style="display:flex; gap:10px;">
+                    <input type="text" id="e_ref_bppu" placeholder="Otomatis terisi jika menarik bukti potong..." readonly style="background:#f1f5f9; flex:2;">
+                    <button class="btn-aksi btn-verify" style="flex:1; margin:0;" onclick="bukaModalCariBupot('e')">🔍 Tarik Bupot</button>
+                </div>
+            </div>
+            
+            <div class="form-group"><label>Remarks</label><input type="text" id="e_remarks" placeholder="Catatan tambahan..."></div>
+            
+            <hr style="margin: 10px 0; border: 0.5px solid var(--border-color);">
+            
+            <div class="grid-2-col">
+                <div class="form-group"><label>Contract Debtor (Sisa Piutang)</label><input type="text" id="e_contract_debtor" readonly style="background:#f1f5f9; color:var(--danger-600); font-weight:bold;"></div>
+                <div class="form-group"><label>Net Receipt (Kas Masuk)</label><input type="text" id="e_net_receipt" readonly style="background:#f1f5f9; color:var(--success-600); font-weight:bold;"></div>
+            </div>
+            
+            <div style="display:flex; gap:10px; margin-top: 10px;">
+                <button class="btn-simpan" style="background: linear-gradient(135deg, #06b6d4, #0891b2); flex: 2;" onclick="simpanEditJurnal()">💾 Simpan Perubahan</button>
+                <button class="btn-simpan btn-cancel" style="flex: 1; margin-top:0;" onclick="document.getElementById('modalEditJurnal').style.display='none'">Batal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Cari Bupot Prepaid Tax -->
+    <div id="modalCariBupot" class="modal-overlay" style="display: none; z-index: 1000;">
+        <div class="modal-box" style="max-width: 600px; width: 95%;">
+            <h3 style="border-bottom: 2px solid var(--border-color); padding-bottom: 10px; color: #06b6d4; margin-bottom: 15px;">🔍 Pilih Bukti Potong (Prepaid Tax)</h3>
+            <p style="font-size: 0.9rem; margin-bottom: 15px;">Menampilkan Bukti Potong yang ditautkan ke Faktur: <strong id="bupot-inv-target" style="color:var(--primary-700);"></strong></p>
+            
+            <div id="bupot-list-container" style="max-height: 300px; overflow-y: auto; margin-bottom:15px;">
+                <!-- list of bupots will be rendered here -->
+            </div>
+            
+            <div style="display:flex; justify-content:flex-end;">
+                <button class="btn-simpan btn-cancel" style="width:auto; padding: 0.5rem 1.5rem; margin:0;" onclick="document.getElementById('modalCariBupot').style.display='none'">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Cari Uang Muka (Advance DP) -->
+    <div id="modalCariAdvance" class="modal-overlay" style="display: none; z-index: 1000;">
+        <div class="modal-box" style="max-width: 600px; width: 95%;">
+            <h3 style="border-bottom: 2px solid var(--border-color); padding-bottom: 10px; color: #f59e0b; margin-bottom: 15px;">🔍 Tarik Saldo Uang Muka (Advance)</h3>
+            <p style="font-size: 0.9rem; margin-bottom: 15px;">Mencari riwayat Uang Muka untuk klien: <strong id="advance-client-target" style="color:var(--warning-700);"></strong></p>
+            
+            <div id="advance-list-container" style="max-height: 300px; overflow-y: auto; margin-bottom:15px;">
+                <!-- list of advances will be rendered here -->
+            </div>
+            
+            <div style="display:flex; justify-content:flex-end;">
+                <button class="btn-simpan btn-cancel" style="width:auto; padding: 0.5rem 1.5rem; margin:0;" onclick="document.getElementById('modalCariAdvance').style.display='none'">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
+        let currentUser = {};
+        let currentPage = 1, currentLimit = 50, currentSearch = {};
+        
+        let allAvailableInvoices = []; // Menyimpan semua faktur di memori lokal agar filter cepat
+        let isLoadingInvoices = false; // Flag status memuat dari server
+        let selectedInvoiceData = null;
+
+        fetch('/api/me').then(res => res.json()).then(u => currentUser = u);
+        fetch('/sidebar.html').then(res => res.text()).then(html => document.getElementById('sidebar-container').innerHTML = html);
+
+        // Dengarkan pembaruan data dari server
+        socket.on('data-baru-ledger', () => loadData(currentPage, currentLimit));
+
+        let masterBranches = [];
+        async function loadBranches() {
+            try {
+                const res = await fetch('/api/branches?entitas=' + aktifEntitas);
+                if(res.ok) masterBranches = await res.json();
+            } catch(e) {}
+        }
+
+        window.gantiEntitas = async function(entitas) {
+            aktifEntitas = entitas; localStorage.setItem('lastEntitas', entitas); 
+            currentPage = 1; currentSearch = {}; 
+            await loadBranches();
+            loadData();
+        };
+
+        initPagination('pg-container', (p, l) => loadData(p, l), 50);
+
+        // Inisialisasi format input Rupiah
+        function initFormatRupiah() {
+            document.querySelectorAll('.input-rp').forEach(input => {
+                input.addEventListener('input', function(e) {
+                    let val = e.target.value.replace(/[^,\d]/g, '').toString();
+                    let isNegative = e.target.value.startsWith('-');
+                    let split = val.split(',');
+                    let sisa = split[0].length % 3;
+                    let rupiah = split[0].substr(0, sisa);
+                    let ribuan = split[0].substr(sisa).match(/\d{3}/gi);
+
+                    if (ribuan) {
+                        let separator = sisa ? '.' : '';
+                        rupiah += separator + ribuan.join('.');
+                    }
+
+                    rupiah = split[1] != undefined ? rupiah + ',' + split[1] : rupiah;
+                    if(isNegative) rupiah = '-' + rupiah;
+                    e.target.value = rupiah;
+                });
+            });
+        }
+        initFormatRupiah();
+
+        async function loadData(page, limit) {
+            currentPage = page || 1; currentLimit = limit || 50;
+            let url = `/api/data-client-ledger?entitas=${aktifEntitas}&page=${currentPage}&limit=${currentLimit}`;
+            if (Object.keys(currentSearch).length > 0) url += `&search=${encodeURIComponent(JSON.stringify(currentSearch))}`;
+
+            try {
+                const res = await fetch(url);
+                const result = await res.json();
+                const tbody = document.getElementById('tabel-body'); tbody.innerHTML = ''; 
+                const fRp = (n) => "Rp " + Number(n).toLocaleString('id-ID');
+
+                // Statistik dihitung di Backend
+                document.getElementById('stat-transaksi').textContent = result.total || 0;
+                document.getElementById('stat-income').textContent = fRp(result.stats ? result.stats.income : 0);
+                document.getElementById('stat-receipt').textContent = fRp(result.stats ? result.stats.receipt : 0);
+                document.getElementById('stat-debtor').textContent = fRp(result.stats ? result.stats.debtor : 0);
+
+                if (!result.data || result.data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="18" class="text-center" style="padding:20px; color:var(--text-tertiary);">Data belum tersedia. Silakan tambah jurnal.</td></tr>`;
+                    return;
+                }
+
+                result.data.forEach((baris, index) => {
+                    const tr = document.createElement('tr');
+                    let bNo = ((currentPage - 1) * currentLimit) + index + 1;
+                    tr.innerHTML = `
+                        <td class="text-center">${bNo}</td>
+                        <td class="text-center"><button class="btn-tbl btn-tbl-edit" onclick="bukaModalEdit('${encodeURIComponent(JSON.stringify(baris))}')">Edit</button></td>
+                        <td class="text-center font-bold" style="color:var(--primary-700);">${extractBranch(baris.inv_no)}</td>
+                        <td class="text-bold">${baris.nama_client || '-'}</td>
+                        <td class="text-center">${baris.inv_no || '-'}</td>
+                        <td class="text-right">${fRp(baris.contract_income)}</td>
+                        <td class="text-right">${fRp(baris.discount)}</td>
+                        <td class="text-right">${fRp(baris.advance)}</td>
+                        <td class="text-right">${fRp(baris.retention)}</td>
+                        <td class="text-right font-bold">${fRp(baris.net_certificate)}</td>
+                        <td class="text-right">${fRp(baris.vat)}</td>
+                        <td class="text-right font-bold">${fRp(baris.gross_certificate)}</td>
+                        <td class="text-right">${fRp(baris.gross_paym_received)}</td>
+                        <td class="text-right" style="color:var(--danger-600); font-weight:bold;">${fRp(baris.contract_debtor)}</td>
+                        <td class="text-right">${fRp(baris.gross_paym_rcpt)}</td>
+                        <td class="text-right" style="color:var(--warning-600);">${fRp(baris.withholding_tax)}</td>
+                        <td class="text-right">${fRp(baris.bank_charge)}</td>
+                        <td class="text-right" style="color:var(--success-600); font-weight:bold;">${fRp(baris.net_receipt)}</td>
+                        <td class="text-center">${baris.ref_bppu ? `<span class="inv-badge" style="background:var(--primary-100); color:var(--primary-700); cursor:pointer;" title="Bupot Prepaid Tax: ${baris.ref_bppu}">${baris.ref_bppu}</span>` : '-'}</td>
+                        <td>${baris.remarks || '-'}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                renderPagination('pg-container', result.total, currentPage, currentLimit);
+            } catch (e) {}
+        }
+
+        // ==========================================
+        // FUNGSI SEARCH & SELECT FAKTUR (DISEMPURNAKAN)
+        // ==========================================
+        async function bukaModalTambah() {
+            document.getElementById('modalFormJurnal').style.display = 'flex';
+            document.getElementById('inv_search').value = '';
+            document.getElementById('step-select-invoice').style.display = 'block';
+            document.getElementById('form-details').style.display = 'none';
+
+            // Tarik seluruh faktur di awal agar pencarian real-time sangat cepat
+            try {
+                isLoadingInvoices = true;
+                renderInvoiceList(); // Tampilkan skeleton/loading state sementara
+                
+                const res = await fetch(`/api/available-vatout?entitas=${aktifEntitas}&mode=ledger`);
+                const data = await res.json();
+                allAvailableInvoices = [...(data.matching || []), ...(data.others || [])];
+                
+                isLoadingInvoices = false;
+                renderInvoiceList(); 
+            } catch(e) {
+                isLoadingInvoices = false;
+                console.error("Gagal menarik data faktur", e);
+            }
+        }
+
+        function toggleInvoiceList(show) {
+            const dropdown = document.getElementById('inv_dropdown');
+            if(show) {
+                dropdown.classList.add('show');
+                renderInvoiceList();
+            }
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.invoice-select-wrapper')) {
+                document.getElementById('inv_dropdown').classList.remove('show');
+            }
+        });
+
+        // Fungsi Filter Lokal (Real-time tanpa jeda API)
+        function renderInvoiceList() {
+            const dropdown = document.getElementById('inv_dropdown');
+            dropdown.innerHTML = '';
+            
+            if (isLoadingInvoices) {
+                dropdown.innerHTML = '<div class="invoice-dropdown-empty" style="color:var(--primary-600);">⏳ Menarik data Faktur Pajak dari server...</div>';
+                return;
+            }
+            
+            const q = document.getElementById('inv_search').value.toLowerCase();
+            
+            // Pencarian mencakup: Nama Pembeli ATAU No Faktur Pajak ATAU No Invoice Internal
+            const list = allAvailableInvoices.filter(inv => {
+                const nama = (inv.nama_pembeli || '').toLowerCase();
+                const noFaktur = (inv.no_faktur || '').toLowerCase();
+                const noInv = (inv.no_invoice_internal || '').toLowerCase();
+                return nama.includes(q) || noFaktur.includes(q) || noInv.includes(q);
+            });
+
+            // Urutkan List (Yang Sudah Dipakai Ditaruh di Paling Bawah)
+            list.sort((a, b) => {
+                if(a.sudah_dipakai === b.sudah_dipakai) return 0;
+                return a.sudah_dipakai ? 1 : -1;
+            });
+
+            if (list.length === 0) {
+                dropdown.innerHTML = '<div class="invoice-dropdown-empty">Faktur/Invoice tidak ditemukan</div>';
+                return;
+            }
+            
+            list.forEach(inv => {
+                const item = document.createElement('div');
+                item.className = `invoice-dropdown-item ${inv.sudah_dipakai ? 'disabled' : ''}`;
+                
+                // Desain baru: Menampilkan Nomor Invoice Internal dengan badge biru
+                item.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px; align-items:center;">
+                        <span class="inv-faktur" style="font-size:0.95rem;">${inv.no_faktur}</span>
+                        <span class="inv-badge">${inv.no_invoice_internal || 'Belum ada Invoice'}</span>
+                    </div>
+                    <div class="inv-client" style="font-weight:600; color:var(--text-primary); margin-bottom:4px;">${inv.nama_pembeli}</div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <small style="color:var(--text-tertiary);">${inv.tanggal_format}</small>
+                        <span class="inv-amount">NJ (Net): Rp ${Number(inv.harga_jual).toLocaleString('id-ID')}</span>
+                    </div>
+                `;
+                if (!inv.sudah_dipakai) item.onclick = () => selectInvoice(inv);
+                dropdown.appendChild(item);
+            });
+        }
+
+        function selectInvoice(inv) {
+            selectedInvoiceData = inv;
+            document.getElementById('step-select-invoice').style.display = 'none';
+            document.getElementById('form-details').style.display = 'block';
+            
+            // Tampilkan No Invoice Internal juga di badge terpilih
+            let invDisplay = inv.no_invoice_internal && inv.no_invoice_internal !== '-' ? ` [${inv.no_invoice_internal}]` : '';
+            document.getElementById('selected-invoice-display').innerText = `✅ Terpilih: ${inv.no_faktur}${invDisplay} - ${inv.nama_pembeli}`;
+            
+            // Auto-fill Mapping (Menggunakan Harga Jual sebagai Nilai Net/Income)
+            document.getElementById('f_net_cert').value = Number(inv.harga_jual).toLocaleString('id-ID');
+            document.getElementById('f_vat').value = Number(inv.ppn).toLocaleString('id-ID');
+            document.getElementById('f_gross_cert').value = Number(Number(inv.harga_jual) + Number(inv.ppn)).toLocaleString('id-ID');
+            document.getElementById('f_contract_income').value = "0";
+        }
+
+        function resetForm() {
+            selectedInvoiceData = null;
+            document.getElementById('step-select-invoice').style.display = 'block';
+            document.getElementById('form-details').style.display = 'none';
+            document.getElementById('inv_search').value = '';
+            document.getElementById('f_is_advance').checked = false;
+            document.getElementById('f_ref_advance').value = '';
+            toggleAdvanceMode(false);
+            document.getElementById('modalFormJurnal').style.display = 'none';
+        }
+
+        async function simpanJurnal() {
+            if (!selectedInvoiceData) return alert("Silakan pilih faktur terlebih dahulu!");
+
+            const payload = {
+                entitas: aktifEntitas,
+                nama_client: selectedInvoiceData.nama_pembeli,
+                // Kita gunakan No Invoice Internal jika ada, jika tidak gunakan No Faktur
+                inv_no: selectedInvoiceData.no_invoice_internal !== '-' ? selectedInvoiceData.no_invoice_internal : selectedInvoiceData.no_faktur,
+                contract_income: document.getElementById('f_contract_income').value,
+                discount: document.getElementById('f_discount').value,
+                advance: document.getElementById('f_advance').value,
+                retention: document.getElementById('f_retention').value,
+                net_certificate: selectedInvoiceData.harga_jual,
+                vat: selectedInvoiceData.ppn,
+                gross_certificate: Number(selectedInvoiceData.harga_jual) + Number(selectedInvoiceData.ppn),
+                gross_paym_received: 0, 
+                contract_debtor: Number(selectedInvoiceData.harga_jual) + Number(selectedInvoiceData.ppn),     
+                gross_paym_rcpt: 0,     
+                wht: document.getElementById('f_wht').value,
+                bank_charge: document.getElementById('f_bank_charge').value,
+                net_receipt: 0,         
+                remarks: document.getElementById('f_remarks').value,
+                ref_bppu: document.getElementById('f_ref_bppu').value,
+                is_advance: document.getElementById('f_is_advance').checked,
+                ref_advance: document.getElementById('f_ref_advance').value,
+                diinput_oleh: currentUser ? currentUser.nama : 'Admin'
+            };
+            
+            // Kirim ke server
+            socket.emit('simpan-jurnal-ledger', payload);
+            alert("Jurnal Project Billing berhasil disimpan!");
+            resetForm();
+        }
+
+        // ==========================================
+        // FUNGSI EDIT / PELUNASAN JURNAL
+        // ==========================================
+        const getFormatNumber = val => Number(val.toString().replace(/\./g, '').replace(',', '.')) || 0;
+
+        function bukaModalEdit(dataStr) {
+            const data = JSON.parse(decodeURIComponent(dataStr));
+            document.getElementById('modalEditJurnal').style.display = 'flex';
+            document.getElementById('edit-jurnal-info').innerText = `${data.inv_no} - ${data.nama_client} \n(Gross Certificate: Rp ${Number(data.gross_certificate).toLocaleString('id-ID')})`;
+            
+            document.getElementById('e_id').value = data.id;
+            document.getElementById('e_inv_no').value = data.inv_no;
+            document.getElementById('e_gross_cert').value = Number(data.gross_certificate).toLocaleString('id-ID');
+            
+            document.getElementById('e_contract_income').value = Number(data.contract_income || 0).toLocaleString('id-ID');
+            document.getElementById('e_advance').value = Number(data.advance || 0).toLocaleString('id-ID');
+            document.getElementById('e_ref_advance').value = data.ref_advance || '';
+            document.getElementById('e_gross_paym_received').value = Number(data.gross_paym_received || 0).toLocaleString('id-ID');
+            document.getElementById('e_gross_paym_rcpt').value = Number(data.gross_paym_rcpt || 0).toLocaleString('id-ID');
+            document.getElementById('e_wht').value = Number(data.withholding_tax || 0).toLocaleString('id-ID');
+            document.getElementById('e_bank_charge').value = Number(data.bank_charge || 0).toLocaleString('id-ID');
+            document.getElementById('e_ref_bppu').value = data.ref_bppu || '';
+            document.getElementById('e_remarks').value = data.remarks || '';
+            
+            kalkulasiEdit();
+        }
+
+        function kalkulasiEdit() {
+            const grossCert = getFormatNumber(document.getElementById('e_gross_cert').value);
+            const grossPaym = getFormatNumber(document.getElementById('e_gross_paym_received').value);
+            const wht = getFormatNumber(document.getElementById('e_wht').value);
+            const bankCharge = getFormatNumber(document.getElementById('e_bank_charge').value);
+            
+            const debtor = grossCert - grossPaym;
+            const netReceipt = grossPaym - wht - bankCharge;
+            
+            document.getElementById('e_contract_debtor').value = debtor.toLocaleString('id-ID');
+            document.getElementById('e_net_receipt').value = netReceipt.toLocaleString('id-ID');
+        }
+
+        function simpanEditJurnal() {
+            const grossCert = getFormatNumber(document.getElementById('e_gross_cert').value);
+            const grossPaym = getFormatNumber(document.getElementById('e_gross_paym_received').value);
+            const wht = getFormatNumber(document.getElementById('e_wht').value);
+            const bankCharge = getFormatNumber(document.getElementById('e_bank_charge').value);
+            
+            const payload = {
+                id: document.getElementById('e_id').value,
+                contract_income: document.getElementById('e_contract_income').value,
+                advance: document.getElementById('e_advance').value,
+                ref_advance: document.getElementById('e_ref_advance').value,
+                gross_paym_received: document.getElementById('e_gross_paym_received').value,
+                gross_paym_rcpt: document.getElementById('e_gross_paym_rcpt').value,
+                withholding_tax: document.getElementById('e_wht').value,
+                bank_charge: document.getElementById('e_bank_charge').value,
+                remarks: document.getElementById('e_remarks').value,
+                ref_bppu: document.getElementById('e_ref_bppu').value,
+                contract_debtor: grossCert - grossPaym,
+                net_receipt: grossPaym - wht - bankCharge
+            };
+            
+            socket.emit('update-jurnal-ledger', payload);
+            alert("Perubahan pelunasan berhasil disimpan!");
+            document.getElementById('modalEditJurnal').style.display = 'none';
+        }
+
+        // ==========================================
+        // FUNGSI TARIK BUKTI POTONG WHT PREPAID
+        // ==========================================
+        let targetBupotPrefix = 'f';
+
+        async function bukaModalCariBupot(prefix) {
+            targetBupotPrefix = prefix;
+            let invNo = '';
+            if(prefix === 'f') {
+                if(!selectedInvoiceData || !selectedInvoiceData.no_faktur) return alert("Pilih faktur/invoice terlebih dahulu di Step 1!");
+                invNo = selectedInvoiceData.no_faktur;
+            } else {
+                invNo = document.getElementById('e_inv_no').value;
+            }
+
+            document.getElementById('bupot-inv-target').innerText = invNo;
+            document.getElementById('bupot-list-container').innerHTML = '<i style="color:var(--text-secondary);">Sedang mencari data...</i>';
+            document.getElementById('modalCariBupot').style.display = 'flex';
+
+            try {
+                const res = await fetch('/api/search-prepaid-for-ledger?inv_no=' + encodeURIComponent(invNo));
+                const data = await res.json();
+                
+                if(!data || data.length === 0) {
+                    document.getElementById('bupot-list-container').innerHTML = '<div style="padding:15px; background:var(--danger-50); color:var(--danger-700); border:1px solid var(--danger-300); border-radius:6px;">Tidak ada sinkronisasi Bukti Potong yang ditemukan untuk Faktur ini di Data Prepaid.</div>';
+                    return;
+                }
+
+                let html = '';
+                data.forEach(b => {
+                    let dipisah = (b.no_invoice_internal||'').split(',').map(s=>s.trim());
+                    let isMulti = dipisah.length > 1;
+                    
+                    let warningTag = isMulti ? `<div style="margin-top:10px; font-size:0.85rem; background:var(--warning-50); color:var(--warning-800); padding:6px 10px; border-radius:4px; border-left:4px solid var(--warning-500);"><b>⚠️ Multi-Invoice Terdeteksi:</b> Bupot ini digunakan untuk <b>${dipisah.length} Faktur berbeda</b>. Sistem akan mengekstrak total seluruh Nilai PPh (Rp ${Number(b.nilai_pph).toLocaleString('id-ID')}).<br/>Mohon agar Anda membaginya/menyesuaikan kembali nilai WHT yang ditarik <b>secara proporsional manual</b> untuk invoice ini!</div>` : '';
+                    
+                    html += `
+                    <div style="border:1px solid var(--border-color); padding:12px; border-radius:6px; margin-bottom:10px; cursor:pointer; background:#fff; transition:0.2s;" onmouseover="this.style.borderColor='var(--primary-500)'" onmouseout="this.style.borderColor='var(--border-color)'" onclick="pilihBupot('${b.no_bppu}', ${b.nilai_pph})">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                            <strong style="color:var(--primary-600); font-size:1.05rem;">${b.no_bppu}</strong>
+                            <span style="font-size:0.85rem; color:var(--text-tertiary);">${b.tanggal_dokumen}</span>
+                        </div>
+                        <div style="font-size:0.9rem; margin-bottom:5px; color:var(--text-secondary);">${b.nama_pemotong}</div>
+                        <div style="font-weight:bold; color:var(--text-primary);">Total PPh yang Dipotong: Rp ${Number(b.nilai_pph).toLocaleString('id-ID')}</div>
+                        ${warningTag}
+                    </div>`;
+                });
+                document.getElementById('bupot-list-container').innerHTML = html;
+            } catch(e) {
+                document.getElementById('bupot-list-container').innerHTML = '<div style="color:var(--danger-700);">Gagal memuat data dari server.</div>';
+            }
+        }
+
+        function pilihBupot(no_bppu, pph) {
+            document.getElementById(targetBupotPrefix + '_ref_bppu').value = no_bppu;
+            
+            // Format PPh ke rupiah style string untuk input class="input-rp"
+            let val = String(pph);
+            let sisa = val.length % 3;
+            let rupiah = val.substr(0, sisa);
+            let ribuan = val.substr(sisa).match(/\d{3}/gi);
+            if (ribuan) { let separator = sisa ? '.' : ''; rupiah += separator + ribuan.join('.'); }
+            
+            document.getElementById(targetBupotPrefix + '_wht').value = rupiah;
+            
+            if(targetBupotPrefix === 'e') kalkulasiEdit(); // Trigger edit recalc
+            
+            document.getElementById('modalCariBupot').style.display = 'none';
+        }
+
+        // ==========================================
+        // FUNGSI FILTER TABEL UTAMA (DEBOUNCE)
+        // ==========================================
+        let searchTimeout;
+        document.addEventListener('input', function(e) {
+            if (e.target.classList.contains('filter-input')) {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => { jalankanFilterTabel(); }, 500);
+            }
+        });
+
+        function jalankanFilterTabel() {
+            const filters = document.querySelectorAll('.filter-input');
+            let isAnyFilterActive = false;
+            currentSearch = {};
+
+            filters.forEach((input) => {
+                const val = input.value;
+                const colName = input.getAttribute('data-col'); 
+                if (val && colName) {
+                    isAnyFilterActive = true;
+                    currentSearch[colName] = val;
+                }
+            });
+
+            document.getElementById('btnHapusFilter').style.display = isAnyFilterActive ? 'inline-block' : 'none';
+            loadData(1, currentLimit); 
+        }
+
+        function resetSemuaFilter() { 
+            document.querySelectorAll('.filter-input').forEach(input => input.value = ''); 
+            currentSearch = {};
+            jalankanFilterTabel(); 
+        }
+
+        // Fungsi ekstrak cabang dari invoice internal (009/30247G/II/2025 -> nama cabang)
+        function extractBranch(invStr) {
+            if(!invStr || invStr === '-') return '-';
+            const parts = invStr.split('/');
+            if(parts.length >= 4) {
+                let code = parts[1]; // Mengambil segmen kedua
+                if(masterBranches && masterBranches.length > 0) {
+                    let branch = masterBranches.find(b => b.kode_cabang === code);
+                    return branch ? branch.nama_cabang : code;
+                }
+                return code;
+            }
+            return '-'; // Jika format bukan invoice internal atau tidak punya '/' memadai
+        }
+
+        // ==========================================
+        // LOGIKA ADVANCE & RETENTIONS
+        // ==========================================
+        function toggleAdvanceMode(isAdv) {
+            const btnTarik = document.getElementById('btn-tarik-advance');
+            if(isAdv) {
+                btnTarik.style.display = 'none';
+                document.getElementById('f_advance').value = '0';
+                document.getElementById('f_ref_advance').value = '';
+                document.getElementById('f_advance').readOnly = true;
+                document.getElementById('f_advance').style.background = 'var(--bg-secondary)';
+            } else {
+                btnTarik.style.display = 'block';
+                document.getElementById('f_advance').readOnly = false;
+                document.getElementById('f_advance').style.background = 'var(--bg-primary)';
+            }
+        }
+
+        function kalkulasiRetention(pct, prefix) {
+            let contractIncomeStr = document.getElementById(prefix + '_contract_income');
+            if(!contractIncomeStr) return; 
+            let cleanStr = contractIncomeStr.value.replace(/[^0-9,-]+/g, "").replace(",", ".");
+            let ci = parseFloat(cleanStr) || 0;
+            let ret = ci * (pct / 100);
+            document.getElementById(prefix + '_retention').value = Math.round(ret).toLocaleString('id-ID');
+        }
+
+        let targetAdvancePrefix = 'f';
+        async function bukaModalCariAdvance(prefix) {
+            targetAdvancePrefix = prefix;
+            
+            // Logika fallback apabila Edit Mode dengan Data Berbeda 
+            let clientName = '';
+            if (prefix === 'e') {
+            // BUG-05 FIX: Gunakan e_inv_no dan nama client dari data yang sudah tersimpan
+            // Hindari parsing teks dari innerText yang bisa rusak jika nama client mengandung "-"
+            const invNoEdit = document.getElementById('e_inv_no').value;
+            if (!invNoEdit) return alert("Data Edit gagal dimuat.");
+            // Ambil nama client dari baris edit modal info dengan pemisah yang lebih aman
+            const infoText = document.getElementById('edit-jurnal-info').innerText;
+            // Format: "INV_NO - NAMA_CLIENT \n(Gross...)"
+            // Gunakan lastIndexOf untuk kasus nama client mengandung '-'
+            const dashIdx = infoText.indexOf(' - ');
+            const newlineIdx = infoText.indexOf('\n');
+            clientName = dashIdx !== -1 ? infoText.substring(dashIdx + 3, newlineIdx !== -1 ? newlineIdx : undefined).trim() : '';
+            if (!clientName) return alert("Gagal membaca nama client. Coba tutup dan buka kembali form edit.");
+            } else {
+                if(!selectedInvoiceData || !selectedInvoiceData.nama_pembeli) return alert("Pilih faktur/invoice terlebih dahulu di Step 1!");
+                clientName = selectedInvoiceData.nama_pembeli;
+            }
+            
+            document.getElementById('advance-client-target').innerText = clientName;
+            document.getElementById('advance-list-container').innerHTML = '<i style="color:var(--text-secondary);">Sedang mencari riwayat...</i>';
+            document.getElementById('modalCariAdvance').style.display = 'flex';
+
+            try {
+                const res = await fetch('/api/search-advance-ledger?client=' + encodeURIComponent(clientName));
+                const data = await res.json();
+                
+                if(!data || data.length === 0) {
+                    document.getElementById('advance-list-container').innerHTML = '<div style="padding:15px; background:var(--danger-50); color:var(--danger-700); border:1px solid var(--danger-300); border-radius:6px;">Tidak ada riwayat saldo Uang Muka yang aktif untuk Klien ini.</div>';
+                    return;
+                }
+
+                let html = '';
+                data.forEach(b => {
+                    html += `
+                    <div style="border:1px solid var(--border-color); padding:12px; border-radius:6px; margin-bottom:10px; cursor:pointer; background:#fff; transition:0.2s;" onmouseover="this.style.borderColor='var(--warning-500)'" onmouseout="this.style.borderColor='var(--border-color)'" onclick="pilihAdvance('${b.inv_no}', ${b.sisa_saldo})">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                            <strong style="color:var(--warning-600); font-size:1.05rem;">Faktur DP: ${b.inv_no}</strong>
+                        </div>
+                        <div style="font-size:0.9rem; margin-bottom:5px; color:var(--text-secondary);">Tercatat pada: ${new Date(b.waktu_input).toLocaleDateString('id-ID')}</div>
+                        <div style="display:flex; justify-content:space-between; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border-color);">
+                            <div style="font-size:0.85rem;">Total DP Awal: <br><b>Rp ${Number(b.total_advance).toLocaleString('id-ID')}</b></div>
+                            <div style="font-size:0.85rem; color:var(--success-600);">Terpakai/Diklaim: <br><b>Rp ${Number(b.terpakai).toLocaleString('id-ID')}</b></div>
+                            <div style="font-size:0.85rem; color:var(--warning-600);">Sisa Saldo: <br><b style="font-size:1.1rem;">Rp ${Number(b.sisa_saldo).toLocaleString('id-ID')}</b></div>
+                        </div>
+                    </div>`;
+                });
+                document.getElementById('advance-list-container').innerHTML = html;
+            } catch(e) {
+                document.getElementById('advance-list-container').innerHTML = '<div style="color:var(--danger-700);">Gagal memuat data dari server.</div>';
+            }
+        }
+
+        function pilihAdvance(inv_no, saldo) {
+            document.getElementById(targetAdvancePrefix + '_ref_advance').value = inv_no;
+            document.getElementById(targetAdvancePrefix + '_advance').value = Math.round(saldo).toLocaleString('id-ID');
+            document.getElementById('modalCariAdvance').style.display = 'none';
+        }
+
+        loadBranches().then(() => loadData());
+    </script>
+</body>
+</html>

@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Utama | Tax Database System</title>
+    <meta name="description" content="Dashboard ringkasan seluruh modul pajak — VAT OUT, VAT IN, Tax Payable, Prepaid Tax, Client Ledger">
+    <script src="/theme.js"></script>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        /* =============================================
+           DASHBOARD UTAMA — Specific Styles
+           ============================================= */
+
+        /* Hero / Greeting Banner */
+        .dashboard-hero {
+            background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-700) 50%, var(--accent-600) 100%);
+            border-radius: var(--radius-xl);
+            padding: 1.75rem 2rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            box-shadow: 0 8px 32px rgba(30, 58, 138, 0.35);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dashboard-hero::before {
+            content: '';
+            position: absolute;
+            top: -40px;
+            right: -40px;
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.06);
+        }
+
+        .dashboard-hero::after {
+            content: '';
+            position: absolute;
+            bottom: -60px;
+            right: 80px;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: rgba(34, 211, 238, 0.1);
+        }
+
+        .hero-left {
+            z-index: 1;
+        }
+
+        .hero-greeting {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: rgba(255,255,255,0.65);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 0.35rem;
+        }
+
+        .hero-name {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #ffffff;
+            margin-bottom: 0.4rem;
+            line-height: 1.2;
+        }
+
+        .hero-subtitle {
+            font-size: 0.82rem;
+            color: rgba(255,255,255,0.65);
+            font-weight: 500;
+        }
+
+        .hero-right {
+            z-index: 1;
+            text-align: right;
+        }
+
+        .hero-date {
+            font-size: 0.78rem;
+            color: rgba(255,255,255,0.6);
+            margin-bottom: 0.3rem;
+        }
+
+        .hero-time {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: #ffffff;
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+            letter-spacing: 2px;
+        }
+
+        .hero-entity-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: rgba(34, 211, 238, 0.2);
+            border: 1px solid rgba(34, 211, 238, 0.4);
+            color: var(--accent-400);
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 0.3rem 0.75rem;
+            border-radius: 999px;
+            margin-top: 0.5rem;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        /* Alert Banner */
+        .dashboard-alert {
+            background: linear-gradient(135deg, #fef3c7, #fffbeb);
+            border: 1px solid #fbbf24;
+            border-left: 4px solid #f59e0b;
+            border-radius: var(--radius-lg);
+            padding: 0.875rem 1.25rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);
+            animation: slideDown 0.4s ease;
+        }
+
+        [data-theme="dark"] .dashboard-alert {
+            background: linear-gradient(135deg, rgba(245,158,11,0.15), rgba(245,158,11,0.08));
+            border-color: rgba(245,158,11,0.4);
+        }
+
+        @keyframes slideDown {
+            from { opacity:0; transform: translateY(-10px); }
+            to   { opacity:1; transform: translateY(0); }
+        }
+
+        .alert-text {
+            font-size: 0.87rem;
+            font-weight: 600;
+            color: #92400e;
+        }
+
+        [data-theme="dark"] .alert-text { color: #fbbf24; }
+
+        .alert-link {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #f59e0b;
+            text-decoration: none;
+            background: rgba(245,158,11,0.15);
+            padding: 0.35rem 0.875rem;
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(245,158,11,0.3);
+            white-space: nowrap;
+            transition: all var(--transition-base);
+        }
+
+        .alert-link:hover {
+            background: #f59e0b;
+            color: white;
+        }
+
+        /* Section Label */
+        .section-label {
+            font-size: 0.68rem;
+            font-weight: 800;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 0.85rem;
+            padding-left: 0.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-label::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border-color);
+        }
+
+        /* Module Cards Grid */
+        .module-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .module-card {
+            background: var(--bg-primary);
+            border-radius: var(--radius-xl);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-md);
+            overflow: hidden;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            text-decoration: none;
+            display: block;
+            position: relative;
+        }
+
+        .module-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-xl);
+            border-color: transparent;
+        }
+
+        .module-card-header {
+            padding: 1rem 1.25rem 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .module-card-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .module-card-title {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            line-height: 1;
+            margin-bottom: 0.25rem;
+        }
+
+        .module-card-subtitle {
+            font-size: 0.7rem;
+            color: var(--text-tertiary);
+            font-weight: 500;
+        }
+
+        .module-card-body {
+            padding: 0 1.25rem 1.25rem;
+        }
+
+        .module-main-value {
+            font-size: 1.55rem;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 0.15rem;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .module-main-label {
+            font-size: 0.7rem;
+            color: var(--text-tertiary);
+            font-weight: 500;
+            margin-bottom: 0.9rem;
+        }
+
+        .module-stats-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        .module-stat-item {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            padding: 0.5rem 0.625rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .module-stat-label {
+            font-size: 0.62rem;
+            color: var(--text-tertiary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.15rem;
+        }
+
+        .module-stat-value {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .module-card-footer {
+            border-top: 1px solid var(--border-color);
+            padding: 0.6rem 1.25rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .module-pending-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.25rem 0.6rem;
+            border-radius: 999px;
+        }
+
+        .pending-zero {
+            background: var(--bg-secondary);
+            color: var(--text-tertiary);
+            border: 1px solid var(--border-color);
+        }
+
+        .pending-active {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            color: #92400e;
+            border: 1px solid #fbbf24;
+            animation: pulse 2s infinite;
+        }
+
+        [data-theme="dark"] .pending-active {
+            background: rgba(245,158,11,0.2);
+            color: #fbbf24;
+            border-color: rgba(245,158,11,0.4);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.75; }
+        }
+
+        .module-link-text {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--text-tertiary);
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            transition: color var(--transition-base);
+        }
+
+        .module-card:hover .module-link-text {
+            color: var(--primary-600);
+        }
+
+        /* Accent Borders (top) */
+        .accent-out    { border-top: 3px solid #ea580c; }
+        .accent-in     { border-top: 3px solid #0891b2; }
+        .accent-pay    { border-top: 3px solid #7c3aed; }
+        .accent-pre    { border-top: 3px solid #059669; }
+        .accent-ledger { border-top: 3px solid #db2777; }
+        .accent-net    { border-top: 3px solid #b45309; }
+
+        .icon-out    { background: rgba(234, 88, 12, 0.12);  color: #ea580c; }
+        .icon-in     { background: rgba(8, 145, 178, 0.12);  color: #0891b2; }
+        .icon-pay    { background: rgba(124, 58, 237, 0.12); color: #7c3aed; }
+        .icon-pre    { background: rgba(5, 150, 105, 0.12);  color: #059669; }
+        .icon-ledger { background: rgba(219, 39, 119, 0.12); color: #db2777; }
+        .icon-net    { background: rgba(180, 83, 9, 0.12);   color: #b45309; }
+
+        .value-out    { color: #ea580c; }
+        .value-in     { color: #0891b2; }
+        .value-pay    { color: #7c3aed; }
+        .value-pre    { color: #059669; }
+        .value-ledger { color: #db2777; }
+        .value-net-pos { color: #ea580c; }
+        .value-net-neg { color: #059669; }
+
+        /* Net PPN Card — special layout */
+        .net-ppn-card {
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+        }
+
+        .net-ppn-formula {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.72rem;
+            color: var(--text-tertiary);
+            margin-bottom: 0.5rem;
+        }
+
+        .net-formula-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.1rem;
+        }
+
+        .net-formula-val {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .net-formula-lbl {
+            font-size: 0.58rem;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+        }
+
+        .net-operator {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-tertiary);
+        }
+
+        .net-status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 0.3rem 0.75rem;
+            border-radius: 999px;
+            margin-top: 0.5rem;
+        }
+
+        .status-lb {
+            background: rgba(234, 88, 12, 0.12);
+            color: #ea580c;
+            border: 1px solid rgba(234, 88, 12, 0.3);
+        }
+
+        .status-kb {
+            background: rgba(5, 150, 105, 0.12);
+            color: #059669;
+            border: 1px solid rgba(5, 150, 105, 0.3);
+        }
+
+        .status-nihil {
+            background: var(--bg-tertiary);
+            color: var(--text-tertiary);
+            border: 1px solid var(--border-color);
+        }
+
+        /* Recent Transactions */
+        .recent-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        @media (max-width: 768px) { .recent-grid { grid-template-columns: 1fr; } }
+
+        .recent-card {
+            background: var(--bg-primary);
+            border-radius: var(--radius-xl);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-md);
+            overflow: hidden;
+        }
+
+        .recent-card-header {
+            padding: 0.9rem 1.1rem 0.7rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .recent-card-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .recent-card-link {
+            font-size: 0.68rem;
+            font-weight: 600;
+            color: var(--primary-600);
+            text-decoration: none;
+        }
+
+        .recent-card-link:hover { text-decoration: underline; }
+
+        .recent-list { padding: 0.25rem 0; }
+
+        .recent-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.6rem 1.1rem;
+            border-bottom: 1px solid var(--border-color);
+            transition: background var(--transition-fast);
+        }
+
+        .recent-item:last-child { border-bottom: none; }
+        .recent-item:hover { background: var(--bg-secondary); }
+
+        .recent-item-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .recent-item-name {
+            flex: 1;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .recent-item-meta {
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .recent-item-ppn {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .recent-item-date {
+            font-size: 0.65rem;
+            color: var(--text-tertiary);
+        }
+
+        .recent-empty {
+            padding: 1.5rem 1rem;
+            text-align: center;
+            font-size: 0.78rem;
+            color: var(--text-tertiary);
+        }
+
+        /* Loading skeleton */
+        .skeleton {
+            background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-tertiary) 50%, var(--bg-secondary) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Counter animation */
+        .count-anim { transition: all 0.6s ease; }
+
+        /* Responsive adjustments */
+        @media (max-width: 640px) {
+            .module-grid { grid-template-columns: 1fr; }
+            .dashboard-hero { flex-direction: column; }
+            .hero-right { text-align: left; }
+        }
+    </style>
+</head>
+<body>
+    <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
+
+    <div class="app-wrapper">
+        <div id="sidebar-container"></div>
+
+        <main class="main-content">
+            <header class="header">
+                <h2>🏠 Dashboard Utama</h2>
+                <div class="user-profile">
+                    <span id="header-user-name"></span>
+                    <a href="/logout" class="btn-logout">Logout</a>
+                </div>
+            </header>
+
+            <div class="container">
+
+                <!-- HERO / GREETING SECTION -->
+                <div class="dashboard-hero" id="hero-section">
+                    <div class="hero-left">
+                        <div class="hero-greeting" id="hero-greeting">Selamat Datang</div>
+                        <div class="hero-name" id="hero-name">Loading...</div>
+                        <div class="hero-subtitle">Tax Database System &mdash; Ringkasan Keseluruhan Modul</div>
+                        <div class="hero-entity-badge" id="hero-entity-badge">
+                            <span>📂</span>
+                            <span id="hero-entity-text">BBS</span>
+                        </div>
+                    </div>
+                    <div class="hero-right">
+                        <div class="hero-date" id="hero-date">—</div>
+                        <div class="hero-time" id="hero-time">00:00:00</div>
+                    </div>
+                </div>
+
+                <!-- ALERT PANEL (pending items) -->
+                <div id="alert-pending" class="dashboard-alert" style="display:none;">
+                    <div class="alert-text" id="alert-pending-text">⚠️ Ada dokumen menunggu verifikasi</div>
+                    <a href="/manage-users" class="alert-link" id="alert-pending-link">Lihat Sekarang →</a>
+                </div>
+
+                <!-- MODULE SUMMARY CARDS -->
+                <div class="section-label">Ringkasan Modul</div>
+
+                <div class="module-grid">
+
+                    <!-- VAT OUT -->
+                    <a href="/dashboard-vatout" class="module-card accent-out" id="card-vatout">
+                        <div class="module-card-header">
+                            <div>
+                                <div class="module-card-title">Faktur Keluaran</div>
+                                <div class="module-card-subtitle">VAT OUT</div>
+                            </div>
+                            <div class="module-card-icon icon-out">🧾</div>
+                        </div>
+                        <div class="module-card-body">
+                            <div class="module-main-value value-out" id="vo-ppn">Rp 0</div>
+                            <div class="module-main-label">Total PPN Keluaran</div>
+                            <div class="module-stats-row">
+                                <div class="module-stat-item">
+                                    <div class="module-stat-label">Total Dokumen</div>
+                                    <div class="module-stat-value" id="vo-jml">0 Faktur</div>
+                                </div>
+                                <div class="module-stat-item">
+                                    <div class="module-stat-label">Total DPP</div>
+                                    <div class="module-stat-value" id="vo-dpp">Rp 0</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="module-card-footer">
+                            <span class="module-pending-badge pending-zero" id="vo-pending-badge">✔ Antrean Bersih</span>
+                            <span class="module-link-text">Lihat Detail →</span>
+                        </div>
+                    </a>
+
+                    <!-- VAT IN -->
+                    <a href="/dashboard-vatin" class="module-card accent-in" id="card-vatin">
+                        <div class="module-card-header">
+                            <div>
+                                <div class="module-card-title">Faktur Masukan</div>
+                                <div class="module-card-subtitle">VAT IN</div>
+                            </div>
+                            <div class="module-card-icon icon-in">📥</div>
+                        </div>
+                        <div class="module-card-body">
+                            <div class="module-main-value value-in" id="vi-ppn">Rp 0</div>
+                            <div class="module-main-label">Total PPN Masukan</div>
+                            <div class="module-stats-row">
+                                <div class="module-stat-item">
+                                    <div class="module-stat-label">Total Dokumen</div>
+                                    <div class="module-stat-value" id="vi-jml">0 Faktur</div>
+                                </div>
+                                <div class="module-stat-item">
+                                    <div class="module-stat-label">Total DPP</div>
+                                    <div class="module-stat-value" id="vi-dpp">Rp 0</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="module-card-footer">
+                            <span class="module-pending-badge pending-zero" id="vi-pending-badge">✔ Antrean Bersih</span>
+                            <span class="module-link-text">Lihat Detail →</span>
+                        </div>
+                    </a>
+
+                    <!-- TAX PAYABLE -->
+                    <a href="/dashboard-payable" class="module-card accent-pay" id="card-payable">
+                        <div class="module-card-header">
+                            <div>
+                                <div class="module-card-title">Tax Payable (BPPU)</div>
+                                <div class="module-card-subtitle">PPh Terutang</div>
+                            </div>
+                            <div class="module-card-icon icon-pay">📋</div>
+                        </div>
+                        <div class="module-card-body">
+                            <div class="module-main-value value-pay" id="pay-pph">Rp 0</div>
+                            <div class="module-main-label">Total Nilai PPh</div>
+                            <div class="module-stats-row">
+                                <div class="module-stat-item">
+                                    <div class="module-stat-label">Total Dokumen</div>
+                                    <div class="module-stat-value" id="pay-jml">0 BPPU</div>
+                                </div>
+                                <div class="module-stat-item">
+                                    <div class="module-stat-label">Total DPP</div>
+                                    <div class="module-stat-value" id="pay-dpp">Rp 0</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="module-card-footer">
+                            <span class="module-pending-badge pending-zero" id="pay-pending-badge">✔ Antrean Bersih</span>
+                            <span class="module-link-text">Lihat Detail →</span>
+                        </div>
+                    </a>
+
+                    <!-- PREPAID TAX -->
+                    <a href="/dashboard-prepaid" class="module-card accent-pre" id="card-prepaid">
+                        <div class="module-card-header">
+                            <div>
+                                <div class="module-card-title">Prepaid Tax (BPPU)</div>
+                                <div class="module-card-subtitle">Uang Muka PPh</div>
+                            </div>
+                            <div class="module-card-icon icon-pre">💰</div>
+                        </div>
+                        <div class="module-card-body">
+                            <div class="module-main-value value-pre" id="pre-pph">Rp 0</div>
+                            <div class="module-main-label">Total Nilai PPh</div>
+                            <div class="module-stats-row">
+                                <div class="module-stat-item">
+                                    <div class="module-stat-label">Total Dokumen</div>
+                                    <div class="module-stat-value" id="pre-jml">0 BPPU</div>
+                                </div>
+                                <div class="module-stat-item">
+                                    <div class="module-stat-label">Total DPP</div>
+                                    <div class="module-stat-value" id="pre-dpp">Rp 0</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="module-card-footer">
+                            <span class="module-pending-badge pending-zero" id="pre-pending-badge">✔ Antrean Bersih</span>
+                            <span class="module-link-text">Lihat Detail →</span>
+                        </div>
+                    </a>
+
+                    <!-- CLIENT LEDGER -->
+                    <a href="/client-ledger" class="module-card accent-ledger" id="card-ledger">
+                        <div class="module-card-header">
+                            <div>
+                                <div class="module-card-title">Client Ledger</div>
+                                <div class="module-card-subtitle">Akuntansi Piutang</div>
+                            </div>
+                            <div class="module-card-icon icon-ledger">📒</div>
+                        </div>
+                        <div class="module-card-body">
+                            <div class="module-main-value value-ledger" id="cl-receipt">Rp 0</div>
+                            <div class="module-main-label">Total Net Receipt</div>
+                            <div class="module-stats-row">
+                                <div class="module-stat-item">
+                                    <div class="module-stat-label">Total Invoice</div>
+                                    <div class="module-stat-value" id="cl-jml">0 Invoice</div>
+                                </div>
+                                <div class="module-stat-item">
+                                    <div class="module-stat-label">Contract Income</div>
+                                    <div class="module-stat-value" id="cl-income">Rp 0</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="module-card-footer">
+                            <div class="module-stat-item" style="border:none; background:none; padding:0; width:auto;">
+                                <div class="module-stat-label">Piutang (Debtor)</div>
+                                <div class="module-stat-value" id="cl-debtor" style="color:#db2777;">Rp 0</div>
+                            </div>
+                            <span class="module-link-text">Lihat Detail →</span>
+                        </div>
+                    </a>
+
+                    <!-- NET PPN POSITION -->
+                    <div class="module-card accent-net net-ppn-card" id="card-net" style="cursor:default;">
+                        <div class="module-card-header">
+                            <div>
+                                <div class="module-card-title">Posisi PPN Neto</div>
+                                <div class="module-card-subtitle">VAT OUT &minus; VAT IN</div>
+                            </div>
+                            <div class="module-card-icon icon-net">⚖️</div>
+                        </div>
+                        <div class="module-card-body">
+                            <div class="module-main-value" id="net-ppn-val">Rp 0</div>
+                            <div class="module-main-label">Selisih PPN (kumulatif)</div>
+                            <div class="net-ppn-formula">
+                                <div class="net-formula-item">
+                                    <div class="net-formula-val" id="net-voVal">Rp 0</div>
+                                    <div class="net-formula-lbl">VAT OUT</div>
+                                </div>
+                                <div class="net-operator">&minus;</div>
+                                <div class="net-formula-item">
+                                    <div class="net-formula-val" id="net-viVal">Rp 0</div>
+                                    <div class="net-formula-lbl">VAT IN</div>
+                                </div>
+                                <div class="net-operator">=</div>
+                                <div class="net-formula-item">
+                                    <div class="net-formula-val" id="net-result">Rp 0</div>
+                                    <div class="net-formula-lbl">SELISIH</div>
+                                </div>
+                            </div>
+                            <div id="net-status-pill" class="net-status-pill status-nihil">— Menghitung...</div>
+                        </div>
+                        <div class="module-card-footer">
+                            <span style="font-size:0.68rem; color:var(--text-tertiary); font-weight:500;">*Kumulatif semua periode</span>
+                            <span></span>
+                        </div>
+                    </div>
+
+                </div><!-- /module-grid -->
+
+                <!-- RECENT TRANSACTIONS -->
+                <div class="section-label">Transaksi Terbaru</div>
+
+                <div class="recent-grid">
+                    <!-- Recent VAT OUT -->
+                    <div class="recent-card">
+                        <div class="recent-card-header">
+                            <div class="recent-card-title">
+                                <span style="color:#ea580c;">🧾</span> Faktur Keluaran Terbaru
+                            </div>
+                            <a href="/dashboard-vatout" class="recent-card-link">Lihat Semua →</a>
+                        </div>
+                        <div class="recent-list" id="recent-vatout-list">
+                            <div class="recent-empty">Memuat data...</div>
+                        </div>
+                    </div>
+
+                    <!-- Recent VAT IN -->
+                    <div class="recent-card">
+                        <div class="recent-card-header">
+                            <div class="recent-card-title">
+                                <span style="color:#0891b2;">📥</span> Faktur Masukan Terbaru
+                            </div>
+                            <a href="/dashboard-vatin" class="recent-card-link">Lihat Semua →</a>
+                        </div>
+                        <div class="recent-list" id="recent-vatin-list">
+                            <div class="recent-empty">Memuat data...</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- /container -->
+        </main>
+    </div>
+
+    <script>
+        // ==================================================
+        // DASHBOARD UTAMA — JAVASCRIPT
+        // ==================================================
+
+        let aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
+        let currentUser  = {};
+
+        // --- Clock & Greeting ---
+        function updateClock() {
+            const now  = new Date();
+            const h    = String(now.getHours()).padStart(2,'0');
+            const m    = String(now.getMinutes()).padStart(2,'0');
+            const s    = String(now.getSeconds()).padStart(2,'0');
+            document.getElementById('hero-time').textContent = `${h}:${m}:${s}`;
+
+            const days  = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+            const months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+            const dateStr = `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+            document.getElementById('hero-date').textContent = dateStr;
+
+            const hNum = now.getHours();
+            let greet = 'Selamat Pagi';
+            if      (hNum >= 12 && hNum < 15) greet = 'Selamat Siang';
+            else if (hNum >= 15 && hNum < 18) greet = 'Selamat Sore';
+            else if (hNum >= 18)              greet = 'Selamat Malam';
+            document.getElementById('hero-greeting').textContent = greet + ',';
+        }
+
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // --- Format Currency ---
+        const fRp = (n) => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
+        const fShort = (n) => {
+            n = Number(n || 0);
+            if (Math.abs(n) >= 1e9) return 'Rp ' + (n/1e9).toFixed(1) + ' M';
+            if (Math.abs(n) >= 1e6) return 'Rp ' + (n/1e6).toFixed(1) + ' jt';
+            return 'Rp ' + n.toLocaleString('id-ID');
+        };
+
+        // --- Animated counter ---
+        function animateCounter(el, to, isRp = false) {
+            const duration = 800;
+            const steps    = 40;
+            const from     = 0;
+            let step       = 0;
+            const inc      = (to - from) / steps;
+            const timer    = setInterval(() => {
+                step++;
+                const val = from + inc * step;
+                el.textContent = isRp ? fShort(val) : Math.round(val);
+                if (step >= steps) { el.textContent = isRp ? fShort(to) : to; clearInterval(timer); }
+            }, duration / steps);
+        }
+
+        // --- Sidebar Load & Entity Sync ---
+        fetch('/sidebar.html').then(r => r.text()).then(html => {
+            document.getElementById('sidebar-container').innerHTML = html;
+            const currentPath = window.location.pathname;
+            document.querySelectorAll('.sidebar-link').forEach(link => {
+                if (link.getAttribute('href') === currentPath) link.classList.add('active');
+            });
+            const sidebarSelect = document.getElementById('global-entity-select');
+            if (sidebarSelect) sidebarSelect.value = aktifEntitas;
+        });
+
+        // --- API Me ---
+        fetch('/api/me').then(r => r.json()).then(u => {
+            currentUser = u;
+            document.getElementById('header-user-name').textContent = u.nama || u.username;
+            document.getElementById('hero-name').textContent = u.nama || u.username;
+        });
+
+        // --- Entity change from sidebar ---
+        window.gantiEntitas = function(entitas) {
+            aktifEntitas = entitas;
+            localStorage.setItem('lastEntitas', entitas);
+            document.getElementById('hero-entity-text').textContent =
+                entitas === 'BBS' ? 'Berca Buana Sakti' : 'Berca JO';
+            const sidebarSelect = document.getElementById('global-entity-select');
+            if (sidebarSelect && sidebarSelect.value !== entitas) sidebarSelect.value = entitas;
+            loadDashboard();
+        };
+
+        // Set entity badge on load
+        function setEntityBadge() {
+            document.getElementById('hero-entity-text').textContent =
+                aktifEntitas === 'BBS' ? 'Berca Buana Sakti' : 'Berca JO';
+        }
+
+        // --- Pending Badge helper ---
+        function setPendingBadge(elId, count, linkHref) {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            if (count > 0) {
+                el.className = 'module-pending-badge pending-active';
+                el.textContent = `⚠ ${count} Menunggu Verifikasi`;
+            } else {
+                el.className = 'module-pending-badge pending-zero';
+                el.textContent = '✔ Antrean Bersih';
+            }
+        }
+
+        // --- MAIN LOAD ---
+        async function loadDashboard() {
+            setEntityBadge();
+
+            try {
+                const res  = await fetch('/api/dashboard-summary?entitas=' + aktifEntitas);
+                const data = await res.json();
+
+                const { vatout, vatin, payable, prepaid, ledger, recent_vatout, recent_vatin, pending_requests } = data;
+
+                // ---- VAT OUT ----
+                animateCounter(document.getElementById('vo-ppn'), vatout.ppn, true);
+                document.getElementById('vo-ppn').textContent = fShort(vatout.ppn);
+                document.getElementById('vo-jml').textContent = vatout.jml + ' Faktur';
+                document.getElementById('vo-dpp').textContent = fShort(vatout.dpp);
+                setPendingBadge('vo-pending-badge', vatout.pending);
+
+                // ---- VAT IN ----
+                document.getElementById('vi-ppn').textContent = fShort(vatin.ppn);
+                document.getElementById('vi-jml').textContent = vatin.jml + ' Faktur';
+                document.getElementById('vi-dpp').textContent = fShort(vatin.dpp);
+                setPendingBadge('vi-pending-badge', vatin.pending);
+
+                // ---- TAX PAYABLE ----
+                document.getElementById('pay-pph').textContent = fShort(payable.pph);
+                document.getElementById('pay-jml').textContent = payable.jml + ' BPPU';
+                document.getElementById('pay-dpp').textContent = fShort(payable.dpp);
+                setPendingBadge('pay-pending-badge', payable.pending);
+
+                // ---- PREPAID TAX ----
+                document.getElementById('pre-pph').textContent = fShort(prepaid.pph);
+                document.getElementById('pre-jml').textContent = prepaid.jml + ' BPPU';
+                document.getElementById('pre-dpp').textContent = fShort(prepaid.dpp);
+                setPendingBadge('pre-pending-badge', prepaid.pending);
+
+                // ---- CLIENT LEDGER ----
+                document.getElementById('cl-receipt').textContent = fShort(ledger.receipt);
+                document.getElementById('cl-jml').textContent = ledger.jml + ' Invoice';
+                document.getElementById('cl-income').textContent = fShort(ledger.income);
+                document.getElementById('cl-debtor').textContent = fShort(ledger.debtor);
+
+                // ---- NET PPN ----
+                const netPPN = vatout.ppn - vatin.ppn;
+                document.getElementById('net-voVal').textContent  = fShort(vatout.ppn);
+                document.getElementById('net-viVal').textContent  = fShort(vatin.ppn);
+                document.getElementById('net-result').textContent = fShort(Math.abs(netPPN));
+
+                const netEl  = document.getElementById('net-ppn-val');
+                const pillEl = document.getElementById('net-status-pill');
+                netEl.textContent = fRp(Math.abs(netPPN));
+
+                if (netPPN > 0) {
+                    netEl.className = 'module-main-value value-net-pos';
+                    pillEl.className = 'net-status-pill status-lb';
+                    pillEl.textContent = '🔴 Lebih Bayar (VAT OUT > VAT IN)';
+                } else if (netPPN < 0) {
+                    netEl.className = 'module-main-value value-net-neg';
+                    pillEl.className = 'net-status-pill status-kb';
+                    pillEl.textContent = '🟢 Kurang Bayar (VAT IN > VAT OUT)';
+                } else {
+                    netEl.className = 'module-main-value';
+                    pillEl.className = 'net-status-pill status-nihil';
+                    pillEl.textContent = '⚪ Nihil (VAT OUT = VAT IN)';
+                }
+
+                // ---- ALERT PANEL ----
+                const totalPending = vatout.pending + vatin.pending + payable.pending + prepaid.pending;
+                const pendingReq   = pending_requests || 0;
+
+                const alertEl = document.getElementById('alert-pending');
+                const alertTx = document.getElementById('alert-pending-text');
+                const alertLk = document.getElementById('alert-pending-link');
+
+                if (totalPending > 0 || pendingReq > 0) {
+                    alertEl.style.display = 'flex';
+                    let msgs = [];
+                    if (totalPending > 0) msgs.push(`${totalPending} dokumen menunggu verifikasi`);
+                    if (pendingReq > 0)   msgs.push(`${pendingReq} permintaan approval user`);
+                    alertTx.textContent = '⚠️ ' + msgs.join(' · ');
+                    if (pendingReq > 0 && ['supervisor','administrator'].includes(currentUser.role)) {
+                        alertLk.href = '/manage-users';
+                        alertLk.textContent = 'Proses Approval →';
+                    } else {
+                        alertLk.href = '/dashboard-vatout';
+                        alertLk.textContent = 'Buka Antrean →';
+                    }
+                } else {
+                    alertEl.style.display = 'none';
+                }
+
+                // ---- RECENT VAT OUT ----
+                renderRecent('recent-vatout-list', recent_vatout, '#ea580c', 'pembeli');
+
+                // ---- RECENT VAT IN ----
+                renderRecent('recent-vatin-list', recent_vatin, '#0891b2', 'penjual');
+
+            } catch (err) {
+                console.error('Dashboard load error:', err);
+            }
+        }
+
+        function renderRecent(containerId, items, dotColor, nameKey) {
+            const el = document.getElementById(containerId);
+            if (!el) return;
+
+            if (!items || items.length === 0) {
+                el.innerHTML = '<div class="recent-empty">Belum ada data faktur.</div>';
+                return;
+            }
+
+            el.innerHTML = items.map(item => {
+                const nama = (nameKey === 'pembeli' ? item.nama_pembeli : item.nama_penjual) || '-';
+                return `
+                    <div class="recent-item">
+                        <div class="recent-item-dot" style="background:${dotColor};"></div>
+                        <div class="recent-item-name" title="${nama}">${nama}</div>
+                        <div class="recent-item-meta">
+                            <div class="recent-item-ppn">${fShort(item.ppn)}</div>
+                            <div class="recent-item-date">${item.tgl || '-'}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // --- Init ---
+        loadDashboard();
+    </script>
+</body>
+</html>

@@ -13,11 +13,28 @@
     </div>
 
     <nav class="sidebar-nav">
-        <span class="sidebar-nav-label">MODUL PAJAK</span>
-        <a href="/dashboard-vatout" class="sidebar-link">Faktur Keluaran</a>
-        <a href="/dashboard-vatin" class="sidebar-link">Faktur Masukan</a>
-        <a href="/dashboard-payable" class="sidebar-link">Tax Payable</a>
-        <a href="/dashboard-prepaid" class="sidebar-link">Prepaid Tax</a>
+        <a href="/dashboard-utama" class="sidebar-link" id="menu-dashboard-utama">🏠 Dashboard Utama</a>
+
+        <div class="sidebar-group" id="group-akuntansi">
+            <span class="sidebar-nav-label collapsible" onclick="toggleSidebarGroup('group-akuntansi')">
+                MODUL AKUNTANSI <span class="chevron">▼</span>
+            </span>
+            <div class="sidebar-links-container">
+                <a href="/client-ledger" class="sidebar-link">Client Ledger</a>
+            </div>
+        </div>
+
+        <div class="sidebar-group" id="group-pajak">
+            <span class="sidebar-nav-label collapsible" onclick="toggleSidebarGroup('group-pajak')">
+                MODUL PAJAK <span class="chevron">▼</span>
+            </span>
+            <div class="sidebar-links-container">
+                <a href="/dashboard-vatout" class="sidebar-link">Faktur Keluaran</a>
+                <a href="/dashboard-vatin" class="sidebar-link">Faktur Masukan</a>
+                <a href="/dashboard-payable" class="sidebar-link">Tax Payable</a>
+                <a href="/dashboard-prepaid" class="sidebar-link">Prepaid Tax</a>
+            </div>
+        </div>
 
         <span class="sidebar-nav-label">SISTEM</span>
         <a href="/summary" class="sidebar-link">Laporan Rekapitulasi</a>
@@ -26,8 +43,8 @@
     </nav>
 
     <div style="padding: 0.75rem 1rem; border-top: 1px solid rgba(255,255,255,0.1); margin-top: auto;">
-        <button id="btn-dark-mode" onclick="window.__toggleDarkMode()" style="position:static; width:100%; display:flex; justify-content:center; align-items:center; gap:0.5rem; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:white; padding:0.5rem 0.75rem; border-radius:6px; cursor:pointer; font-size:0.8rem; font-weight:600;">
-            <span id="dm-icon">&#127769;</span> <span id="dm-text">Dark Mode</span>
+        <button id="btn-dark-mode" onclick="window.__toggleDarkMode()" style="position:static; width:100%; display:flex; justify-content:center; align-items:center; gap:0.5rem; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); color:white; padding:0.625rem; border-radius:8px; cursor:pointer;">
+            <span id="dm-icon">🌙</span> <span id="dm-text">Dark Mode</span>
         </button>
     </div>
-</aside>
+</aside>    

@@ -9,6 +9,9 @@
     <script src="/pagination.js"></script>
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
+    <style>
+        .table-responsive { max-height: calc(100vh - 320px); }
+    </style>
 </head>
 <body>
     <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
@@ -25,14 +28,13 @@
             </header>
 
             <div class="container">
-                <!-- Statistics Cards -->
                 <div class="stats-grid" id="stats-cards" data-testid="stats-cards">
                     <div class="stat-card accent-orange" data-testid="stat-total-doc">
                         <span class="stat-label">Total Dokumen</span>
                         <span class="stat-value" id="stat-total">0</span>
                         <div class="stat-mom neutral" id="mom-total">-- vs bulan lalu</div>
                     </div>
-                    <div class="stat-card accent-green" data-testid="stat-total-ppn">
+                    <div class="stat-card accent-purple" data-testid="stat-total-ppn">
                         <span class="stat-label">Total PPN</span>
                         <span class="stat-value" id="stat-ppn">Rp 0</span>
                         <div class="stat-mom neutral" id="mom-ppn">-- vs bulan lalu</div>
@@ -80,14 +82,14 @@
                                 </tr>
                                 <tr class="filter-row">
                                     <th></th><th></th><th></th>
-                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="c.nama_cabang" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.no_invoice_internal" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.nama_pembeli" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.no_faktur" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.tanggal_faktur" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.dpp" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.ppn" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.diinput_oleh" placeholder="🔍 Cari..."></th>
                                 </tr>
                             </thead>
                             <tbody id="tabel-body"></tbody>
@@ -127,6 +129,11 @@
         let currentUser = {};
         let targetEditFaktur = '';
 
+        // STATE UNTUK SERVER-SIDE
+        let currentPage = 1;
+        let currentLimit = 50;
+        let currentSearch = {};
+
         fetch('/api/me').then(res => res.json()).then(u => currentUser = u);
 
         fetch('/sidebar.html').then(res => res.text()).then(html => {
@@ -140,7 +147,7 @@
             if (sidebarSelect) sidebarSelect.value = aktifEntitas;
         });
 
-        socket.on('data-baru-vatout', () => loadData());
+        socket.on('data-baru-vatout', () => loadData(currentPage, currentLimit));
 
         // Dipanggil dari Sidebar Dropdown
         window.gantiEntitas = function(entitas) {
@@ -148,20 +155,32 @@
             localStorage.setItem('lastEntitas', entitas); 
             const sidebarSelect = document.getElementById('global-entity-select');
             if (sidebarSelect && sidebarSelect.value !== entitas) sidebarSelect.value = entitas;
-            loadData();
+            currentPage = 1;
+            currentSearch = {};
+            document.querySelectorAll('.filter-input').forEach(input => input.value = '');
+            loadData(currentPage, currentLimit);
         };
 
         // Pagination init
-        initPagination('pg-container', function(page, limit) { loadData(page, limit); }, 50);
+        initPagination('pg-container', function(page, limit) { 
+            loadData(page, limit); 
+        }, 50);
 
         async function loadData(page, limit) {
-            page = page || 1;
-            limit = limit || 50;
-            var url = '/api/data-vatout?entitas=' + aktifEntitas + '&page=' + page + '&limit=' + limit;
+            currentPage = page || 1;
+            currentLimit = limit || 50;
+            
+            let url = '/api/data-vatout?entitas=' + aktifEntitas + '&page=' + currentPage + '&limit=' + currentLimit;
+            if (Object.keys(currentSearch).length > 0) {
+                url += `&search=${encodeURIComponent(JSON.stringify(currentSearch))}`;
+            }
+
             const res = await fetch(url);
             const result = await res.json();
             const data = result.data || [];
             const total = result.total || 0;
+            const offset = (currentPage - 1) * currentLimit;
+            
             const tbody = document.getElementById('tabel-body');
             tbody.innerHTML = ''; 
             const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
@@ -172,11 +191,13 @@
             document.getElementById('stat-total').textContent = total + ' Faktur';
             document.getElementById('stat-ppn').textContent = formatRupiah(totalPPN);
             document.getElementById('stat-dpp').textContent = formatRupiah(totalDPP);
+            
             fetch('/api/inbox-vatout').then(r => r.json()).then(inbox => {
-                document.getElementById('stat-pending').textContent = (inbox.total || inbox.length || 0);
+                const pendingEl = document.getElementById('stat-pending');
+                if (pendingEl) pendingEl.textContent = (inbox.total || inbox.length || 0);
             }).catch(() => {});
 
-            // Month-over-Month
+            // Month-over-Month calculation
             var now = new Date(), curMonth = now.getMonth(), curYear = now.getFullYear();
             var thisMonthData = data.filter(function(d) { var dt = new Date(d.tanggal_faktur); return dt.getMonth() === curMonth && dt.getFullYear() === curYear; });
             var lastMonth = curMonth === 0 ? 11 : curMonth - 1, lastYear = curMonth === 0 ? curYear - 1 : curYear;
@@ -186,11 +207,16 @@
             var lastMonthPPN = lastMonthData.reduce(function(s,d){return s+Number(d.ppn||0)},0);
             updateMoM('mom-ppn', thisMonthPPN, lastMonthPPN, '');
 
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="11" class="text-center" style="padding:20px; color:#64748b;">Data tidak ditemukan.</td></tr>`;
+            }
+
             data.forEach((baris, index) => {
                 const tr = document.createElement('tr');
                 let curBr = baris.kode_cabang || '';
                 let curInv = baris.no_invoice_internal || '';
                 let curTgl = baris.tgl_tukar_faktur || '';
+                let barisNo = offset + index + 1; // Penomoran Akurat
 
                 let btnView = `<button class="btn-tbl btn-tbl-view" title="Lihat" onclick="viewItems('${baris.no_faktur}')">Lihat</button>`;
                 let btnEdit = `<button class="btn-tbl btn-tbl-edit" title="Edit" onclick="handleAction('${baris.no_faktur}', 'EDIT', '${curBr}', '${curInv}', '${curTgl}')">Edit</button>`;
@@ -198,7 +224,7 @@
                 let btnPdf = baris.link_pdf_lokal ? `<a href="/${baris.link_pdf_lokal}" target="_blank" class="btn-tbl btn-tbl-pdf">PDF</a>` : `-`;
 
                 tr.innerHTML = `
-                    <td class="text-center">${index + 1}</td>
+                    <td class="text-center">${barisNo}</td>
                     <td class="text-center" style="white-space:nowrap;">${btnView} ${btnEdit} ${btnDel}</td>
                     <td class="text-center">${btnPdf}</td>
                     <td class="text-center">${baris.nama_cabang || baris.kode_cabang || '-'}</td>
@@ -212,15 +238,50 @@
                 `;
                 tbody.appendChild(tr);
             });
-            jalankanFilterTabel();
-            renderPagination('pg-container', total, page, limit === 'all' ? total : limit);
+            
+            // Render pagination
+            renderPagination('pg-container', total, currentPage, currentLimit === 'all' ? total : currentLimit);
         }
 
+        // FUNGSI PENCARIAN SERVER-SIDE (DEBOUNCE)
+        let searchTimeout;
+        document.addEventListener('input', function(e) {
+            if (e.target.classList.contains('filter-input')) {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => { jalankanFilterTabel(); }, 500);
+            }
+        });
+
+        function jalankanFilterTabel() {
+            const filters = document.querySelectorAll('.filter-input');
+            let isAnyFilterActive = false;
+            currentSearch = {};
+
+            filters.forEach((input) => {
+                const val = input.value;
+                const colName = input.getAttribute('data-col'); 
+                if (val && colName) {
+                    isAnyFilterActive = true;
+                    currentSearch[colName] = val;
+                }
+            });
+
+            document.getElementById('btnHapusFilter').style.display = isAnyFilterActive ? 'inline-block' : 'none';
+            loadData(1, currentLimit); // Reset ke halaman 1 saat difilter
+        }
+
+        function resetSemuaFilter() { 
+            document.querySelectorAll('.filter-input').forEach(input => input.value = ''); 
+            currentSearch = {};
+            jalankanFilterTabel(); 
+        }
+
+        // FUNGSI LAMA TIDAK ADA YANG DIUBAH
         async function viewItems(noFaktur) {
             try {
                 const res = await fetch(`/api/items/vatout/${noFaktur}`);
                 const items = await res.json();
-                document.getElementById('modal-title-faktur').innerText = "Rincian Faktur: " + noFaktur;
+                document.getElementById('modal-title-faktur').innerText = "Rincian Penagihan: " + noFaktur;
                 const container = document.getElementById('container-items');
                 
                 if (!items || items.length === 0) {
@@ -284,59 +345,20 @@
             if(!isSupervisor) alert("Permintaan Edit diajukan ke Panel Approval.");
         }
 
-        // Jalankan Pertama Kali
-        loadData();
-
-        function jalankanFilterTabel() {
-            const filters = document.querySelectorAll('.filter-input');
-            const rows = document.querySelectorAll('#tabel-body tr');
-            let isAnyFilterActive = false;
-
-            rows.forEach(row => {
-                let isMatch = true;
-                filters.forEach((input, index) => {
-                    const filterValue = input.value.toLowerCase();
-                    if (filterValue) {
-                        isAnyFilterActive = true;
-                        const colIndex = index + 3; 
-                        const cellText = row.cells[colIndex] ? row.cells[colIndex].innerText.toLowerCase() : "";
-                        if (!cellText.includes(filterValue)) isMatch = false;
-                    }
-                });
-                row.style.display = isMatch ? '' : 'none';
-            });
-            document.getElementById('btnHapusFilter').style.display = isAnyFilterActive ? 'inline-block' : 'none';
-        }
-
-        function resetSemuaFilter() { document.querySelectorAll('.filter-input').forEach(input => input.value = ''); jalankanFilterTabel(); }
-        document.addEventListener('input', function(e) { if (e.target.classList.contains('filter-input')) jalankanFilterTabel(); });
-
         function updateMoM(elId, current, previous, suffix) {
-            var el = document.getElementById(elId); if (!el) return;
+            var el = document.getElementById(elId);
+            if (!el) return;
             var diff = current - previous;
             if (previous === 0 && current === 0) { el.className = 'stat-mom neutral'; el.textContent = 'Belum ada data'; return; }
             if (previous === 0) { el.className = 'stat-mom up'; el.innerHTML = '&#9650; Baru ' + current + suffix + ' bulan ini'; return; }
             var pct = ((diff / previous) * 100).toFixed(1);
             if (diff > 0) { el.className = 'stat-mom up'; el.innerHTML = '&#9650; +' + pct + '% vs bulan lalu'; }
             else if (diff < 0) { el.className = 'stat-mom down'; el.innerHTML = '&#9660; ' + pct + '% vs bulan lalu'; }
-            else { el.className = 'stat-mom neutral'; el.textContent = 'Sama dengan bulan lalu'; }
+            else { el.className = 'stat-mom neutral'; el.textContent = '&#9644; Sama dengan bulan lalu'; }
         }
 
-        function exportCSV() {
-            var table = document.getElementById('tabel-data');
-            var rows = table.querySelectorAll('tr:not(.filter-row)');
-            var csv = [];
-            rows.forEach(function(row) {
-                if (row.style.display === 'none') return;
-                var cols = row.querySelectorAll('th, td');
-                var rowData = [];
-                cols.forEach(function(col, i) { if (i === 1 || i === 2) return; var text = col.innerText.replace(/"/g, '""').replace(/\n/g, ' '); rowData.push('"' + text + '"'); });
-                csv.push(rowData.join(','));
-            });
-            var blob = new Blob(['\uFEFF' + csv.join('\n')], {type: 'text/csv;charset=utf-8;'});
-            var link = document.createElement('a'); link.href = URL.createObjectURL(blob);
-            link.download = 'data_vatout_' + aktifEntitas + '_' + new Date().toISOString().slice(0,10) + '.csv'; link.click();
-        }
+        // Jalankan Pertama Kali
+        loadData(1, 50);
 
     </script>
 </body>

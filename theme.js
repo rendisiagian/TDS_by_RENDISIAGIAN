@@ -32,3 +32,44 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }).catch(function() {});
 });
+
+// Fungsi Global untuk Sidebar Accordion
+window.toggleSidebarGroup = function(groupId) {
+    const groups = document.querySelectorAll('.sidebar-group');
+    groups.forEach(group => {
+        if (group.id === groupId) {
+            group.classList.toggle('expanded');
+        } else {
+            // Tutup group lain agar rapi
+            group.classList.remove('expanded');
+        }
+    });
+};
+
+// Pastikan modul yang aktif otomatis terbuka saat halaman dimuat
+document.addEventListener('DOMContentLoaded', () => {
+    // Gunakan interval singkat karena sidebar dimuat secara asinkron (fetch)
+    const checkSidebar = setInterval(() => {
+        let currentPath = window.location.pathname;
+        
+        // --- LOGIKA PINTAR UNTUK INBOX ---
+        // Jika sedang di halaman inbox, arahkan penanda aktif ke tombol dashboard-nya
+        if (currentPath.startsWith('/inbox-')) {
+            currentPath = currentPath.replace('/inbox-', '/dashboard-');
+        }
+
+        const activeLink = document.querySelector(`.sidebar-link[href="${currentPath}"]`);
+        
+        if (activeLink) {
+            activeLink.classList.add('active');
+            const parentGroup = activeLink.closest('.sidebar-group');
+            if (parentGroup) {
+                parentGroup.classList.add('expanded');
+            }
+            clearInterval(checkSidebar); // Hentikan pengecekan jika sudah ketemu
+        }
+    }, 100);
+    
+    // Berhenti cek setelah 3 detik jika tidak ketemu
+    setTimeout(() => clearInterval(checkSidebar), 3000);
+});
