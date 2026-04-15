@@ -2348,3 +2348,115 @@ tbody:empty::after {
 [data-theme="dark"] .text-view-only {
     color: var(--text-tertiary);
 }
+
+/* === 41. PAGINATION BAR === */
+.pg-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.625rem 1rem;
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border-color);
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+}
+
+.pg-info {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.pg-rpp {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+.pg-rpp select {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 0.8rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    cursor: pointer;
+    width: auto;
+}
+
+.pg-btns {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.pg-btn {
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 600;
+    transition: all 0.15s;
+    min-width: 28px;
+    text-align: center;
+}
+
+.pg-btn:hover:not(:disabled) {
+    background: var(--primary-50);
+    border-color: var(--primary-500);
+    color: var(--primary-600);
+}
+
+.pg-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.pg-btn.pg-active {
+    background: var(--primary-600);
+    color: white;
+    border-color: var(--primary-600);
+}
+
+.pg-dots {
+    padding: 0 0.25rem;
+    color: var(--text-tertiary);
+}
+
+/* Dark mode */
+[data-theme="dark"] .pg-bar {
+    background: var(--bg-secondary);
+    border-top-color: var(--border-color);
+}
+
+[data-theme="dark"] .pg-btn {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .pg-btn:hover:not(:disabled) {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: var(--primary-400);
+}
+
+[data-theme="dark"] .pg-btn.pg-active {
+    background: var(--primary-600);
+    color: white;
+}
+
+[data-theme="dark"] .pg-rpp select {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+@media print {
+    .pg-bar { display: none !important; }
+}

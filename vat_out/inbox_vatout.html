@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bank Data VAT OUT | Tax Upload and Database</title>
     <script src="/theme.js"></script>
+    <script src="/pagination.js"></script>
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
@@ -59,6 +60,7 @@
                             <tbody id="tabel-inbox"></tbody>
                         </table>
                     </div>
+                    <div id="pg-container"></div>
                 </div>
             </div>
         </main>
@@ -144,9 +146,15 @@
             loadInbox(); // Reload data tabel sesuai entitas
         };
 
-        async function loadInbox() {
-            const res = await fetch('/api/inbox-vatout');
-            const data = await res.json();
+        initPagination('pg-container', function(page, limit) { loadInbox(page, limit); }, 50);
+
+        async function loadInbox(page, limit) {
+            page = page || 1;
+            limit = limit || 50;
+            const res = await fetch('/api/inbox-vatout?page=' + page + '&limit=' + limit);
+            const result = await res.json();
+            const data = result.data || result;
+            const total = result.total || data.length;
             dataInboxLokal = data;
 
             const tbody = document.getElementById('tabel-inbox');
@@ -177,6 +185,7 @@
             });
 
             jalankanFilterInbox();
+            renderPagination("pg-container", total, page, limit === "all" ? total : limit);
         }
 
         function hapusInbox(id) {
