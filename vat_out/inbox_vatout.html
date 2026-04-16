@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id" data-theme="light">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,8 +11,9 @@
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 </head>
+
 <body>
-    <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
+    <script>(function () { var t = localStorage.getItem("theme") || "light"; document.documentElement.setAttribute("data-theme", t) })()</script>
 
     <div class="app-wrapper">
         <div id="sidebar-container"></div>
@@ -19,22 +21,27 @@
         <main class="main-content">
             <header class="header">
                 <h2>📥 Antrean Verifikasi - Faktur Keluaran</h2>
-                <div class="user-profile"><span id="header-user-name"></span><a href="/dashboard-vatout" class="nav-back-link" >← Kembali</a></div>
+                <div class="user-profile"><span id="header-user-name"></span><a href="/dashboard-vatout"
+                        class="nav-back-link">← Kembali</a></div>
             </header>
 
             <div class="container">
                 <div class="card">
-                    <div class="card-header-padding" style="display:flex; justify-content:space-between; align-items:center;">
-                        <h3 class="title-primary" style="border-left-color: #ea580c; margin: 0;">Dokumen Menunggu Verifikasi</h3>
-                        
+                    <div class="card-header-padding"
+                        style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3 class="title-primary" style="border-left-color: #ea580c; margin: 0;">Dokumen Menunggu
+                            Verifikasi</h3>
+
                         <div style="display: flex; gap: 10px; align-items: center;">
-                            <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">🗑️ Hapus Filter</button>
-                            <button class="btn-simpan" style="margin:0; background-color: #ea580c;" onclick="document.getElementById('filePdfUpload').click()">
+                            <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">🗑️ Hapus
+                                Filter</button>
+                            <button class="btn-simpan" style="margin:0; background-color: #ea580c;"
+                                onclick="document.getElementById('filePdfUpload').click()">
                                 📁 Unggah Dokumen PDF
                             </button>
                         </div>
                     </div>
-                    
+
                     <div class="table-responsive">
                         <table id="tabel-inbox-induk">
                             <thead>
@@ -49,8 +56,10 @@
                                 </tr>
                                 <tr class="filter-row">
                                     <th></th>
-                                    <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari Faktur..."></th>
-                                    <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari Client..."></th>
+                                    <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari Faktur...">
+                                    </th>
+                                    <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari Client...">
+                                    </th>
                                     <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari DPP..."></th>
                                     <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari PPN..."></th>
                                     <th></th>
@@ -68,18 +77,26 @@
 
     <div id="modalReviewPDF" class="modal-overlay">
         <div class="modal-box modal-box-scroll" style="max-width: 900px;">
-            <h3 style="color:#ea580c; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">📋 Informasi Lengkap Faktur Keluaran</h3>
-            
-            <h4 style="margin-top:15px; color:#475569; font-size:0.9rem; margin-bottom: 5px;">A. Data Faktur & Pihak Pembeli</h4>
+            <h3 style="color:#ea580c; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">📋 Informasi Lengkap
+                Faktur Keluaran</h3>
+
+            <h4 style="margin-top:15px; color:#475569; font-size:0.9rem; margin-bottom: 5px;">A. Data Faktur & Pihak
+                Pembeli</h4>
             <div class="grid-2-col">
-                <div class="form-group"><label>Nomor Faktur</label><input type="text" id="rev_faktur" readonly style="background:#f1f5f9; font-weight:bold;"></div>
-                <div class="form-group"><label>Tanggal Faktur</label><input type="text" id="rev_tanggal" readonly style="background:#f1f5f9;"></div>
-                <div class="form-group"><label>Nama Client (Pembeli)</label><input type="text" id="rev_client" readonly style="background:#f1f5f9;"></div>
-                <div class="form-group"><label>NPWP Client</label><input type="text" id="rev_npwp" readonly style="background:#f1f5f9;"></div>
-                <div class="form-group" style="grid-column: span 2;"><label>Alamat Lengkap</label><input type="text" id="rev_alamat" readonly style="background:#f1f5f9; font-size:0.8rem;"></div>
+                <div class="form-group"><label>Nomor Faktur</label><input type="text" id="rev_faktur" readonly
+                        style="background:#f1f5f9; font-weight:bold;"></div>
+                <div class="form-group"><label>Tanggal Faktur</label><input type="text" id="rev_tanggal" readonly
+                        style="background:#f1f5f9;"></div>
+                <div class="form-group"><label>Nama Client (Pembeli)</label><input type="text" id="rev_client" readonly
+                        style="background:#f1f5f9;"></div>
+                <div class="form-group"><label>NPWP Client</label><input type="text" id="rev_npwp" readonly
+                        style="background:#f1f5f9;"></div>
+                <div class="form-group" style="grid-column: span 2;"><label>Alamat Lengkap</label><input type="text"
+                        id="rev_alamat" readonly style="background:#f1f5f9; font-size:0.8rem;"></div>
             </div>
 
-            <h4 style="margin-top:10px; color:#475569; font-size:0.9rem; margin-bottom: 5px;">B. Rincian Item Barang / Jasa</h4>
+            <h4 style="margin-top:10px; color:#475569; font-size:0.9rem; margin-bottom: 5px;">B. Rincian Item Barang /
+                Jasa</h4>
             <table class="item-table">
                 <thead>
                     <tr>
@@ -95,25 +112,49 @@
                 </tbody>
             </table>
 
-            <h4 style="margin-top:20px; color:#475569; font-size:0.9rem; margin-bottom: 5px;">C. Rekapitulasi Nilai & Pengesahan</h4>
+            <h4 style="margin-top:20px; color:#475569; font-size:0.9rem; margin-bottom: 5px;">C. Rekapitulasi Nilai &
+                Pengesahan</h4>
             <div class="grid-2-col">
-                <div class="form-group"><label>Potongan Harga Total (Rp)</label><input type="text" id="rev_diskon_total" readonly style="background:#f1f5f9;"></div>
-                <div class="form-group"><label>Uang Muka / DP (Rp)</label><input type="text" id="rev_dp" readonly style="background:#f1f5f9;"></div>
-                <div class="form-group"><label>DPP (Rp)</label><input type="text" id="rev_dpp" readonly style="background:#f1f5f9; font-weight:bold;"></div>
-                <div class="form-group"><label>PPN (Rp)</label><input type="text" id="rev_ppn" readonly style="background:#fff7ed; font-weight:bold; color:#ea580c;"></div>
-                <div class="form-group"><label>Referensi / PO</label><input type="text" id="rev_ref" readonly style="background:#f1f5f9;"></div>
-                <div class="form-group"><label>Kota & Penandatangan</label><input type="text" id="rev_kota_ttd" readonly style="background:#f1f5f9;"></div>
+                <div class="form-group"><label>Potongan Harga Total (Rp)</label><input type="text" id="rev_diskon_total"
+                        readonly style="background:#f1f5f9;"></div>
+                <div class="form-group"><label>Uang Muka / DP (Rp)</label><input type="text" id="rev_dp" readonly
+                        style="background:#f1f5f9;"></div>
+                <div class="form-group"><label>DPP (Rp)</label><input type="text" id="rev_dpp" readonly
+                        style="background:#f1f5f9; font-weight:bold;"></div>
+                <div class="form-group"><label>PPN (Rp)</label><input type="text" id="rev_ppn" readonly
+                        style="background:#fff7ed; font-weight:bold; color:#ea580c;"></div>
+                <div class="form-group"><label>Referensi / PO</label><input type="text" id="rev_ref" readonly
+                        style="background:#f1f5f9;"></div>
+                <div class="form-group"><label>Kota & Penandatangan</label><input type="text" id="rev_kota_ttd" readonly
+                        style="background:#f1f5f9;"></div>
             </div>
-            
             <div style="border-top: 2px dashed #cbd5e1; margin: 20px 0;"></div>
             <h4 style="color:#1e293b; font-size:0.95rem; margin-bottom: 10px;">D. Lengkapi Relasi Internal</h4>
-            
-            <div class="form-group"><label>Branch / Cabang Internal</label><select id="input_branch_baru" class="form-select"></select></div>
-            <div class="form-group"><label>Nomor Invoice Internal / Tagihan</label><input type="text" id="input_invoice_baru" autocomplete="off" placeholder="Wajib untuk relasi Prepaid!"></div>
-            
+
+            <div class="form-group">
+                <label>Nomor Invoice Internal / Tagihan</label>
+                <input type="text" id="input_invoice_baru" autocomplete="off" placeholder="Contoh: 001/30000G/XII/2099"
+                    oninput="autoDetectBranch(this.value)">
+            </div>
+
+            <div class="form-group">
+                <label style="display:flex; align-items:center; gap:8px;">
+                    Branch / Cabang Internal
+                    <span id="badge-branch-status"
+                        style="display:none; font-size:0.72rem; font-weight:600; padding:2px 8px; border-radius:20px; background:#dcfce7; color:#15803d; border:1px solid #bbf7d0;">&#10004;
+                        Terdeteksi Otomatis</span>
+                    <span id="badge-branch-notfound"
+                        style="display:none; font-size:0.72rem; font-weight:600; padding:2px 8px; border-radius:20px; background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;">&#9888;
+                        Kode tidak ditemukan</span>
+                </label>
+                <select id="input_branch_baru" class="form-select"></select>
+            </div>
+
             <div style="display:flex; gap:10px; margin-top: 15px;">
-                <button class="btn-simpan" style="background-color: #ea580c; flex: 2;" onclick="simpanFinalVatout()">💾 Verifikasi & Simpan</button>
-                <button class="btn-simpan btn-cancel" style="flex: 1; margin-top:0;" onclick="document.getElementById('modalReviewPDF').style.display='none'">Batal</button>
+                <button class="btn-simpan" style="background-color: #ea580c; flex: 2;"
+                    onclick="simpanFinalVatout()">&#128190; Verifikasi &amp; Simpan</button>
+                <button class="btn-simpan btn-cancel" style="flex: 1; margin-top:0;"
+                    onclick="document.getElementById('modalReviewPDF').style.display='none'">Batal</button>
             </div>
         </div>
     </div>
@@ -122,23 +163,24 @@
 
     <script>
         const socket = io();
-        let currentUserName = "Admin", aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS', tempDataFinal = {}; 
+        let currentUserName = "Admin", aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS', tempDataFinal = {};
         let dataInboxLokal = [];
+        let loadedBranches = []; // Cache daftar cabang yang sedang aktif di modal
 
         let uploadStats = { isActive: false, totalFiles: 0, chunksTotal: 0, chunksDone: 0, sukses: 0, duplikat: 0, gagal: 0 };
 
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-        fetch('/sidebar.html').then(res => res.text()).then(html => { 
-            document.getElementById('sidebar-container').innerHTML = html; 
+        fetch('/sidebar.html').then(res => res.text()).then(html => {
+            document.getElementById('sidebar-container').innerHTML = html;
             const sidebarSelect = document.getElementById('global-entity-select');
             if (sidebarSelect) sidebarSelect.value = aktifEntitas;
         });
 
-        fetch('/api/me').then(res => res.json()).then(user => { if(user.nama) currentUserName = user.nama; });
+        fetch('/api/me').then(res => res.json()).then(user => { if (user.nama) currentUserName = user.nama; });
 
         // Fungsi Sinkronisasi Entitas
-        window.gantiEntitas = function(entitas) {
+        window.gantiEntitas = function (entitas) {
             aktifEntitas = entitas;
             localStorage.setItem('lastEntitas', entitas);
             const sidebarSelect = document.getElementById('global-entity-select');
@@ -146,7 +188,7 @@
             loadInbox(); // Reload data tabel sesuai entitas
         };
 
-        initPagination('pg-container', function(page, limit) { loadInbox(page, limit); }, 50);
+        initPagination('pg-container', function (page, limit) { loadInbox(page, limit); }, 50);
 
         async function loadInbox(page, limit) {
             page = page || 1;
@@ -167,7 +209,7 @@
             filteredData.forEach((row, index) => {
                 const tr = document.createElement('tr');
                 let parsed = {};
-                try { parsed = JSON.parse(row.data_ekstraksi); } catch(e) {}
+                try { parsed = JSON.parse(row.data_ekstraksi); } catch (e) { }
 
                 tr.innerHTML = `
                     <td class="text-center">${index + 1}</td>
@@ -189,7 +231,7 @@
         }
 
         function hapusInbox(id) {
-            if(confirm("Yakin ingin menghapus antrean Faktur Keluaran ini beserta file PDF fisiknya?")) {
+            if (confirm("Yakin ingin menghapus antrean Faktur Keluaran ini beserta file PDF fisiknya?")) {
                 socket.emit('hapus-inbox-vatout', id);
             }
         }
@@ -202,18 +244,18 @@
                 uploadStats.chunksDone++;
 
                 if (uploadStats.chunksDone === uploadStats.chunksTotal) {
-                    uploadStats.isActive = false; 
+                    uploadStats.isActive = false;
                     alert(`✅ PROSES UPLOAD SEMUA SELESAI!\n\nTotal Dibaca: ${uploadStats.totalFiles} Dokumen\nBerhasil Masuk Antrean: ${uploadStats.sukses}\nLewati (Sudah Ada/Duplikat): ${uploadStats.duplikat}\nGagal (Format Salah/Beda PT): ${uploadStats.gagal}`);
                 }
             }
         });
 
-        document.getElementById('filePdfUpload').addEventListener('change', async function(e) {
+        document.getElementById('filePdfUpload').addEventListener('change', async function (e) {
             const files = e.target.files;
             if (files.length === 0) return;
             alert(`Memproses ekstraksi ${files.length} file PDF.\n\nKarena jumlah file banyak, sistem akan membaginya ke dalam beberapa tahap agar browser tidak hang. Mohon tunggu Notifikasi Selesai!`);
 
-            const chunkSize = 5; 
+            const chunkSize = 5;
             uploadStats = { isActive: true, totalFiles: files.length, chunksTotal: Math.ceil(files.length / chunkSize), chunksDone: 0, sukses: 0, duplikat: 0, gagal: 0 };
 
             for (let i = 0; i < files.length; i += chunkSize) {
@@ -225,32 +267,36 @@
                         const arrayBuffer = await file.arrayBuffer();
                         const loadingTask = pdfjsLib.getDocument(new Uint8Array(arrayBuffer));
                         const pdf = await loadingTask.promise;
-                        
+
                         let fullText = "";
                         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                             const page = await pdf.getPage(pageNum);
                             const textContent = await page.getTextContent();
                             fullText += textContent.items.map(item => item.str).join(" ") + " ";
                         }
-                        loadingTask.destroy(); 
+                        loadingTask.destroy();
                         payloadFiles.push({ teksPDF: fullText, fileBuffer: arrayBuffer });
-                    } catch(err) {
+                    } catch (err) {
                         payloadFiles.push({ teksPDF: "ERROR", fileBuffer: await file.arrayBuffer() });
                     }
                 }
                 socket.emit('upload-pdf-vatout-batch', { entitas: aktifEntitas, username: currentUserName, files: payloadFiles });
             }
-            this.value = ''; 
+            this.value = '';
         });
 
         async function bukaJalurManual(idStr) {
             const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
             const rowData = dataInboxLokal.find(r => r.id == idStr);
-            if(!rowData) return alert("Data tidak ditemukan!");
+            if (!rowData) return alert("Data tidak ditemukan!");
 
             let parsed = JSON.parse(rowData.data_ekstraksi);
             tempDataFinal = parsed; tempDataFinal.id_link = idStr; tempDataFinal.username = currentUserName;
-            
+
+            // ✅ FIX: Selalu kosongkan field input manual setiap kali modal dibuka
+            // agar nilai faktur sebelumnya tidak terbawa ke faktur berikutnya
+            document.getElementById('input_invoice_baru').value = '';
+
             document.getElementById('rev_faktur').value = parsed.noFaktur || '-';
             document.getElementById('rev_tanggal').value = parsed.tanggalFaktur || '-';
             document.getElementById('rev_client').value = parsed.namaPembeli || '-';
@@ -265,32 +311,77 @@
 
             const tbodyItems = document.getElementById('tabel-items-modal');
             tbodyItems.innerHTML = '';
-            if(parsed.items && parsed.items.length > 0) {
+            if (parsed.items && parsed.items.length > 0) {
                 parsed.items.forEach(it => {
                     tbodyItems.innerHTML += `<tr><td class="text-center">${it.no}</td><td style="white-space: normal;"><b>${it.kode}</b> - ${it.nama_barang}</td><td class="text-right">${formatRupiah(it.harga_satuan)}</td><td class="text-center">${it.qty} ${it.satuan}</td><td class="text-right">${formatRupiah(it.diskon)}</td><td class="text-right" style="font-weight:bold;">${formatRupiah(it.total_harga)}</td></tr>`;
                 });
             } else {
                 tbodyItems.innerHTML = `<tr><td colspan="6" class="text-center" style="color:#64748b;">Tidak ada rincian item terbaca.</td></tr>`;
             }
-            
+
             const res = await fetch('/api/branches?entitas=' + rowData.entitas);
             const branches = await res.json();
+            loadedBranches = branches; // Simpan ke variabel global agar bisa diakses oleh autoDetectBranch()
             const select = document.getElementById('input_branch_baru');
 
             if (rowData.entitas === 'JO') {
                 select.innerHTML = '<option value="Berca JO" selected>Berca JO</option>';
-                select.disabled = true; select.style.backgroundColor = '#f1f5f9'; 
+                select.disabled = true; select.style.backgroundColor = '#f1f5f9';
             } else {
                 select.disabled = false; select.style.backgroundColor = '#fff';
-                select.innerHTML = '<option value="">-- Pilih Branch --</option>';
+                select.innerHTML = '<option value="">-- Akan terisi otomatis dari nomor invoice --</option>';
                 branches.forEach(b => select.innerHTML += `<option value="${b.kode_cabang}">${b.kode_cabang} - ${b.nama_cabang}</option>`);
             }
+
+            // Reset indikator status branch
+            document.getElementById('badge-branch-status').style.display = 'none';
+            document.getElementById('badge-branch-notfound').style.display = 'none';
+
             document.getElementById('modalReviewPDF').style.display = 'flex';
+        }
+
+        // ======================================================
+        // AUTO-DETECT BRANCH DARI NOMOR INVOICE
+        // Format  : 022/30236G/III/2025
+        // Ekstrak : segmen ke-2 → 30236G → cari di master_cabang
+        // ======================================================
+        function autoDetectBranch(invoiceVal) {
+            const badgeOk = document.getElementById('badge-branch-status');
+            const badgeErr = document.getElementById('badge-branch-notfound');
+            const select = document.getElementById('input_branch_baru');
+
+            // Jangan proses jika entitas JO (branch sudah fixed)
+            if (select.disabled) return;
+
+            const parts = (invoiceVal || '').trim().split('/');
+            if (parts.length < 2 || parts[1].trim() === '') {
+                // Belum ada kode cabang yang bisa diekstrak
+                select.value = '';
+                badgeOk.style.display = 'none';
+                badgeErr.style.display = 'none';
+                return;
+            }
+
+            const kodeCabangDari = parts[1].trim().toUpperCase();
+            const cocok = loadedBranches.find(b => b.kode_cabang.toUpperCase() === kodeCabangDari);
+
+            if (cocok) {
+                select.value = cocok.kode_cabang;
+                select.style.backgroundColor = '#f0fdf4'; // hijau lembut
+                badgeOk.style.display = 'inline-block';
+                badgeErr.style.display = 'none';
+            } else {
+                select.value = '';
+                select.style.backgroundColor = '#fff';
+                badgeOk.style.display = 'none';
+                badgeErr.style.display = 'inline-block';
+                badgeErr.textContent = `⚠ Kode '${kodeCabangDari}' tidak ditemukan`;
+            }
         }
 
         function simpanFinalVatout() {
             tempDataFinal.invoiceInput = document.getElementById('input_invoice_baru').value;
-            tempDataFinal.tglTukarInput = "-"; 
+            tempDataFinal.tglTukarInput = "-";
             tempDataFinal.branchInput = document.getElementById('input_branch_baru').value;
             tempDataFinal.username = currentUserName;
 
@@ -327,7 +418,7 @@
             jalankanFilterInbox();
         }
 
-        document.addEventListener('input', function(e) {
+        document.addEventListener('input', function (e) {
             if (e.target.classList.contains('filter-input-inbox')) jalankanFilterInbox();
         });
 
@@ -335,4 +426,5 @@
         loadInbox();
     </script>
 </body>
+
 </html>

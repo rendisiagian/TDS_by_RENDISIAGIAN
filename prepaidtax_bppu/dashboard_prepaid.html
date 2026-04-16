@@ -125,7 +125,19 @@
             <h3 style="border-bottom: 2px solid var(--border-color); padding-bottom: 10px; color: var(--warning-600);">✏️ Edit Relasi Internal</h3>
             <p style="font-size: 0.85rem; color: var(--text-tertiary); margin-bottom: 15px;">BPPU: <b id="edit-faktur-title"></b></p>
             <div class="form-group"><label>Branch / Cabang Baru</label><select id="edit_branch" class="form-select"></select></div>
-            <div class="form-group"><label>No. Internal Tagihan (VAT OUT)</label><input type="text" id="edit_invoice" autocomplete="off" placeholder="Ketik No Invoice/Faktur..."></div>
+            <div class="form-group">
+                <label>Nomor Internal Tagihan (VAT OUT)</label>
+                <div class="invoice-select-wrapper" style="position:relative;">
+                    <input type="text" id="input_invoice_search" class="invoice-search" placeholder="Ketik untuk cari faktur VAT OUT..." autocomplete="off" onfocus="showInvoiceDropdown()" oninput="filterInvoiceDropdown()">
+                    <div id="invoice-dropdown" class="invoice-dropdown" style="position:absolute; width:100%; top:100%; z-index:9999;"></div>
+                </div>
+                <input type="hidden" id="edit_invoice" value="">
+                <div id="selected-invoice-display" style="display:none; margin-top:0.5rem; padding:0.5rem 0.75rem; background:var(--success-50); border:1px solid var(--success-500); border-radius:6px; font-size:0.85rem; font-weight:600; color:var(--success-700);"></div>
+                <span class="invoice-manual-toggle" id="btn-manual-toggle" onclick="toggleManualInput()" style="font-size:0.8rem; color:var(--primary-600); cursor:pointer; font-weight:600; display:block; margin-top:5px;">&#9998; Input manual (jika tidak ada di daftar)</span>
+                <div id="manual-input-area" style="display:none; margin-top:0.5rem;">
+                    <textarea id="input_invoice_manual" rows="2" placeholder="Ketik nomor faktur/invoice manual..." style="width:100%; padding:0.75rem; border:1px solid var(--border-color); border-radius:6px; font-family:inherit; resize:vertical; background:var(--bg-primary); color:var(--text-primary);"></textarea>
+                </div>
+            </div>
             <div style="display:flex; gap:10px; margin-top: 20px;">
                 <button class="btn-simpan" style="background-color: var(--warning-600); flex: 2;" onclick="submitEdit()">💾 Simpan Perubahan</button>
                 <button class="btn-simpan btn-cancel" style="flex: 1; margin-top:0;" onclick="document.getElementById('modalEditData').style.display='none'">Batal</button>
@@ -227,7 +239,7 @@
                 let barisNo = offset + index + 1; 
 
                 let btnView = `<button class="btn-tbl btn-tbl-view" title="Komparasi Faktur" onclick="viewItems('${baris.no_bppu}')">Lihat</button>`;
-                let btnEdit = `<button class="btn-tbl btn-tbl-edit" title="Edit Data" onclick="handleAction('${baris.no_bppu}', 'EDIT', '${curBr}', '${curInv}')">Edit</button>`;
+                let btnEdit = `<button class="btn-tbl btn-tbl-edit" title="Edit Data" onclick="handleAction('${baris.no_bppu}', 'EDIT', '${curBr}', '${curInv}', '${(baris.nama_pemotong || '').replace(/'/g, "\\'").replace(/"/g, '&quot;')}')">Edit</button>`;
                 let btnDel  = `<button class="btn-tbl btn-tbl-del" title="Hapus Data" onclick="handleAction('${baris.no_bppu}', 'DELETE')">Hapus</button>`;
                 let btnPdf = baris.link_pdf_lokal ? `<a href="/${baris.link_pdf_lokal}" target="_blank" class="btn-tbl btn-tbl-pdf">PDF</a>` : `-`;
 
@@ -325,7 +337,7 @@
         }
 
         // AKSI & MAKER CHECKER
-        async function handleAction(noBppu, actionType, curCabang = '', curInvoice = '') {
+        async function handleAction(noBppu, actionType, curCabang = '', curInvoice = '', namaPemotong = '') {
             const userRole = currentUser.role ? currentUser.role.toLowerCase() : '';
             const isSupervisor = ['supervisor', 'administrator'].includes(userRole);
             
@@ -337,7 +349,21 @@
             } else if (actionType === 'EDIT') {
                 targetEditFaktur = noBppu;
                 document.getElementById('edit-faktur-title').innerText = noBppu;
-                document.getElementById('edit_invoice').value = (curInvoice === '-' || curInvoice === 'null') ? '' : curInvoice;
+                
+                let valInv = (curInvoice === '-' || curInvoice === 'null') ? '' : curInvoice;
+                
+                // Initialize Select UI
+                arraySelectedInvoice = valInv ? valInv.split(',').map(s=>s.trim()).filter(Boolean) : [];
+                document.getElementById('edit_invoice').value = arraySelectedInvoice.join(', ');
+                renderSelectedInvoices();
+                
+                document.getElementById('input_invoice_search').value = '';
+                document.getElementById('manual-input-area').style.display = 'none';
+                document.getElementById('input_invoice_search').style.display = 'block';
+                document.getElementById('btn-manual-toggle').innerHTML = '&#9998; Input manual (jika tidak ada di daftar)';
+                isManualMode = false;
+                
+                await loadVatoutOptions(namaPemotong);
                 
                 const res = await fetch('/api/branches?entitas=' + aktifEntitas);
                 const branches = await res.json();
@@ -362,7 +388,14 @@
         function submitEdit() {
             const isSupervisor = currentUser.role && ['supervisor', 'administrator'].includes(currentUser.role.toLowerCase());
             const branch = document.getElementById('edit_branch').value;
-            const invoice = document.getElementById('edit_invoice').value;
+            
+            var manualArea = document.getElementById('manual-input-area');
+            var invoice = '';
+            if (manualArea.style.display !== 'none') {
+                invoice = document.getElementById('input_invoice_manual').value.trim();
+            } else {
+                invoice = document.getElementById('edit_invoice').value.trim();
+            }
 
             if (!branch) return alert("Branch wajib diisi!");
             socket.emit('request-action-faktur', { action: 'EDIT', mod: 'prepaid', faktur: targetEditFaktur, id_user: currentUser.id, username: currentUser.username, role: currentUser.role, newData: { branch, invoice, tanggal: '-' } });
@@ -381,6 +414,167 @@
             else if (diff < 0) { el.className = 'stat-mom down'; el.innerHTML = '&#9660; ' + pct + '% vs bulan lalu'; }
             else { el.className = 'stat-mom neutral'; el.textContent = 'Sama dengan bulan lalu'; }
         }
+
+        // === VAT OUT DROPDOWN LOGIC ===
+        let vatoutData = { matching: [], others: [] };
+        let isManualMode = false;
+        let arraySelectedInvoice = [];
+
+        function toggleManualInput() {
+            isManualMode = !isManualMode;
+            var manualArea = document.getElementById('manual-input-area');
+            var searchInput = document.getElementById('input_invoice_search');
+            var dropdown = document.getElementById('invoice-dropdown');
+            var toggleBtn = document.getElementById('btn-manual-toggle');
+            var display = document.getElementById('selected-invoice-display');
+            
+            if (isManualMode) {
+                manualArea.style.display = 'block';
+                searchInput.style.display = 'none';
+                dropdown.classList.remove('show');
+                display.style.display = 'none';
+                document.getElementById('edit_invoice').value = '';
+                toggleBtn.innerHTML = '&#8592; Kembali ke pilih dari daftar';
+            } else {
+                manualArea.style.display = 'none';
+                searchInput.style.display = 'block';
+                document.getElementById('input_invoice_manual').value = '';
+                toggleBtn.innerHTML = '&#9998; Input manual (jika tidak ada di daftar)';
+            }
+        }
+
+        async function loadVatoutOptions(clientName) {
+            try {
+                var url = '/api/available-vatout?entitas=' + aktifEntitas + '&current_doc=' + encodeURIComponent(targetEditFaktur);
+                if (clientName) url += '&client=' + encodeURIComponent(clientName);
+                var res = await fetch(url);
+                vatoutData = await res.json();
+                renderInvoiceDropdown('');
+            } catch(e) {
+                vatoutData = { matching: [], others: [] };
+            }
+        }
+
+        function showInvoiceDropdown() {
+            document.getElementById('invoice-dropdown').classList.add('show');
+            renderInvoiceDropdown(document.getElementById('input_invoice_search').value);
+        }
+
+        function filterInvoiceDropdown() {
+            var query = document.getElementById('input_invoice_search').value;
+            renderInvoiceDropdown(query);
+            // DO NOT OVERWRITE edit_invoice.value HERE!
+        }
+
+        function renderInvoiceDropdown(query) {
+            var dd = document.getElementById('invoice-dropdown');
+            var q = (query || '').toLowerCase();
+            var formatRp = function(n) { return 'Rp ' + Number(n || 0).toLocaleString('id-ID'); };
+            var html = '';
+
+            var matchingItems = vatoutData.matching || [];
+
+            // 1. FILTER: Keluarkan item yang no_invoice_internal-nya sudah dipilih
+            var available = matchingItems.filter(function(r) {
+                var invNo = (r.no_invoice_internal && r.no_invoice_internal !== '-') ? r.no_invoice_internal.trim() : '';
+                // Cek apakah salah satu dari invoice yang sudah dipilih cocok
+                if (!invNo) return true; // Biarkan tampil (tapi tidak bisa diklik)
+                return !arraySelectedInvoice.includes(invNo);
+            });
+
+            // 2. SORT: Urutkan berdasarkan angka prefix sebelum '/' pertama (001, 002, 009, 013...)
+            available.sort(function(a, b) {
+                var getPrefix = function(r) {
+                    var inv = (r.no_invoice_internal && r.no_invoice_internal !== '-') ? r.no_invoice_internal.trim() : '';
+                    if (!inv || inv.indexOf('/') === -1) return 9999; // tanpa invoice internal → paling bawah
+                    return parseInt(inv.split('/')[0], 10) || 9999;
+                };
+                return getPrefix(a) - getPrefix(b);
+            });
+
+            // 3. FILTER: Pencarian teks
+            var filtered = available;
+            if (q) {
+                filtered = available.filter(function(r) {
+                    return (r.no_invoice_internal || '').toLowerCase().includes(q) ||
+                           (r.no_faktur || '').toLowerCase().includes(q) ||
+                           (r.nama_pembeli || '').toLowerCase().includes(q);
+                });
+            }
+
+            if (filtered.length > 0) {
+                filtered.forEach(function(r) { html += buildDropdownItem(r, formatRp); });
+            } else if (arraySelectedInvoice.length > 0 && available.length === 0) {
+                html = '<div class="invoice-dropdown-empty" style="padding:10px; background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d;">✔ Semua faktur yang relevan sudah dipilih.</div>';
+            } else {
+                html = '<div class="invoice-dropdown-empty" style="padding:10px; background:#fff; border:1px solid #ddd;">Tidak ada faktur VAT OUT yang relevan. Gunakan input manual jika di luar jangkauan pencarian.</div>';
+            }
+
+            dd.innerHTML = html;
+            dd.classList.add('show');
+        }
+
+        function buildDropdownItem(r, formatRp) {
+            // Gunakan no_invoice_internal sebagai nilai primer (yang disimpan ke database)
+            // no_faktur hanya sebagai referensi informasi
+            var invNo = (r.no_invoice_internal && r.no_invoice_internal !== '-') ? r.no_invoice_internal.trim() : '';
+            var cls = 'invoice-dropdown-item';
+
+            if (!invNo) {
+                // Faktur ini belum punya nomor invoice internal - tidak bisa dipilih
+                return '<div class="' + cls + '" style="padding:10px; border-bottom:1px solid #eee; background:#fffbf0; opacity:0.7; cursor:not-allowed;">' +
+                    '<div style="font-weight:bold; color:#94a3b8;">' + r.no_faktur + '</div>' +
+                    '<div style="font-size:0.8rem; color:#f59e0b;">⚠ Belum memiliki No. Invoice Internal</div>' +
+                    '<div style="font-size:0.8rem; color:#94a3b8;">' + (r.nama_pembeli || '-') + ' | ' + (r.tanggal_format || '-') + '</div>' +
+                '</div>';
+            }
+
+            var onClick = 'onclick="selectInvoice(\'' + invNo.replace(/'/g, "\\''") + '\')"';
+            return '<div class="' + cls + '" ' + onClick + ' style="padding:10px; border-bottom:1px solid #eee; cursor:pointer; background:#fff;" onmouseover="this.style.background=\'#f0fdf4\'" onmouseout="this.style.background=\'#fff\'">' +
+                '<div style="font-weight:700; font-size:1rem; color:var(--success-700); letter-spacing:0.01em;">' + invNo + '</div>' +
+                '<div style="font-size:0.78rem; color:var(--text-tertiary); margin-top:2px;">No. Faktur: ' + r.no_faktur + '</div>' +
+                '<div style="font-size:0.78rem; color:#666; margin-top:1px;">' + (r.nama_pembeli || '-') + ' | ' + (r.tanggal_format || '-') + '</div>' +
+                '<div style="font-size:0.78rem; color:#666;">DPP: ' + formatRp(r.dpp) + ' | PPN: ' + formatRp(r.ppn) + '</div>' +
+            '</div>';
+        }
+
+        function selectInvoice(noFaktur) {
+            if(arraySelectedInvoice.includes(noFaktur)) return;
+            arraySelectedInvoice.push(noFaktur);
+            document.getElementById('edit_invoice').value = arraySelectedInvoice.join(', ');
+            document.getElementById('input_invoice_search').value = '';
+            document.getElementById('invoice-dropdown').classList.remove('show');
+            renderSelectedInvoices();
+        }
+
+        function renderSelectedInvoices() {
+            var display = document.getElementById('selected-invoice-display');
+            if(arraySelectedInvoice.length === 0) {
+                display.style.display = 'none';
+                document.getElementById('edit_invoice').value = '';
+                return;
+            }
+            display.style.display = 'block';
+            let html = `<strong>Terpilih (${arraySelectedInvoice.length}):</strong><div style="margin-top:5px; display:flex; gap:5px; flex-wrap:wrap;">`;
+            arraySelectedInvoice.forEach(inv => {
+                html += `<span style="background:#fff; border:1px solid var(--success-500); color:var(--success-700); padding:2px 8px; border-radius:12px; font-size:0.8rem;">${inv} <span onclick="removeInvoice('${inv}')" style="margin-left:5px;cursor:pointer;color:var(--danger-500);">✖</span></span>`;
+            });
+            html += `</div>`;
+            display.innerHTML = html;
+        }
+
+        function removeInvoice(inv) {
+            arraySelectedInvoice = arraySelectedInvoice.filter(i => i !== inv);
+            document.getElementById('edit_invoice').value = arraySelectedInvoice.join(', ');
+            renderSelectedInvoices();
+        }
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.invoice-select-wrapper')) {
+                const dd = document.getElementById('invoice-dropdown');
+                if (dd) dd.classList.remove('show');
+            }
+        });
 
         // Jalankan Pertama Kali
         loadData(1, 50);

@@ -288,10 +288,13 @@
                     container.innerHTML = "<p class='text-center' style='padding:20px;'>Tidak ada rincian item.</p>";
                 } else {
                     let tableHtml = `<table class="modal-item-table"><thead><tr><th>Barang/Jasa</th><th class='text-right'>Harga Satuan</th><th class='text-center'>Qty</th><th class='text-right'>Total</th></tr></thead><tbody>`;
+                    let totalSemua = 0;
                     items.forEach(it => {
-                        tableHtml += `<tr><td>${it.nama_barang || '-'}</td><td class='text-right'>Rp ${Number(it.harga_satuan || 0).toLocaleString('id-ID')}</td><td class='text-center'>${Number(it.qty || 0)} ${it.satuan || ''}</td><td class='text-right'><b>Rp ${Number(it.total_harga || 0).toLocaleString('id-ID')}</b></td></tr>`;
+                        let t = Number(it.total_harga || 0);
+                        totalSemua += t;
+                        tableHtml += `<tr><td>${it.nama_barang || '-'}</td><td class='text-right'>Rp ${Number(it.harga_satuan || 0).toLocaleString('id-ID')}</td><td class='text-center'>${Number(it.qty || 0)} ${it.satuan || ''}</td><td class='text-right'><b>Rp ${t.toLocaleString('id-ID')}</b></td></tr>`;
                     });
-                    tableHtml += `</tbody></table>`;
+                    tableHtml += `</tbody><tfoot><tr style="background: var(--bg-tertiary);"><td colspan="3" class="text-right" style="font-weight:700; padding:10px;">TOTAL KESELURUHAN</td><td class="text-right" style="font-weight:700; font-size:1.05rem; color: #ea580c; padding:10px;">Rp ${totalSemua.toLocaleString('id-ID')}</td></tr></tfoot></table>`;
                     container.innerHTML = tableHtml;
                 }
                 document.getElementById('modalViewItem').style.display = 'flex';

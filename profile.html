@@ -21,29 +21,30 @@
             <div class="container">
                 <div class="flex-container-gap">
                     <div class="card flex-1-p20">
-                        <h3>Ajukan Perubahan Data</h3>
+                        <h3 id="card-title">Ajukan Perubahan Data</h3>
+                        <p id="card-subtitle" style="font-size:0.85rem; margin-bottom:1rem; color:var(--text-tertiary);"></p>
                         <div class="form-group">
                             <label>Jenis Perubahan</label>
-                            <select id="jenis_req" class="form-select">
+                            <select id="jenis_req" class="form-select" onchange="updateLabel()">
                                 <option value="NAMA">Ubah Nama Lengkap</option>
                                 <option value="PASSWORD">Ubah Password</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Nilai / Data Baru</label>
+                            <label id="label-nilai">Nilai / Data Baru</label>
                             <input type="text" id="nilai_baru" placeholder="Ketik data baru..." autocomplete="off">
                         </div>
-                        <button id="btn-ajukan" class="btn-simpan" onclick="ajukanPerubahan()">Ajukan ke Administrator</button>
+                        <button id="btn-ajukan" class="btn-simpan" onclick="ajukanPerubahan()">Ajukan Perubahan</button>
                     </div>
 
                     <div class="card flex-2" style="padding: 0;">
                         <div style="padding: 1.5rem 1.5rem 0.75rem 1.5rem;">
-                            <h3 style="margin-bottom: 0; border: none;">Riwayat Pengajuan</h3>
+                            <h3 style="margin-bottom: 0; border: none;" id="riwayat-title">Riwayat Pengajuan</h3>
                         </div>
                         <div class="table-responsive">
                             <table>
                                 <thead>
-                                    <tr><th>Waktu Pengajuan</th><th>Tipe Request</th><th>Status Approval</th></tr>
+                                    <tr><th>Waktu</th><th>Tipe</th><th>Status</th></tr>
                                 </thead>
                                 <tbody id="tabel-riwayat"></tbody>
                             </table>
@@ -60,28 +61,93 @@
 
         fetch('/sidebar.html').then(res => res.text()).then(html => {
             document.getElementById('sidebar-container').innerHTML = html;
-            document.querySelectorAll('.sidebar-link').forEach(l => { if(l.getAttribute('href') === window.location.pathname) l.classList.add('active'); });
+            document.querySelectorAll('.sidebar-link').forEach(l => {
+                if (l.getAttribute('href') === window.location.pathname) l.classList.add('active');
+            });
         });
+
+        // Supervisor dan Administrator sama-sama bisa langsung ubah data diri sendiri tanpa approval
+        function isSelfManaged(role) {
+            if (!role) return false;
+            return ['administrator', 'superadmin', 'supervisor'].includes(role.toLowerCase());
+        }
+
+        function updateLabel() {
+            const jenis = document.getElementById('jenis_req').value;
+            const input = document.getElementById('nilai_baru');
+            const label = document.getElementById('label-nilai');
+            if (jenis === 'PASSWORD') {
+                input.type = 'password';
+                label.innerText = 'Password Baru';
+                input.placeholder = 'Masukkan password baru...';
+            } else {
+                input.type = 'text';
+                label.innerText = 'Nama Lengkap Baru';
+                input.placeholder = 'Masukkan nama lengkap baru...';
+            }
+        }
+
+        function updateUIFromRole() {
+            if (isSelfManaged(currentUser.role)) {
+                // Supervisor & Administrator: langsung simpan tanpa approval
+                document.getElementById('card-title').innerText = 'Ubah Data Akun';
+                const roleLabel = currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1);
+                document.getElementById('card-subtitle').innerText =
+                    'Sebagai ' + roleLabel + ', perubahan Anda langsung diterapkan tanpa memerlukan approval.';
+                document.getElementById('btn-ajukan').innerText = '💾 Simpan Perubahan';
+                document.getElementById('riwayat-title').innerText = 'Riwayat Perubahan';
+            } else {
+                // User / Admin input: masuk antrian approval
+                document.getElementById('card-title').innerText = 'Ajukan Perubahan Data';
+                document.getElementById('card-subtitle').innerText =
+                    'Perubahan akan dikirim ke Supervisor / Administrator untuk disetujui.';
+                document.getElementById('btn-ajukan').innerText = '📤 Ajukan Persetujuan';
+            }
+        }
 
         async function initProfile() {
             const res = await fetch('/api/me');
             currentUser = await res.json();
+            document.getElementById('header-user-name').innerText = currentUser.nama || currentUser.username;
+            updateUIFromRole();
+            updateLabel();
             loadRiwayat();
-            if (['administrator', 'superadmin', 'super admin'].includes(currentUser.role.toLowerCase())) {
-                document.getElementById('btn-ajukan').innerText = "Simpan Perubahan";
-            }
         }
 
         function ajukanPerubahan() {
             const jenis = document.getElementById('jenis_req').value;
-            const nilai = document.getElementById('nilai_baru').value;
-            if(!nilai) return alert("Data baru tidak boleh kosong!");
-            socket.emit('ajukan-perubahan', { id_user: currentUser.id, username: currentUser.username, jenis: jenis, nilai_baru: nilai });
-            document.getElementById('nilai_baru').value = '';
-            alert(isSuperAdmin(currentUser.role) ? "Tersimpan!" : "Diajukan ke Admin!");
-        }
+            const nilai = document.getElementById('nilai_baru').value.trim();
+            if (!nilai) return alert('Data baru tidak boleh kosong!');
 
-        function isSuperAdmin(role) { return ['administrator', 'superadmin', 'super admin'].includes(role.toLowerCase()); }
+            if (isSelfManaged(currentUser.role)) {
+                // ============================================================
+                // ALUR SUPERVISOR & ADMINISTRATOR: Langsung simpan tanpa approval
+                // ============================================================
+                if (jenis === 'PASSWORD') {
+                    if (!confirm('Yakin ingin mengubah password Anda?')) return;
+                    socket.emit('reset-password-user', { user_id: currentUser.id, new_password: nilai });
+                    alert('Password berhasil diubah!');
+                } else {
+                    if (!confirm('Yakin ingin mengubah nama lengkap Anda?')) return;
+                    socket.emit('admin-update-nama', { user_id: currentUser.id, nilai_baru: nilai });
+                    alert('Nama lengkap berhasil diperbarui!');
+                }
+            } else {
+                // ============================================================
+                // ALUR USER BIASA (role: admin/input): Masuk antrian approval
+                // ============================================================
+                socket.emit('ajukan-perubahan', {
+                    id_user: currentUser.id,
+                    username: currentUser.username,
+                    jenis: jenis,
+                    nilai_baru: nilai
+                });
+                alert('Pengajuan berhasil dikirim! Menunggu persetujuan Supervisor / Administrator.');
+            }
+
+            document.getElementById('nilai_baru').value = '';
+            loadRiwayat();
+        }
 
         async function loadRiwayat() {
             const res = await fetch('/api/my-requests');
@@ -94,13 +160,24 @@
             }
             data.forEach(req => {
                 const tr = document.createElement('tr');
-                let statusClass = req.status === 'Pending' ? 'status-pending-text' : (req.status === 'Disetujui' ? 'status-approved-text' : 'status-rejected-text');
-                tr.innerHTML = '<td>' + req.waktu_format + '</td><td class="text-bold">Ubah ' + req.jenis_request + '</td><td class="status-text ' + statusClass + '">' + req.status + '</td>';
+                let statusClass = req.status === 'Pending' ? 'status-pending-text'
+                    : (req.status === 'Disetujui' ? 'status-approved-text' : 'status-rejected-text');
+                let tipeLabel = req.jenis_request === 'NAMA' ? 'Ubah Nama'
+                    : (req.jenis_request === 'PASSWORD' ? 'Ubah Password' : req.jenis_request);
+                tr.innerHTML = '<td>' + req.waktu_format + '</td><td class="text-bold">' + tipeLabel + '</td><td class="status-text ' + statusClass + '">' + req.status + '</td>';
                 tbody.appendChild(tr);
             });
         }
+
         initProfile();
         socket.on('request-updated', () => loadRiwayat());
+        socket.on('users-updated', () => {
+            // Jika nama sendiri yang berubah, refresh tampilan header
+            fetch('/api/me').then(r => r.json()).then(u => {
+                currentUser = u;
+                document.getElementById('header-user-name').innerText = currentUser.nama || currentUser.username;
+            });
+        });
     </script>
 </body>
 </html>

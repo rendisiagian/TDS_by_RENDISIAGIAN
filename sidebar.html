@@ -40,6 +40,17 @@
         <a href="/summary" class="sidebar-link">Laporan Rekapitulasi</a>
         <a href="/profile" class="sidebar-link">Pengaturan Akun</a>
         <a href="/manage-users" class="sidebar-link" id="menu-manage-users">Manajemen &amp; Approval</a>
+
+        <div id="group-administrasi" class="sidebar-group" style="display:none;">
+            <span class="sidebar-nav-label collapsible" onclick="toggleSidebarGroup('group-administrasi')" style="color: #f59e0b; font-weight: 700; letter-spacing: 0.08em;">
+                ⚙️ ADMINISTRASI <span class="chevron">▼</span>
+            </span>
+            <div class="sidebar-links-container">
+                <a href="/master-cabang" class="sidebar-link" id="menu-master-cabang">🗂️ Master Proyek/Cabang</a>
+                <a href="/master-kontak" class="sidebar-link" id="menu-master-kontak">📇 Master Client & Vendor</a>
+                <a href="/audit-logs" class="sidebar-link" id="menu-audit-logs">📜 Log Audit Aktivitas</a>
+            </div>
+        </div>
     </nav>
 
     <div style="padding: 0.75rem 1rem; border-top: 1px solid rgba(255,255,255,0.1); margin-top: auto;">

@@ -46,7 +46,7 @@ app.use((req, res, next) => {
     }
     next();
 });
-app.use(express.static(__dirname));
+
 
 // ==========================================
 // 2. INISIALISASI DATABASE & TABEL
@@ -126,6 +126,13 @@ db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS master_cabang (kode_cabang TEXT PRIMARY KEY, nama_cabang TEXT, entitas TEXT)`);
     db.run(`CREATE TABLE IF NOT EXISTS master_vendor (npwp TEXT PRIMARY KEY, nama TEXT, alamat TEXT)`);
     db.run(`CREATE TABLE IF NOT EXISTS master_client (npwp TEXT PRIMARY KEY, nama TEXT, alamat TEXT)`);
+    db.run(`CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, username TEXT, action TEXT, module TEXT, details TEXT, waktu DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+
+    global.insertAuditLog = function(user_id, username, action, module, details) {
+        db.run(`INSERT INTO audit_logs (user_id, username, action, module, details) VALUES (?, ?, ?, ?, ?)`, [user_id, username, action, module, details], (err) => {
+            if (err) console.error("Audit Log Error:", err);
+        });
+    };
 
     // TABEL BARU: MODUL AKUNTANSI (CLIENT LEDGER)
     db.run(`CREATE TABLE IF NOT EXISTS data_client_ledger (
@@ -187,28 +194,99 @@ db.serialize(() => {
 // ==========================================
 const cekAuth = (req, res, next) => { if (req.session.user) return next(); res.redirect('/login'); };
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'login.html')));
-app.get('/sidebar.html', (req, res) => res.sendFile(path.join(__dirname, 'sidebar.html')));
+app.get('/sidebar.html', (req, res) => {
+    const sidebarPath = path.join(__dirname, 'sidebar.html');
+    fs.readFile(sidebarPath, 'utf8', (err, html) => {
+        if (err) return res.status(500).send('');
+        // Jika user adalah administrator, tampilkan menu administrasi
+        const role = (req.session && req.session.user && req.session.user.role) ? req.session.user.role.toLowerCase() : '';
+        const isAdmin = ['administrator', 'superadmin'].includes(role);
+        if (isAdmin) {
+            html = html.replace(
+                'id="group-administrasi" class="sidebar-group" style="display:none;"',
+                'id="group-administrasi" class="sidebar-group"'
+            );
+        }
+        res.setHeader('Content-Type', 'text/html');
+        res.send(html);
+    });
+});
 app.get('/profile', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'profile.html')));
 app.get('/summary', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'summary.html')));
 app.get('/manage-users', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'manage_users.html')));
+app.get('/master-cabang', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'master_cabang.html')));
+app.get('/master-kontak', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'master_kontak.html')));
+app.get('/audit-logs', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'audit_logs.html')));
 app.get('/', (req, res) => req.session.user ? res.redirect('/dashboard-utama') : res.redirect('/login'));
 app.get('/dashboard-utama', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'dashboard_utama.html')));
 app.get('/client-ledger', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'accounting', 'client_ledger.html')));
+
+// Static middleware ditempatkan setelah rute HTML agar route kustom (seperti /sidebar.html) dapat tereksekusi
+app.use(express.static(__dirname));
+
+// API: MASTER CABANG - Semua data tanpa filter entitas (untuk halaman admin)
+app.get('/api/master-cabang-all', cekAuth, (req, res) => {
+    db.all(`SELECT * FROM master_cabang ORDER BY entitas, kode_cabang`, (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows || []);
+    });
+});
+
+app.get('/api/master-kontak-all', cekAuth, (req, res) => {
+    db.all(`SELECT * FROM master_client ORDER BY nama`, (err, rowsClient) => {
+        db.all(`SELECT * FROM master_vendor ORDER BY nama`, (err, rowsVendor) => {
+            res.json({ clients: rowsClient || [], vendors: rowsVendor || [] });
+        });
+    });
+});
+
+app.get('/api/audit-logs', cekAuth, (req, res) => {
+    db.all(`SELECT *, strftime('%d-%m-%Y %H:%M:%S', waktu, 'localtime') as wkt FROM audit_logs ORDER BY id DESC LIMIT 500`, (err, rows) => res.json(rows || []));
+});
 
 app.get('/api/items/:mod/:faktur', cekAuth, (req, res) => {
     db.all(`SELECT * FROM item_${req.params.mod} WHERE no_faktur = ?`, [req.params.faktur], (err, rows) => res.json(rows || []));
 });
 
-// API: Compare Prepaid Tax DPP vs VAT OUT Harga Jual
+// API: Compare Prepaid Tax vs VAT OUT (Membaca no_faktur atau no_invoice_internal)
 app.get('/api/prepaid-comparison/:noBppu', cekAuth, (req, res) => {
     db.get(`SELECT * FROM data_prepaid WHERE no_bppu = ?`, [req.params.noBppu], (err, prepaid) => {
-        if (!prepaid) return res.json({ prepaid: null, vatout: null });
+        if (err || !prepaid) return res.json({ prepaid: null, vatout: null });
 
-        const invoiceRef = prepaid.no_invoice_internal;
+        const invoiceRef = (prepaid.no_invoice_internal || '').trim();
         if (!invoiceRef || invoiceRef === '-') return res.json({ prepaid, vatout: null });
 
-        db.get(`SELECT * FROM data_vatout WHERE no_faktur = ?`, [invoiceRef], (err2, vatout) => {
-            res.json({ prepaid, vatout: vatout || null });
+        // Pisahkan jika ada banyak invoice (koma)
+        const refs = invoiceRef.split(',').map(s => s.trim()).filter(Boolean);
+        if (refs.length === 0) return res.json({ prepaid, vatout: null });
+
+        const placeholders = refs.map(() => '?').join(',');
+        const sql = `SELECT * FROM data_vatout 
+                     WHERE no_invoice_internal IN (${placeholders}) OR no_faktur IN (${placeholders})`;
+        
+        // Kita masukkan array refs dua kali untuk mencakup kedua kolom di IN clause
+        db.all(sql, [...refs, ...refs], (err2, rows) => {
+            if (err2 || !rows || rows.length === 0) {
+                return res.json({ prepaid, vatout: null });
+            }
+
+            // Agregasi nilai Harga Jual dan PPN dari semua faktur yang ditemukan
+            const aggregated = rows.reduce((acc, r) => {
+                acc.dpp += (r.harga_jual || 0); // Menggunakan harga_jual sebagai pembanding DPP
+                acc.ppn += (r.ppn || 0);
+                return acc;
+            }, { dpp: 0, ppn: 0 });
+
+            // Kirim balik sebagai objek vatout tunggal agar UI tetap kompatibel
+            res.json({ 
+                prepaid, 
+                vatout: {
+                    dpp: aggregated.dpp,
+                    ppn: aggregated.ppn,
+                    is_aggregated: rows.length > 1,
+                    count: rows.length
+                } 
+            });
         });
     });
 });
@@ -241,7 +319,7 @@ app.get('/api/data-client-ledger', cekAuth, (req, res) => {
 
     db.get(`SELECT count(*) as total ${baseSql}`, params, (err, countRow) => {
         const total = countRow ? countRow.total : 0;
-        let selectSql = `SELECT d.*, strftime('%d-%m-%Y', d.waktu_input) AS tanggal_format ${baseSql} ORDER BY d.id DESC`;
+        let selectSql = `SELECT d.*, strftime('%d-%m-%Y', d.waktu_input) AS tanggal_format ${baseSql} ORDER BY CAST(SUBSTR(d.inv_no, 1, MAX(1, INSTR(d.inv_no, '/') - 1)) AS INTEGER) ASC, d.id DESC`;
         const queryParams = [...params]; // Salinan bersih untuk query SELECT
 
         if (limit) {
@@ -313,7 +391,7 @@ modules.forEach(mod => {
             const total = countRow ? countRow.total : 0;
 
             let selectSql = mod.id.startsWith('vat')
-                ? `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_faktur) AS tanggal_format, strftime('%d-%m-%Y', d.tgl_tukar_faktur) AS tgl_tukar_format ${baseSql} ORDER BY d.waktu_input DESC`
+                ? `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_faktur) AS tanggal_format, strftime('%d-%m-%Y', d.tgl_tukar_faktur) AS tgl_tukar_format ${baseSql} ORDER BY CAST(SUBSTR(d.no_invoice_internal, 1, MAX(1, INSTR(d.no_invoice_internal, '/') - 1)) AS INTEGER) ASC, d.waktu_input DESC`
                 : `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_dokumen) AS tgl_dokumen_format ${baseSql} ORDER BY d.waktu_input DESC`;
 
             if (limit) {
@@ -331,9 +409,15 @@ modules.forEach(mod => {
         const page = parseInt(req.query.page) || 1;
         const limit = req.query.limit === 'all' ? null : (parseInt(req.query.limit) || 50);
         const search = (req.query.search || '').trim();
+        const entitas = req.query.entitas;
 
         let baseSql = `FROM inbox_${mod.id} WHERE 1=1`;
         let params = [];
+
+        if (entitas) {
+            baseSql += ` AND entitas = ?`;
+            params.push(entitas);
+        }
 
         if (search) {
             baseSql += ` AND (data_ekstraksi LIKE ? OR diinput_oleh LIKE ?)`;
@@ -464,6 +548,7 @@ app.get('/api/available-vatout', cekAuth, (req, res) => {
     const entitas = req.query.entitas || 'BBS';
     const clientName = req.query.client || '';
     const mode = req.query.mode || '';
+    const currentDoc = req.query.current_doc || '';
 
     const sql = `
         SELECT d.no_faktur, d.nama_pembeli, d.harga_jual, d.dpp, d.ppn, d.no_invoice_internal, 
@@ -480,10 +565,24 @@ app.get('/api/available-vatout', cekAuth, (req, res) => {
             ? `SELECT inv_no AS used_ref FROM data_client_ledger WHERE inv_no IS NOT NULL AND inv_no != '' AND inv_no != '-'`
             : `SELECT no_invoice_internal AS used_ref FROM data_prepaid WHERE no_invoice_internal IS NOT NULL AND no_invoice_internal != '' AND no_invoice_internal != '-'`;
 
-        db.all(usedSql, [], (err2, usedRows) => {
-            const usedInvoices = new Set((usedRows || []).map(r => r.used_ref).filter(Boolean));
+        let paramData = [];
+        if (mode !== 'ledger' && currentDoc) {
+             usedSql += ` AND no_bppu != ?`;
+             paramData.push(currentDoc);
+        }
 
-            const result = vatoutRows.map(row => ({
+        db.all(usedSql, paramData, (err2, usedRows) => {
+            const usedInvoices = new Set();
+            (usedRows || []).forEach(r => {
+                if(r.used_ref) {
+                    r.used_ref.split(',').forEach(item => usedInvoices.add(item.trim()));
+                }
+            });
+
+            const result = vatoutRows.filter(row => {
+               // Jangan tampilkan faktur yang sudah dipakai di list
+               return !(usedInvoices.has(row.no_faktur) || usedInvoices.has(row.no_invoice_internal));
+            }).map(row => ({
                 no_faktur: row.no_faktur,
                 nama_pembeli: row.nama_pembeli,
                 harga_jual: row.harga_jual,
@@ -491,7 +590,7 @@ app.get('/api/available-vatout', cekAuth, (req, res) => {
                 ppn: row.ppn,
                 tanggal_format: row.tanggal_format,
                 no_invoice_internal: row.no_invoice_internal,
-                sudah_dipakai: usedInvoices.has(row.no_faktur) || usedInvoices.has(row.no_invoice_internal)
+                sudah_dipakai: false
             }));
 
             if (clientName) {
@@ -587,6 +686,9 @@ io.on('connection', (socket) => {
     };
 
     socket.on('request-action-faktur', (d) => {
+        if (isDummy(socket)) {
+            return socket.emit('request-updated', { message: 'Mode Dummy: Permintaan disimulasi.' });
+        }
         const isSupervisor = ['supervisor', 'administrator'].includes(d.role.toLowerCase());
         const isBPPU = (d.mod === 'payable' || d.mod === 'prepaid');
         const pkColumn = isBPPU ? 'no_bppu' : 'no_faktur';
@@ -623,6 +725,9 @@ io.on('connection', (socket) => {
     });
 
     socket.on('upload-pdf-vatin-batch', async (payload) => {
+        if (isDummy(socket)) {
+            return socket.emit('upload-batch-selesai', { modul: 'VAT IN', total: payload.files.length, sukses: payload.files.length, duplikat: 0, gagal: 0 });
+        }
         const { entitas, username, files } = payload;
         let sukses = 0, duplikat = 0, gagal = 0;
 
@@ -689,6 +794,10 @@ io.on('connection', (socket) => {
     });
 
     socket.on('simpan-final-vatin', (d) => {
+        if (isDummy(socket)) {
+            socket.emit('simpan-final-sukses', { message: 'Mode Dummy: Verifikasi disimulasi.' });
+            return io.emit('update-tabel-vatin');
+        }
         let namaVendorSafe = sanitizeFilename(d.namaVendor);
         let namaFileFinal = `arsip_vatin/${d.branchInput}_${d.noFaktur}_${namaVendorSafe}.pdf`;
 
@@ -716,6 +825,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('hapus-inbox-vatin', (id) => {
+        if (isDummy(socket)) return io.emit('update-tabel-vatin');
         db.get(`SELECT link_pdf_lokal FROM inbox_vatin WHERE id = ?`, [id], (err, row) => {
             if (row) { try { fs.unlinkSync(path.join(__dirname, 'vat_in', row.link_pdf_lokal)); } catch (e) { } }
             db.run(`DELETE FROM inbox_vatin WHERE id = ?`, [id], () => io.emit('update-tabel-vatin'));
@@ -726,6 +836,9 @@ io.on('connection', (socket) => {
     // BATCH UPLOADER: VAT OUT
     // ==============================================================
     socket.on('upload-pdf-vatout-batch', async (payload) => {
+        if (isDummy(socket)) {
+            return socket.emit('upload-batch-selesai', { modul: 'VAT OUT', total: payload.files.length, sukses: payload.files.length, duplikat: 0, gagal: 0 });
+        }
         const { entitas, username, files } = payload;
         let sukses = 0, duplikat = 0, gagal = 0;
 
@@ -828,6 +941,9 @@ io.on('connection', (socket) => {
     // BATCH UPLOADER: TAX PAYABLE (BPPU)
     // ==============================================================
     socket.on('upload-pdf-payable-batch', async (payload) => {
+        if (isDummy(socket)) {
+            return socket.emit('upload-batch-selesai', { modul: 'Tax Payable', total: payload.files.length, sukses: payload.files.length, duplikat: 0, gagal: 0 });
+        }
         const { entitas, username, files } = payload;
         let sukses = 0, duplikat = 0, gagal = 0;
 
@@ -868,6 +984,10 @@ io.on('connection', (socket) => {
     });
 
     socket.on('simpan-final-payable', (d) => {
+        if (isDummy(socket)) {
+            socket.emit('simpan-final-sukses', { message: 'Mode Dummy: Verifikasi disimulasi.' });
+            return io.emit('update-tabel-payable');
+        }
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
             db.run(`INSERT INTO data_payable (no_bppu, masa_pajak, entitas, kode_cabang, nama_dipotong, dpp, nilai_pph, tarif, tanggal_dokumen, nomor_dokumen, no_invoice_internal, diinput_oleh, link_pdf_lokal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -892,6 +1012,9 @@ io.on('connection', (socket) => {
     // BATCH UPLOADER: PREPAID TAX (BPPU)
     // ==============================================================
     socket.on('upload-pdf-prepaid-batch', async (payload) => {
+        if (isDummy(socket)) {
+            return socket.emit('upload-batch-selesai', { modul: 'Prepaid Tax', total: payload.files.length, sukses: payload.files.length, duplikat: 0, gagal: 0 });
+        }
         const { entitas, username, files } = payload;
         let sukses = 0, duplikat = 0, gagal = 0;
 
@@ -932,6 +1055,10 @@ io.on('connection', (socket) => {
     });
 
     socket.on('simpan-final-prepaid', (d) => {
+        if (isDummy(socket)) {
+            socket.emit('simpan-final-sukses', { message: 'Mode Dummy: Verifikasi disimulasi.' });
+            return io.emit('update-tabel-prepaid');
+        }
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
             db.run(`INSERT INTO data_prepaid (no_bppu, masa_pajak, entitas, kode_cabang, nama_pemotong, dpp, nilai_pph, tarif, tanggal_dokumen, nomor_dokumen, no_invoice_internal, diinput_oleh, link_pdf_lokal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -956,6 +1083,7 @@ io.on('connection', (socket) => {
     // LOGIKA PENYIMPANAN CLIENT LEDGER
     // ==============================================================
     socket.on('simpan-jurnal-ledger', (d) => {
+        if (isDummy(socket)) return io.emit('data-baru-ledger');
         db.run(`INSERT INTO data_client_ledger (
             entitas, nama_client, inv_no, contract_income, discount, advance, retention,
             net_certificate, vat, gross_certificate, gross_paym_received, contract_debtor,
@@ -974,6 +1102,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('update-jurnal-ledger', (d) => {
+        if (isDummy(socket)) return io.emit('data-baru-ledger');
         db.run(`UPDATE data_client_ledger SET 
             contract_income = ?, gross_paym_received = ?, contract_debtor = ?, gross_paym_rcpt = ?,
             withholding_tax = ?, bank_charge = ?, net_receipt = ?, remarks = ?, ref_bppu = ?
@@ -991,27 +1120,174 @@ io.on('connection', (socket) => {
     // SECURITY: Validasi role di backend untuk operasi sensitif (BUG-07)
     const isAdministrator = (socket) => ['administrator', 'superadmin'].includes((socket.user && socket.user.role || '').toLowerCase());
     const isSupervisorOrAbove = (socket) => ['supervisor', 'administrator', 'superadmin'].includes((socket.user && socket.user.role || '').toLowerCase());
+    const isDummy = (socket) => (socket.user && socket.user.role || '').toLowerCase() === 'dummy';
+
+    // ==============================================================
+    // CRUD MASTER CABANG (Khusus Administrator)
+    // ==============================================================
+    socket.on('tambah-cabang', (d) => {
+        if (isDummy(socket)) return io.emit('data-baru-cabang');
+        if (!isAdministrator(socket)) {
+            return socket.emit('error-cabang', 'Akses ditolak: Hanya Administrator yang dapat menambah data cabang.');
+        }
+        const { kode_cabang, nama_cabang, entitas, user } = d;
+        if (!kode_cabang || !nama_cabang || !entitas) {
+            return socket.emit('error-cabang', 'Kode, Nama, dan Entitas wajib diisi.');
+        }
+        db.run(
+            `INSERT INTO master_cabang (kode_cabang, nama_cabang, entitas) VALUES (?, ?, ?)`,
+            [kode_cabang.trim().toUpperCase(), nama_cabang.trim(), entitas],
+            function(err) {
+                if (err) {
+                    return socket.emit('error-cabang', err.code === 'SQLITE_CONSTRAINT' ? `Kode cabang '${kode_cabang}' sudah terdaftar!` : err.message);
+                }
+                insertAuditLog(socket.user.id, user, 'TAMBAH', 'MASTER CABANG', `Menambahkan cabang baru: ${kode_cabang} - ${nama_cabang}`);
+                io.emit('data-baru-cabang');
+            }
+        );
+    });
+
+    socket.on('edit-cabang', (d) => {
+        if (isDummy(socket)) return io.emit('data-baru-cabang');
+        if (!isAdministrator(socket)) {
+            return socket.emit('error-cabang', 'Akses ditolak: Hanya Administrator yang dapat mengedit data cabang.');
+        }
+        const { kode_cabang, nama_cabang, entitas, user } = d;
+        if (!kode_cabang || !nama_cabang || !entitas) {
+            return socket.emit('error-cabang', 'Kode, Nama, dan Entitas wajib diisi.');
+        }
+        db.run(
+            `UPDATE master_cabang SET nama_cabang = ?, entitas = ? WHERE kode_cabang = ?`,
+            [nama_cabang.trim(), entitas, kode_cabang],
+            function(err) {
+                if (err) return socket.emit('error-cabang', err.message);
+                if (this.changes === 0) return socket.emit('error-cabang', `Cabang '${kode_cabang}' tidak ditemukan.`);
+                insertAuditLog(socket.user.id, user, 'EDIT', 'MASTER CABANG', `Mengubah cabang ${kode_cabang} menjadi ${nama_cabang} (${entitas})`);
+                io.emit('data-baru-cabang');
+            }
+        );
+    });
+
+    socket.on('hapus-cabang', (d) => {
+        if (isDummy(socket)) return io.emit('data-baru-cabang');
+        if (!isAdministrator(socket)) {
+            return socket.emit('error-cabang', 'Akses ditolak: Hanya Administrator yang dapat menghapus data cabang.');
+        }
+        const { kode_cabang, user } = d;
+        if (!kode_cabang || kode_cabang === 'PUSAT') {
+            return socket.emit('error-cabang', 'Data cabang \'PUSAT\' tidak dapat dihapus (protected).');
+        }
+        db.run(`DELETE FROM master_cabang WHERE kode_cabang = ?`, [kode_cabang], function(err) {
+            if (err) return socket.emit('error-cabang', err.message);
+            if (this.changes === 0) return socket.emit('error-cabang', `Cabang '${kode_cabang}' tidak ditemukan.`);
+            insertAuditLog(socket.user.id, user, 'HAPUS', 'MASTER CABANG', `Menghapus cabang ${kode_cabang}`);
+            io.emit('data-baru-cabang');
+        });
+    });
+
+    // ==============================================================
+    // CRUD MASTER KONTAK (CLIENT/VENDOR)
+    // ==============================================================
+    socket.on('tambah-kontak', (d) => {
+        if (isDummy(socket)) return io.emit('data-baru-kontak');
+        if (!isAdministrator(socket)) return socket.emit('error-kontak', 'Akses ditolak.');
+        const t = d.tipe === 'vendor' ? 'master_vendor' : 'master_client';
+        db.run(`INSERT INTO ${t} (npwp, nama, alamat) VALUES (?, ?, ?)`, [d.npwp, d.nama, d.alamat], function(err) {
+            if (err) return socket.emit('error-kontak', err.message);
+            insertAuditLog(socket.user.id, d.user, 'TAMBAH', `MASTER ${d.tipe.toUpperCase()}`, `Menambah ${d.tipe}: ${d.nama} (${d.npwp})`);
+            io.emit('data-baru-kontak');
+        });
+    });
+
+    socket.on('edit-kontak', (d) => {
+        if (isDummy(socket)) return io.emit('data-baru-kontak');
+        if (!isAdministrator(socket)) return socket.emit('error-kontak', 'Akses ditolak.');
+        const t = d.tipe === 'vendor' ? 'master_vendor' : 'master_client';
+        // NPWP sebagai primary key tidak diubah, kita ubah nama dan alamat
+        db.run(`UPDATE ${t} SET nama = ?, alamat = ? WHERE npwp = ?`, [d.nama, d.alamat, d.npwp], function(err) {
+            if (err) return socket.emit('error-kontak', err.message);
+            insertAuditLog(socket.user.id, d.user, 'EDIT', `MASTER ${d.tipe.toUpperCase()}`, `Mengubah detail ${d.tipe}: ${d.npwp}`);
+            io.emit('data-baru-kontak');
+        });
+    });
+
+    socket.on('hapus-kontak', (d) => {
+        if (isDummy(socket)) return io.emit('data-baru-kontak');
+        if (!isAdministrator(socket)) return socket.emit('error-kontak', 'Akses ditolak.');
+        const t = d.tipe === 'vendor' ? 'master_vendor' : 'master_client';
+        db.run(`DELETE FROM ${t} WHERE npwp = ?`, [d.npwp], function(err) {
+            if (err) return socket.emit('error-kontak', err.message);
+            insertAuditLog(socket.user.id, d.user, 'HAPUS', `MASTER ${d.tipe.toUpperCase()}`, `Menghapus ${d.tipe} ber-NPWP: ${d.npwp}`);
+            io.emit('data-baru-kontak');
+        });
+    });
 
     socket.on('tambah-user', (d) => {
+        if (isDummy(socket)) return io.emit('users-updated');
         // SECURITY: Hanya administrator yang boleh tambah user
         if (!isAdministrator(socket)) {
             return socket.emit('error-action', { message: 'Akses ditolak: Hanya Administrator yang dapat menambah pengguna.' });
         }
-        db.run(`INSERT INTO users (username, password, nama_lengkap, role) VALUES (?, ?, ?, ?)`, [d.username, bcrypt.hashSync(d.password, 12), d.nama, d.role], () => io.emit('users-updated'));
+        db.run(`INSERT INTO users (username, password, nama_lengkap, role) VALUES (?, ?, ?, ?)`, [d.username, bcrypt.hashSync(d.password, 12), d.nama, d.role], () => {
+            insertAuditLog(socket.user.id, socket.user.username, 'TAMBAH', 'USER MANAGEMENT', `Menambahkan user baru: ${d.username} (${d.role})`);
+            io.emit('users-updated');
+        });
     });
     socket.on('reset-password-user', (d) => {
-        // SECURITY: Hanya administrator yang boleh reset password
-        if (!isAdministrator(socket)) {
-            return socket.emit('error-action', { message: 'Akses ditolak: Hanya Administrator yang dapat mereset password.' });
+        if (isDummy(socket)) return io.emit('users-updated');
+        const isSelf = (d.user_id === socket.user.id);
+        const canSelfChange = isSupervisorOrAbove(socket) && isSelf;
+        const canResetOther = isAdministrator(socket) && !isSelf;
+
+        if (!canSelfChange && !canResetOther) {
+            return socket.emit('error-action', { message: 'Akses ditolak: Hanya Administrator yang dapat mereset password orang lain.' });
         }
-        db.run(`UPDATE users SET password = ? WHERE id = ?`, [bcrypt.hashSync(d.new_password, 12), d.user_id], () => io.emit('users-updated'));
+        if (!d.new_password || d.new_password.length < 6) {
+            return socket.emit('error-action', { message: 'Password baru minimal 6 karakter.' });
+        }
+        db.run(`UPDATE users SET password = ? WHERE id = ?`, [bcrypt.hashSync(d.new_password, 12), d.user_id], () => {
+            const logDetail = isSelf
+                ? `${socket.user.role} '${socket.user.username}' mereset password sendiri`
+                : `Administrator mereset password untuk user ID: ${d.user_id}`;
+            insertAuditLog(socket.user.id, socket.user.username, 'EDIT', 'USER MANAGEMENT', logDetail);
+            io.emit('users-updated');
+        });
     });
+
+    // UPDATE NAMA SENDIRI: Supervisor & Administrator bisa langsung ubah nama sendiri (tanpa approval)
+    socket.on('admin-update-nama', (d) => {
+        if (isDummy(socket)) return io.emit('users-updated');
+        // Hanya boleh mengubah nama diri sendiri
+        if (!isSupervisorOrAbove(socket) || d.user_id !== socket.user.id) {
+            return socket.emit('error-action', { message: 'Akses ditolak: Anda hanya dapat mengubah nama Anda sendiri.' });
+        }
+        if (!d.nilai_baru || d.nilai_baru.trim() === '') {
+            return socket.emit('error-action', { message: 'Nama baru tidak boleh kosong.' });
+        }
+        db.run(`UPDATE users SET nama_lengkap = ? WHERE id = ?`, [d.nilai_baru.trim(), d.user_id], () => {
+            insertAuditLog(socket.user.id, socket.user.username, 'EDIT', 'USER MANAGEMENT',
+                `${socket.user.role} '${socket.user.username}' mengubah nama sendiri menjadi: ${d.nilai_baru.trim()}`);
+            io.emit('users-updated');
+        });
+    });
+
     socket.on('ajukan-perubahan', (d) => {
+        if (isDummy(socket)) return socket.emit('request-updated', { message: 'Mode Dummy: Pengajuan disimulasi.' });
+        // SECURITY: Supervisor & Administrator tidak perlu lewat antrian approval - langsung bisa ubah
+        // Event ini hanya untuk role user/input biasa
+        if (isSupervisorOrAbove(socket)) {
+            return socket.emit('error-action', { message: 'Supervisor/Administrator tidak perlu mengajukan perubahan - gunakan tombol Simpan Perubahan.' });
+        }
         let val = d.jenis === 'PASSWORD' ? bcrypt.hashSync(d.nilai_baru, 12) : d.nilai_baru;
         db.run(`INSERT INTO user_requests (user_id, username, jenis_request, nilai_baru) VALUES (?, ?, ?, ?)`, [d.id_user, d.username, d.jenis, val], () => io.emit('request-updated'));
     });
 
     socket.on('proses-request', (d) => {
+        if (isDummy(socket)) return io.emit('request-updated');
+        // SECURITY: Hanya supervisor/administrator yang dapat memproses request approval
+        if (!isSupervisorOrAbove(socket)) {
+            return socket.emit('error-action', { message: 'Akses ditolak: Hanya Supervisor atau Administrator yang dapat memproses permintaan.' });
+        }
         db.get(`SELECT * FROM user_requests WHERE id = ?`, [d.req_id], (err, req) => {
             if (!req) return;
 

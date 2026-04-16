@@ -173,7 +173,7 @@
                 if(isAdmin) {
                     btnAksi = `
                         <div style="display:flex; justify-content:center; gap:5px;">
-                            <button class="btn-tbl btn-tbl-edit" onclick="siapkanEdit('${d.kode_cabang}', '${d.nama_cabang.replace(/'/g, "\\'")}', '${d.entitas}')">Edit Nama</button>
+                            <button class="btn-tbl btn-tbl-edit" onclick="siapkanEdit('${d.kode_cabang}', '${(d.nama_cabang || '').replace(/'/g, "\\'")}', '${d.entitas}')">Edit Nama</button>
                             ${d.kode_cabang !== 'PUSAT' ? `<button class="btn-hapus" onclick="hapusCabang('${d.kode_cabang}')">Hapus</button>` : `<span style="font-size:0.8rem; color:#64748b; padding:5px;">Protected</span>`}
                         </div>
                     `;

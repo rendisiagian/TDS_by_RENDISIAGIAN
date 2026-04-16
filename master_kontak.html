@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master Data Kontak (Client & Vendor)</title>
+    <script src="/theme.js"></script>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .btn-tambah { background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-tambah:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.4); }
+        .btn-hapus { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: 0.2s; }
+        .btn-hapus:hover { background: #ef4444; color: white; }
+        
+        .tab-container { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 10px; }
+        .tab-btn { background: none; border: none; font-size: 1.1rem; font-weight: bold; color: var(--text-secondary); cursor: pointer; padding: 8px 16px; border-radius: 6px; }
+        .tab-btn.active { color: var(--primary-700); background: var(--primary-50); box-shadow: inset 0 -2px 0 var(--primary-600); }
+        .tab-btn:hover:not(.active) { background: var(--bg-secondary); }
+    </style>
+</head>
+<body>
+    <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
+
+    <div class="app-wrapper">
+        <div id="sidebar-container"></div>
+
+        <main class="main-content">
+            <header class="header">
+                <h2>Master Data Kontak 📇</h2>
+                <div class="user-profile">
+                    <span id="user-name-display"></span>
+                    <a href="/logout" class="btn-logout">Logout</a>
+                </div>
+            </header>
+
+            <div class="container">
+                <div id="restricted-notice" class="d-none" style="padding: 20px; background: var(--danger-50); color: var(--danger-700); border: 1px solid var(--danger-300); border-radius: 8px; margin-bottom: 20px; font-weight: bold;">
+                    ⚠️ Anda tidak memiliki hak akses (Administrator) untuk mengatur Kontak. Anda hanya dapat melihat data.
+                </div>
+                
+                <div class="tab-container">
+                    <button class="tab-btn active" id="tab-client" onclick="switchTab('client')">👥 Master Client (Pembeli)</button>
+                    <button class="tab-btn" id="tab-vendor" onclick="switchTab('vendor')">🏭 Master Vendor (Penjual)</button>
+                </div>
+
+                <div class="flex-container-gap">
+                    <div class="card flex-1-p20" id="admin-form-section" style="display: none;">
+                        <h3 class="title-primary" id="form-title">➕ Tambah Client Baru</h3>
+                        <input type="hidden" id="f_mode" value="add">
+                        
+                        <div class="form-group">
+                            <label>NPWP / KTP <span style="color:var(--danger-600);">*</span></label>
+                            <input type="text" id="f_npwp" placeholder="Cth: 01.234.567.8-901.000" autocomplete="off">
+                            <small style="color:var(--text-secondary); display:block; margin-top:5px;">(Tidak dapat diedit setelah disimpan)</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Nama Perusahaan / Kontak <span style="color:var(--danger-600);">*</span></label>
+                            <input type="text" id="f_nama" placeholder="Cth: PT Makmur Sentosa" autocomplete="off">
+                        </div>
+                        <div class="form-group">
+                            <label>Alamat Lengkap</label>
+                            <textarea id="f_alamat" class="form-textarea" rows="3" placeholder="Alamat.."></textarea>
+                        </div>
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn-simpan btn-manage" style="flex:2;" onclick="simpanKontak()">💾 Simpan Data</button>
+                            <button class="btn-simpan btn-cancel d-none" id="btn-batal-edit" style="flex:1;" onclick="batalEdit()">Batal</button>
+                        </div>
+                    </div>
+
+                    <div class="card flex-2">
+                        <div class="card-header-padding page-header" style="padding-top:0;">
+                            <h3 class="title-success" style="margin:0;" id="table-title">Daftar Client</h3>
+                            <input type="text" id="search_kontak" placeholder="🔍 Cari nama/npwp..." class="filter-input" style="width:200px; padding: 6px 10px;" onkeyup="renderTable()">
+                        </div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>NPWP</th>
+                                        <th>Nama Kontak</th>
+                                        <th>Alamat</th>
+                                        <th class="text-center" style="width:130px;">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabel-kontak">
+                                    <tr><td colspan="4" class="text-center" style="padding: 20px; color:var(--text-tertiary);">⏳ Memuat data...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentUser = {};
+        let masterClients = [];
+        let masterVendors = [];
+        let currentTab = 'client';
+
+        // Sinkronisasi Sidebar
+        let aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
+        fetch('/sidebar.html')
+            .then(res => res.text())
+            .then(html => {
+                document.getElementById('sidebar-container').innerHTML = html;
+                const currentPath = window.location.pathname;
+                document.querySelectorAll('.sidebar-link').forEach(link => {
+                    if (link.getAttribute('href') === currentPath) link.classList.add('active');
+                });
+                const sidebarSelect = document.getElementById('global-entity-select');
+                if (sidebarSelect) sidebarSelect.value = aktifEntitas;
+            });
+
+        window.gantiEntitas = function(entitas) {
+            localStorage.setItem('lastEntitas', entitas);
+            const sidebarSelect = document.getElementById('global-entity-select');
+            if (sidebarSelect) sidebarSelect.value = entitas;
+        };
+
+        function isSuperAdmin(role) {
+            if (!role) return false;
+            return ['administrator', 'superadmin', 'super admin'].includes(role.toLowerCase());
+        }
+
+        function switchTab(tabStr) {
+            currentTab = tabStr;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-' + tabStr).classList.add('active');
+            
+            document.getElementById('table-title').innerText = tabStr === 'client' ? 'Daftar Client' : 'Daftar Vendor';
+            let titleAdd = tabStr === 'client' ? 'Client' : 'Vendor';
+            
+            if(document.getElementById('f_mode').value === 'add') {
+                document.getElementById('form-title').innerText = `➕ Tambah ${titleAdd} Baru`;
+            }
+            batalEdit();
+            renderTable();
+        }
+
+        async function initPage() {
+            try {
+                const res = await fetch('/api/me');
+                currentUser = await res.json();
+                document.getElementById('user-name-display').innerText = currentUser.nama || currentUser.username;
+
+                if (isSuperAdmin(currentUser.role)) {
+                    document.getElementById('admin-form-section').style.display = 'block';
+                } else {
+                    document.getElementById('restricted-notice').classList.remove('d-none');
+                }
+                
+                loadDataKontak();
+            } catch(e) {
+                console.error("Gagal inisiasi", e);
+            }
+        }
+
+        async function loadDataKontak() {
+            try {
+                const res = await fetch('/api/master-kontak-all'); 
+                const data = await res.json();
+                masterClients = data.clients;
+                masterVendors = data.vendors;
+                renderTable();
+            } catch(e) {
+                console.error("Gagal menarik data kontak", e);
+            }
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('tabel-kontak');
+            const q = document.getElementById('search_kontak').value.toLowerCase();
+            tbody.innerHTML = '';
+            
+            const activeData = currentTab === 'client' ? masterClients : masterVendors;
+            const filtered = activeData.filter(d => 
+                (d.npwp && d.npwp.toLowerCase().includes(q)) || 
+                (d.nama && d.nama.toLowerCase().includes(q))
+            );
+
+            if(filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="padding:20px; color:var(--text-tertiary);">Data kosong / tidak ditemukan.</td></tr>';
+                return;
+            }
+
+            const isAdmin = isSuperAdmin(currentUser.role);
+
+            filtered.forEach(d => {
+                const tr = document.createElement('tr');
+                
+                let btnAksi = '-';
+                if(isAdmin) {
+                    btnAksi = `
+                        <div style="display:flex; justify-content:center; gap:5px; flex-wrap:wrap;">
+                            <button class="btn-tbl btn-tbl-edit" onclick="siapkanEdit('${d.npwp}', '${(d.nama || '').replace(/'/g, "\\'")}', '${(d.alamat || '').replace(/'/g, "\\'")}')">Edit</button>
+                            ${d.npwp !== '00.000.000.0-000.000' && d.npwp !== '-' ? `<button class="btn-hapus" onclick="hapusKontak('${d.npwp}')">Hps</button>` : ``}
+                        </div>
+                    `;
+                }
+
+                tr.innerHTML = `
+                    <td class="text-bold" style="font-family:monospace; color:var(--primary-700);">${d.npwp}</td>
+                    <td>${d.nama || '-'}</td>
+                    <td><div style="max-height:60px; overflow-y:auto; font-size:0.85rem; padding-right:5px;">${d.alamat || '-'}</div></td>
+                    <td class="text-center">${btnAksi}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function siapkanEdit(npwp, nama, alamat) {
+            let n = currentTab === 'client' ? 'Client' : 'Vendor';
+            document.getElementById('form-title').innerText = `📝 Edit ${n}`;
+            document.getElementById('f_mode').value = 'edit';
+            
+            document.getElementById('f_npwp').value = npwp;
+            document.getElementById('f_npwp').setAttribute('readonly', 'true');
+            document.getElementById('f_npwp').style.background = '#f1f5f9';
+            
+            document.getElementById('f_nama').value = nama;
+            document.getElementById('f_alamat').value = alamat;
+            
+            document.getElementById('btn-batal-edit').classList.remove('d-none');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function batalEdit() {
+            let n = currentTab === 'client' ? 'Client' : 'Vendor';
+            document.getElementById('form-title').innerText = `➕ Tambah ${n} Baru`;
+            document.getElementById('f_mode').value = 'add';
+            
+            document.getElementById('f_npwp').value = '';
+            document.getElementById('f_npwp').removeAttribute('readonly');
+            document.getElementById('f_npwp').style.background = '#fff';
+            
+            document.getElementById('f_nama').value = '';
+            document.getElementById('f_alamat').value = '';
+            
+            document.getElementById('btn-batal-edit').classList.add('d-none');
+        }
+
+        function simpanKontak() {
+            if(!isSuperAdmin(currentUser.role)) return alert("Akses Ditolak.");
+            
+            const mode = document.getElementById('f_mode').value;
+            const npwp = document.getElementById('f_npwp').value.trim();
+            const nama = document.getElementById('f_nama').value.trim();
+            const alamat = document.getElementById('f_alamat').value.trim();
+
+            if(!npwp || !nama) return alert("NPWP & Nama Kontak wajib diisi!");
+
+            if(mode === 'add') {
+                const activeData = currentTab === 'client' ? masterClients : masterVendors;
+                if(activeData.find(d => d.npwp.toLowerCase() === npwp.toLowerCase())) {
+                    return alert("NPWP ini sudah terdaftar! Edit jika ada perubahan nama.");
+                }
+                socket.emit('tambah-kontak', { tipe: currentTab, npwp, nama, alamat, user: currentUser.username });
+            } else {
+                socket.emit('edit-kontak', { tipe: currentTab, npwp, nama, alamat, user: currentUser.username });
+            }
+            
+            batalEdit();
+        }
+
+        function hapusKontak(npwp) {
+            if(!isSuperAdmin(currentUser.role)) return alert("Akses Ditolak.");
+            if(confirm(`Apakah Anda yakin ingin menghapus data kontak dengan NPWP '${npwp}'? \nHati-hati: Ini tidak akan menghapus data jurnalnya, namun referensi nama/alamatnya mungkin akan hilang.`)) {
+                socket.emit('hapus-kontak', { tipe: currentTab, npwp: npwp, user: currentUser.username });
+            }
+        }
+
+        socket.on('data-baru-kontak', () => loadDataKontak());
+        
+        socket.on('error-kontak', (msg) => {
+            alert("GAGAL: " + msg);
+        });
+
+        initPage();
+    </script>
+</body>
+</html>

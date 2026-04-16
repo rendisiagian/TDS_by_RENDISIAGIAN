@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bank Data Prepaid Tax | Tax Upload and Database</title>
+    <title>Inbox Prepaid | Tax Database</title>
     <script src="/theme.js"></script>
     <script src="/pagination.js"></script>
     <link rel="stylesheet" href="/style.css">
@@ -35,16 +35,18 @@
                         </div>
                     </div>
                     
+                    <input type="file" id="filePdfUpload" multiple accept=".pdf" style="display:none;">
+
                     <div class="table-responsive">
                         <table id="tabel-inbox-induk">
                             <thead>
                                 <tr>
-                                    <th class="text-center" style="width: 40px;">No.</th>
+                                    <th class="text-center" style="width:50px;">No.</th>
                                     <th class="text-center">No. BPPU</th>
-                                    <th>Nama Client (Pemotong)</th>
+                                    <th class="text-center">Nama Client (Pemotong)</th>
                                     <th class="text-center">Masa Pajak</th>
-                                    <th class="text-right">DPP (Rp)</th>
-                                    <th class="text-right">PPh (Rp)</th>
+                                    <th class="text-center">DPP</th>
+                                    <th class="text-center">Nilai PPh</th>
                                     <th class="text-center">Status Arsip</th>
                                     <th class="text-center">Aksi</th>
                                 </tr>
@@ -62,12 +64,14 @@
                             <tbody id="tabel-inbox"></tbody>
                         </table>
                     </div>
+                    
                     <div id="pg-container"></div>
                 </div>
             </div>
         </main>
     </div>
 
+    <!-- MODAL REVIEW & LENGKAPI -->
     <div id="modalReviewPDF" class="modal-overlay">
         <div class="modal-box modal-box-scroll" style="max-width: 800px;">
             <h3 style="color:#4f46e5; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">📋 Informasi Bukti Potong (Prepaid)</h3>
@@ -92,7 +96,14 @@
             <div style="border-top: 2px dashed #cbd5e1; margin: 20px 0;"></div>
             <h4 style="color:#1e293b; font-size:0.95rem; margin-bottom: 10px;">C. Lengkapi Relasi Internal</h4>
             
-            <div class="form-group"><label>Branch / Cabang Internal</label><select id="input_branch_baru" class="form-select"></select></div>
+            <div class="form-group">
+                <label style="display:flex; align-items:center; gap:8px;">
+                    Branch / Cabang Internal
+                    <span id="badge-branch-status" style="display:none; font-size:0.72rem; font-weight:600; padding:2px 8px; border-radius:20px; background:#dcfce7; color:#15803d; border:1px solid #bbf7d0;">✔ Terdeteksi Otomatis</span>
+                    <span id="badge-branch-notfound" style="display:none; font-size:0.72rem; font-weight:600; padding:2px 8px; border-radius:20px; background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;">⚠ Kode tidak ditemukan</span>
+                </label>
+                <select id="input_branch_baru" class="form-select"></select>
+            </div>
             
             <div class="form-group">
                 <label>Nomor Faktur Keluaran (VAT OUT) Terkait</label>
@@ -104,7 +115,7 @@
                 <div id="selected-invoice-display" style="display:none; margin-top:0.5rem; padding:0.5rem 0.75rem; background:var(--success-50); border:1px solid var(--success-500); border-radius:6px; font-size:0.85rem; font-weight:600; color:var(--success-700);"></div>
                 <span class="invoice-manual-toggle" id="btn-manual-toggle" onclick="toggleManualInput()">&#9998; Input manual (jika tidak ada di daftar)</span>
                 <div id="manual-input-area" style="display:none; margin-top:0.5rem;">
-                    <textarea id="input_invoice_manual" rows="2" placeholder="Ketik nomor faktur/invoice manual..." style="width:100%; padding:0.75rem; border:1px solid var(--border-color); border-radius:6px; font-family:inherit; resize:vertical; background:var(--bg-primary); color:var(--text-primary);"></textarea>
+                    <textarea id="input_invoice_manual" rows="2" placeholder="Ketik nomor faktur/invoice manual..." style="width:100%; padding:0.75rem; border:1px solid var(--border-color); border-radius:6px; font-family:inherit; resize:vertical; background:var(--bg-primary); color:var(--text-primary)"></textarea>
                 </div>
                 <span style="font-size:0.75rem; color:var(--text-tertiary); display:block; margin-top:0.375rem;">*Pilih dari daftar VAT OUT atau input manual.</span>
             </div>
@@ -116,15 +127,12 @@
         </div>
     </div>
 
-    <input type="file" id="filePdfUpload" accept="application/pdf" multiple class="d-none">
-
     <script>
         const socket = io();
         let currentUserName = "Admin", aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS', tempDataFinal = {}; 
         let dataInboxLokal = [];
+        let loadedBranches = [];
         let arraySelectedInvoice = [];
-
-        let uploadStats = { isActive: false, totalFiles: 0, chunksTotal: 0, chunksDone: 0, sukses: 0, duplikat: 0, gagal: 0 };
 
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
@@ -133,7 +141,6 @@
             const sidebarSelect = document.getElementById('global-entity-select');
             if (sidebarSelect) sidebarSelect.value = aktifEntitas;
         });
-
         fetch('/api/me').then(res => res.json()).then(user => { if(user.nama) currentUserName = user.nama; });
 
         // Fungsi Sinkronisasi Entitas
@@ -148,33 +155,32 @@
         initPagination('pg-container', function(page, limit) { loadInbox(page, limit); }, 50);
 
         async function loadInbox(page, limit) {
-            page = page || 1;
-            limit = limit || 50;
-            const res = await fetch('/api/inbox-prepaid?page=' + page + '&limit=' + limit);
+            page = page || 1; limit = limit || 50;
+            const res = await fetch(`/api/inbox-prepaid?entitas=${aktifEntitas}&page=${page}&limit=${limit}`);
             const result = await res.json();
-            const data = result.data || result;
-            const total = result.total || data.length;
+            const data = result.data || [];
             dataInboxLokal = data;
-
+            
             const tbody = document.getElementById('tabel-inbox');
             tbody.innerHTML = '';
             const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
 
-            // Logika Penyaringan Data berdasarkan Entitas Aktif
-            const filteredData = data.filter(row => row.entitas === aktifEntitas);
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="padding:20px;">Belum ada dokumen dalam antrean.</td></tr>';
+            }
 
-            filteredData.forEach((row, index) => {
+            data.forEach((row, index) => {
                 const tr = document.createElement('tr');
                 let parsed = {};
                 try { parsed = JSON.parse(row.data_ekstraksi); } catch(e) {}
 
                 tr.innerHTML = `
                     <td class="text-center">${index + 1}</td>
-                    <td class="text-center font-bold" style="color:#4f46e5;">${parsed.noBppu || '-'}</td>
-                    <td>${parsed.namaPemotong || '-'}</td>
+                    <td class="text-center" style="font-weight:bold; color:#4f46e5;">${parsed.noBppu || '-'}</td>
+                    <td class="text-bold">${parsed.namaPemotong || '-'}</td>
                     <td class="text-center">${parsed.masaPajak || '-'}</td>
                     <td class="text-right">${formatRupiah(parsed.dpp || 0)}</td>
-                    <td class="text-right font-bold">${formatRupiah(parsed.pph || 0)}</td>
+                    <td class="text-right" style="font-weight:bold; color:#1e40af;">${formatRupiah(parsed.pph || 0)}</td>
                     <td class="text-center"><span style="color:green;">✔ Tersimpan Lokal</span></td>
                     <td class="text-center">
                         <button class="btn-aksi btn-verify" style="background-color: #4f46e5;" onclick="bukaJalurManual('${row.id}')">📝 Lengkapi</button>
@@ -183,9 +189,7 @@
                 `;
                 tbody.appendChild(tr);
             });
-
-            jalankanFilterInbox();
-            renderPagination("pg-container", total, page, limit === "all" ? total : limit);
+            renderPagination('pg-container', result.total || 0, page, limit);
         }
 
         function hapusInbox(id) {
@@ -198,7 +202,6 @@
             if (res.modul === 'Prepaid Tax' && uploadStats.isActive) {
                 uploadStats.sukses += res.sukses;
                 uploadStats.duplikat += res.duplikat;
-                uploadStats.gagal += res.gagal;
                 uploadStats.chunksDone++;
 
                 if (uploadStats.chunksDone === uploadStats.chunksTotal) {
@@ -212,16 +215,14 @@
             const files = e.target.files;
             if (files.length === 0) return;
 
-            alert(`Memproses ekstraksi ${files.length} file PDF Bukti Potong.\n\nSistem membaginya ke dalam beberapa tahap. Mohon tunggu Notifikasi Selesai!`);
-
             const chunkSize = 5; 
             uploadStats = { isActive: true, totalFiles: files.length, chunksTotal: Math.ceil(files.length / chunkSize), chunksDone: 0, sukses: 0, duplikat: 0, gagal: 0 };
 
             for (let i = 0; i < files.length; i += chunkSize) {
-                let payloadFiles = [];
-                let chunk = Array.from(files).slice(i, i + chunkSize);
+                const chunk = Array.from(files).slice(i, i + chunkSize);
+                const payloadFiles = [];
 
-                for (let file of chunk) {
+                for (const file of chunk) {
                     try {
                         const arrayBuffer = await file.arrayBuffer();
                         const loadingTask = pdfjsLib.getDocument(new Uint8Array(arrayBuffer));
@@ -240,26 +241,27 @@
                         payloadFiles.push({ teksPDF: "ERROR", fileBuffer: await file.arrayBuffer() });
                     }
                 }
-
                 socket.emit('upload-pdf-prepaid-batch', { entitas: aktifEntitas, username: currentUserName, files: payloadFiles });
             }
             this.value = ''; 
         });
 
         async function bukaJalurManual(idStr) {
-            const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
             const rowData = dataInboxLokal.find(r => r.id == idStr);
             if(!rowData) return alert("Data tidak ditemukan!");
 
             let parsed = JSON.parse(rowData.data_ekstraksi);
             tempDataFinal = parsed;
-            tempDataFinal.id_link = idStr;
+            tempDataFinal.id_link = rowData.id; // Harus id_link agar dibaca app.js
+            tempDataFinal.file_name = rowData.file_name;
+            tempDataFinal.link_pdf_lokal = rowData.link_pdf_lokal; // Ambil dari kolom link_pdf_lokal
+            tempDataFinal.entitas = rowData.entitas;
             tempDataFinal.username = currentUserName;
             
             document.getElementById('rev_bppu').value = parsed.noBppu || '-';
             document.getElementById('rev_masa').value = parsed.masaPajak || '-';
             document.getElementById('rev_client').value = parsed.namaPemotong || '-';
-            document.getElementById('rev_npwp').value = parsed.npwpLawan || '-';
+            document.getElementById('rev_npwp').value = parsed.npwpPemotong || '-';
             document.getElementById('rev_tanggal').value = parsed.tanggalDokumen || '-';
             document.getElementById('rev_kode').value = parsed.kodePajak || '-';
             
@@ -267,8 +269,10 @@
             document.getElementById('rev_tarif').value = parsed.tarif ? parsed.tarif + '%' : '0%';
             document.getElementById('rev_pph').value = formatRupiah(parsed.pph || 0);
 
-            const res = await fetch('/api/branches?entitas=' + rowData.entitas);
-            const branches = await res.json();
+            // Fetch Branches
+            const brRes = await fetch('/api/branches?entitas=' + rowData.entitas);
+            const branches = await brRes.json();
+            loadedBranches = branches; // Simpan untuk auto-detect
             const select = document.getElementById('input_branch_baru');
 
             if (rowData.entitas === 'JO') {
@@ -276,15 +280,20 @@
                 select.disabled = true; select.style.backgroundColor = '#f1f5f9'; 
             } else {
                 select.disabled = false; select.style.backgroundColor = '#fff';
-                select.innerHTML = '<option value="">-- Pilih Branch --</option>';
-                branches.forEach(b => select.innerHTML += `<option value="${b.kode_cabang}">${b.kode_cabang} - ${b.nama_cabang}</option>`);
+                select.innerHTML = '<option value="">-- Akan terisi otomatis --</option>';
+                branches.forEach(b => { select.innerHTML += `<option value="${b.kode_cabang}">${b.kode_cabang} - ${b.nama_cabang}</option>`; });
             }
+
+            // Reset indikator status branch
+            document.getElementById('badge-branch-status').style.display = 'none';
+            document.getElementById('badge-branch-notfound').style.display = 'none';
+            select.style.backgroundColor = '#fff';
             
             document.getElementById('input_invoice_search').value = '';
             document.getElementById('input_invoice_baru').value = '';
             arraySelectedInvoice = [];
             renderSelectedInvoices();
-            document.getElementById('selected-invoice-display').style.display = 'none';
+            
             document.getElementById('manual-input-area').style.display = 'none';
             document.getElementById('input_invoice_search').style.display = 'block';
             document.getElementById('btn-manual-toggle').innerHTML = '&#9998; Input manual (jika tidak ada di daftar)';
@@ -297,7 +306,9 @@
         }
 
         function simpanFinalPrepaid() {
-            // Check if manual or dropdown
+            var branch = document.getElementById('input_branch_baru').value;
+            if(!branch) return alert("Pilih Branch terlebih dahulu!");
+            
             var manualArea = document.getElementById('manual-input-area');
             var invoiceVal = '';
             if (manualArea.style.display !== 'none') {
@@ -307,15 +318,17 @@
             }
             
             tempDataFinal.invoiceInput = invoiceVal;
-            tempDataFinal.branchInput = document.getElementById('input_branch_baru').value;
+            tempDataFinal.branchInput = branch;
             tempDataFinal.username = currentUserName;
-
-            if (!tempDataFinal.branchInput) return alert("Branch wajib diisi!");
-            if (!invoiceVal) return alert("Nomor Faktur / Invoice Keluaran wajib diisi!");
 
             socket.emit('simpan-final-prepaid', tempDataFinal);
             document.getElementById('modalReviewPDF').style.display = 'none';
         }
+
+        socket.on('simpan-final-sukses', (res) => { alert(res.message); loadInbox(); });
+        socket.on('update-tabel-inbox-prepaid', () => loadInbox());
+
+        function formatRupiah(n) { return "Rp " + Number(n).toLocaleString('id-ID'); }
 
         // === VAT OUT DROPDOWN LOGIC ===
         let vatoutData = { matching: [], others: [] };
@@ -364,8 +377,6 @@
         function filterInvoiceDropdown() {
             var query = document.getElementById('input_invoice_search').value;
             renderInvoiceDropdown(query);
-            // Also set hidden input for manual typing
-            document.getElementById('input_invoice_baru').value = query;
         }
 
         function renderInvoiceDropdown(query) {
@@ -374,11 +385,29 @@
             var formatRp = function(n) { return 'Rp ' + Number(n || 0).toLocaleString('id-ID'); };
             var html = '';
             
-            // ONLY show matching client - block others completely
             var matchingItems = vatoutData.matching || [];
-            var filtered = matchingItems;
+
+            // 1. FILTER: Sembunyikan item yang sudah terpilih
+            var available = matchingItems.filter(function(r) {
+                var invNo = (r.no_invoice_internal && r.no_invoice_internal !== '-') ? r.no_invoice_internal.trim() : '';
+                if (!invNo) return true;
+                return !arraySelectedInvoice.includes(invNo);
+            });
+
+            // 2. SORT: Urutkan numerik berdasarkan prefix (angka sebelum '/')
+            available.sort(function(a, b) {
+                var getPrefix = function(r) {
+                    var inv = (r.no_invoice_internal && r.no_invoice_internal !== '-') ? r.no_invoice_internal.trim() : '';
+                    if (!inv || inv.indexOf('/') === -1) return 9999;
+                    return parseInt(inv.split('/')[0], 10) || 9999;
+                };
+                return getPrefix(a) - getPrefix(b);
+            });
+
+            // 3. FILTER: Pencarian teks
+            var filtered = available;
             if (q) {
-                filtered = matchingItems.filter(function(r) {
+                filtered = available.filter(function(r) {
                     return (r.no_faktur || '').toLowerCase().includes(q) || 
                            (r.nama_pembeli || '').toLowerCase().includes(q) ||
                            (r.no_invoice_internal || '').toLowerCase().includes(q);
@@ -387,8 +416,10 @@
 
             if (filtered.length > 0) {
                 filtered.forEach(function(r) { html += buildDropdownItem(r, formatRp); });
+            } else if (arraySelectedInvoice.length > 0 && available.length === 0) {
+                html = '<div class="invoice-dropdown-empty" style="padding:10px; background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d;">✔ Semua faktur yang relevan sudah dipilih.</div>';
             } else {
-                html = '<div class="invoice-dropdown-empty">Tidak ada faktur VAT OUT yang cocok dengan client ini. Gunakan input manual jika diperlukan.</div>';
+                html = '<div class="invoice-dropdown-empty">Tidak ada faktur VAT OUT yang cocok dengan client ini.</div>';
             }
             
             dd.innerHTML = html;
@@ -396,25 +427,63 @@
         }
 
         function buildDropdownItem(r, formatRp) {
-            var cls = r.sudah_dipakai ? 'invoice-dropdown-item disabled' : 'invoice-dropdown-item';
-            var onClick = r.sudah_dipakai ? '' : 'onclick="selectInvoice(\'' + r.no_faktur + '\', \'' + (r.nama_pembeli || '').replace(/'/g, '') + '\')"';
-            var usedTag = r.sudah_dipakai ? ' <span style="color:var(--danger-500); font-weight:700;">[SUDAH DIPAKAI]</span>' : '';
-            return '<div class="' + cls + '" ' + onClick + '>' +
-                '<div><span class="inv-faktur">' + r.no_faktur + '</span>' + usedTag + '</div>' +
-                '<div class="inv-client">' + (r.nama_pembeli || '-') + ' | ' + (r.tanggal_format || '-') + '</div>' +
-                '<div class="inv-amount">DPP: ' + formatRp(r.dpp) + ' | PPN: ' + formatRp(r.ppn) + '</div>' +
+            var invNo = (r.no_invoice_internal && r.no_invoice_internal !== '-') ? r.no_invoice_internal.trim() : '';
+            var cls = 'invoice-dropdown-item';
+
+            if (!invNo) {
+                return '<div class="' + cls + '" style="padding:10px; border-bottom:1px solid #eee; background:#fffbf0; opacity:0.7; cursor:not-allowed;">' +
+                    '<div style="font-weight:bold; color:#94a3b8;">' + r.no_faktur + '</div>' +
+                    '<div style="font-size:0.8rem; color:#f59e0b;">⚠ Belum memiliki No. Invoice Internal</div>' +
+                '</div>';
+            }
+
+            var onClick = 'onclick="selectInvoice(\'' + invNo.replace(/'/g, "\\''") + '\')"';
+            return '<div class="' + cls + '" ' + onClick + ' style="padding:10px; border-bottom:1px solid #eee; cursor:pointer;" onmouseover="this.style.background=\'#f0fdf4\'" onmouseout="this.style.background=\'\'">' +
+                '<div style="font-weight:700; font-size:1rem; color:var(--success-700);">' + invNo + '</div>' +
+                '<div style="font-size:0.78rem; color:var(--text-tertiary);">No. Faktur: ' + r.no_faktur + '</div>' +
+                '<div style="font-size:0.75rem; color:#666;">' + (r.nama_pembeli || '-') + ' | ' + (r.tanggal_format || '-') + '</div>' +
+                '<div style="font-size:0.75rem; color:#666;">DPP: ' + formatRp(r.dpp) + ' | PPN: ' + formatRp(r.ppn) + '</div>' +
             '</div>';
         }
 
-        function selectInvoice(noFaktur, namaPembeli) {
+        function autoDetectBranch(invoiceVal) {
+            const badgeOk = document.getElementById('badge-branch-status');
+            const badgeErr = document.getElementById('badge-branch-notfound');
+            const select = document.getElementById('input_branch_baru');
+            if (select.disabled) return;
+
+            const parts = (invoiceVal || '').trim().split('/');
+            if (parts.length < 2 || parts[1].trim() === '') {
+                select.value = ''; badgeOk.style.display = 'none'; badgeErr.style.display = 'none';
+                select.style.backgroundColor = '#fff'; return;
+            }
+
+            const kodeCabangDari = parts[1].trim().toUpperCase();
+            const cocok = loadedBranches.find(b => b.kode_cabang.toUpperCase() === kodeCabangDari);
+
+            if (cocok) {
+                select.value = cocok.kode_cabang;
+                select.style.backgroundColor = '#f0fdf4';
+                badgeOk.style.display = 'inline-block';
+                badgeErr.style.display = 'none';
+            } else {
+                select.value = ''; select.style.backgroundColor = '#fff';
+                badgeOk.style.display = 'none';
+                badgeErr.style.display = 'inline-block';
+                badgeErr.textContent = `⚠ Kode '${kodeCabangDari}' tidak ditemukan`;
+            }
+        }
+
+        function selectInvoice(noFaktur) {
             if(arraySelectedInvoice.includes(noFaktur)) return;
             arraySelectedInvoice.push(noFaktur);
             document.getElementById('input_invoice_baru').value = arraySelectedInvoice.join(', ');
-            
             document.getElementById('input_invoice_search').value = '';
             document.getElementById('invoice-dropdown').classList.remove('show');
-            
             renderSelectedInvoices();
+            
+            // Trigger auto-detect dari invoice terpilih pertama (atau terbaru)
+            if (arraySelectedInvoice.length > 0) autoDetectBranch(arraySelectedInvoice[0]);
         }
 
         function renderSelectedInvoices() {
@@ -437,11 +506,12 @@
             arraySelectedInvoice = arraySelectedInvoice.filter(i => i !== inv);
             document.getElementById('input_invoice_baru').value = arraySelectedInvoice.join(', ');
             renderSelectedInvoices();
-        }
-
-        function clearSelectedInvoice() {
-            arraySelectedInvoice = [];
-            renderSelectedInvoices();
+            
+            if (arraySelectedInvoice.length > 0) {
+                autoDetectBranch(arraySelectedInvoice[0]);
+            } else {
+                autoDetectBranch('');
+            }
         }
 
         // Close dropdown when clicking outside
@@ -461,14 +531,12 @@
             rows.forEach(row => {
                 let isMatch = true;
                 filters.forEach((input, index) => {
-                    const filterValue = input.value.toLowerCase();
-                    if (filterValue) {
+                    const filterVal = input.value.toLowerCase();
+                    if (filterVal) {
                         isAnyFilterActive = true;
-                        const cellIndex = index + 1;
-                        const cellText = row.cells[cellIndex] ? row.cells[cellIndex].innerText.toLowerCase() : "";
-                        if (!cellText.includes(filterValue)) {
-                            isMatch = false;
-                        }
+                        // Kolom data dimulai dari index 1 (BPPU), 2 (Client), dst.
+                        const cellVal = row.cells[index + 1] ? row.cells[index + 1].textContent.toLowerCase() : '';
+                        if (!cellVal.includes(filterVal)) isMatch = false;
                     }
                 });
                 row.style.display = isMatch ? '' : 'none';
@@ -478,7 +546,7 @@
         }
 
         function resetSemuaFilter() {
-            document.querySelectorAll('.filter-input-inbox').forEach(input => input.value = '');
+            document.querySelectorAll('.filter-input-inbox').forEach(i => i.value = '');
             jalankanFilterInbox();
         }
 
