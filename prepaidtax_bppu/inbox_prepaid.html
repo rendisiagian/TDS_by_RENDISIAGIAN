@@ -43,6 +43,8 @@
                                 <tr>
                                     <th class="text-center" style="width:50px;">No.</th>
                                     <th class="text-center">No. BPPU</th>
+                                    <th class="text-center">No. Dokumen</th>
+                                    <th class="text-center">Tgl. Dokumen</th>
                                     <th class="text-center">Nama Client (Pemotong)</th>
                                     <th class="text-center">Masa Pajak</th>
                                     <th class="text-center">DPP</th>
@@ -53,6 +55,8 @@
                                 <tr class="filter-row">
                                     <th></th>
                                     <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari BPPU..."></th>
+                                    <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari No Dok..."></th>
+                                    <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari Tgl Dok..."></th>
                                     <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari Client..."></th>
                                     <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari Masa..."></th>
                                     <th><input type="text" class="filter-input-inbox" placeholder="🔍 Cari DPP..."></th>
@@ -166,7 +170,7 @@
             const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
 
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="padding:20px;">Belum ada dokumen dalam antrean.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center" style="padding:20px;">Belum ada dokumen dalam antrean.</td></tr>';
             }
 
             data.forEach((row, index) => {
@@ -177,6 +181,8 @@
                 tr.innerHTML = `
                     <td class="text-center">${index + 1}</td>
                     <td class="text-center" style="font-weight:bold; color:#4f46e5;">${parsed.noBppu || '-'}</td>
+                    <td class="text-center" style="font-size:0.8rem;">${parsed.nomorDokumen || '-'}</td>
+                    <td class="text-center" style="font-size:0.8rem;">${parsed.tanggalDokumen || '-'}</td>
                     <td class="text-bold">${parsed.namaPemotong || '-'}</td>
                     <td class="text-center">${parsed.masaPajak || '-'}</td>
                     <td class="text-right">${formatRupiah(parsed.dpp || 0)}</td>

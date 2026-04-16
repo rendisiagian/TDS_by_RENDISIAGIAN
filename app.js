@@ -329,16 +329,26 @@ app.get('/api/data-client-ledger', cekAuth, (req, res) => {
 
         db.all(selectSql, queryParams, (err2, rows) => {
             db.get(statsSql, statsParams, (err3, statsRow) => {
-                res.json({
-                    data: rows || [],
-                    total,
-                    page,
-                    limit: limit || total,
-                    stats: {
-                        income: statsRow && statsRow.total_income ? statsRow.total_income : 0,
-                        receipt: statsRow && statsRow.total_receipt ? statsRow.total_receipt : 0,
-                        debtor: statsRow && statsRow.total_debtor ? statsRow.total_debtor : 0
-                    }
+                // Tambahan: Hitung Sisa Saldo Advance (Outstanding)
+                const advSql = `
+                    SELECT 
+                        (SELECT COALESCE(SUM(net_certificate),0) FROM data_client_ledger WHERE entitas = ? AND is_advance = 1) -
+                        (SELECT COALESCE(SUM(advance),0) FROM data_client_ledger WHERE entitas = ? AND ref_advance IS NOT NULL AND ref_advance != '' AND ref_advance != '-')
+                    AS sisa_advance
+                `;
+                db.get(advSql, [entitas, entitas], (err4, advRow) => {
+                    res.json({
+                        data: rows || [],
+                        total,
+                        page,
+                        limit: limit || total,
+                        stats: {
+                            income: statsRow && statsRow.total_income ? statsRow.total_income : 0,
+                            receipt: statsRow && statsRow.total_receipt ? statsRow.total_receipt : 0,
+                            debtor: statsRow && statsRow.total_debtor ? statsRow.total_debtor : 0,
+                            outstanding_advance: advRow ? advRow.sisa_advance : 0
+                        }
+                    });
                 });
             });
         });
@@ -611,16 +621,52 @@ app.get('/api/available-vatout', cekAuth, (req, res) => {
 });
 
 app.get('/api/search-prepaid-for-ledger', cekAuth, (req, res) => {
-    const invNo = req.query.inv_no || '';
-    if (!invNo) return res.json([]);
+    const queryTerm = req.query.inv_no || '';
+    if (!queryTerm) return res.json([]);
+    
+    // Pecah search term ke array (siapa tahu dari frontend mengirim koma)
+    const searchTerms = queryTerm.split(',').map(s => s.trim()).filter(Boolean);
+
     db.all(`SELECT no_bppu, nama_pemotong, dpp, nilai_pph, tanggal_dokumen, no_invoice_internal FROM data_prepaid`, [], (err, rows) => {
         if (!rows) return res.json([]);
         const matched = rows.filter(r => {
             if (!r.no_invoice_internal) return false;
-            let invs = r.no_invoice_internal.split(',').map(i => i.trim());
-            return invs.includes(invNo.trim());
+            let invsInDb = r.no_invoice_internal.split(',').map(i => i.trim());
+            // COCOKKAN: Jika ada salah satu searchTerm yang masuk di dalam list invoice di DB
+            return searchTerms.some(term => invsInDb.includes(term));
         });
         res.json(matched);
+    });
+});
+
+// API: SUMMARY SALDO ADVANCE GLOBAL
+app.get('/api/client-advance-summary', cekAuth, (req, res) => {
+    const entitas = req.query.entitas || 'BBS';
+    
+    // Ambil semua transaksi DP (is_advance = 1)
+    const sqlMain = `SELECT id, inv_no, nama_client, net_certificate as total_advance, waktu_input FROM data_client_ledger WHERE entitas = ? AND is_advance = 1`;
+    
+    db.all(sqlMain, [entitas], (err, advances) => {
+        if (err || !advances) return res.json([]);
+        
+        // Ambil semua potongan DP yang pernah dilakukan
+        const sqlDeductions = `SELECT ref_advance, SUM(advance) as total_terpakai FROM data_client_ledger WHERE entitas = ? AND ref_advance IS NOT NULL AND ref_advance != '' AND ref_advance != '-' GROUP BY ref_advance`;
+        
+        db.all(sqlDeductions, [entitas], (err2, deductions) => {
+            const dedMap = {};
+            (deductions || []).forEach(d => { dedMap[d.ref_advance] = d.total_terpakai; });
+            
+            const results = advances.map(adv => {
+                const terpakai = dedMap[adv.inv_no] || 0;
+                return {
+                    ...adv,
+                    terpakai: terpakai,
+                    sisa_saldo: adv.total_advance - terpakai
+                };
+            }).filter(adv => adv.sisa_saldo > 0); // Hanya tampilkan yang masih ada sisa
+            
+            res.json(results);
+        });
     });
 });
 
@@ -1104,11 +1150,13 @@ io.on('connection', (socket) => {
     socket.on('update-jurnal-ledger', (d) => {
         if (isDummy(socket)) return io.emit('data-baru-ledger');
         db.run(`UPDATE data_client_ledger SET 
-            contract_income = ?, gross_paym_received = ?, contract_debtor = ?, gross_paym_rcpt = ?,
+            contract_income = ?, advance = ?, ref_advance = ?, 
+            gross_paym_received = ?, contract_debtor = ?, gross_paym_rcpt = ?,
             withholding_tax = ?, bank_charge = ?, net_receipt = ?, remarks = ?, ref_bppu = ?
             WHERE id = ?`,
             [
-                bersihkanAngka(d.contract_income), bersihkanAngka(d.gross_paym_received), bersihkanAngka(d.contract_debtor), bersihkanAngka(d.gross_paym_rcpt),
+                bersihkanAngka(d.contract_income), bersihkanAngka(d.advance), d.ref_advance || '',
+                bersihkanAngka(d.gross_paym_received), bersihkanAngka(d.contract_debtor), bersihkanAngka(d.gross_paym_rcpt),
                 bersihkanAngka(d.withholding_tax), bersihkanAngka(d.bank_charge), bersihkanAngka(d.net_receipt), d.remarks, d.ref_bppu,
                 d.id
             ], () => {

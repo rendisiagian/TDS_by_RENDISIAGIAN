@@ -1,12 +1,13 @@
 <aside class="sidebar">
     <div class="sidebar-brand">
-        <h3>TAX DATABASE</h3>
+        <h3>TAX DATABASE SYSTEM</h3>
         <p>by Rendi Siagian</p>
     </div>
-    
+
     <div class="sidebar-entity-box">
         <label class="sidebar-entity-label">ENTITAS AKTIF</label>
-        <select id="global-entity-select" class="sidebar-entity-select" onchange="localStorage.setItem('lastEntitas', this.value); if(typeof gantiEntitas === 'function') { gantiEntitas(this.value); } else if(typeof loadSummary === 'function') { aktifEntitas = this.value; loadSummary(); } else { window.location.reload(); }">
+        <select id="global-entity-select" class="sidebar-entity-select"
+            onchange="localStorage.setItem('lastEntitas', this.value); if(typeof gantiEntitas === 'function') { gantiEntitas(this.value); } else if(typeof loadSummary === 'function') { aktifEntitas = this.value; loadSummary(); } else { window.location.reload(); }">
             <option value="BBS">Berca Buana Sakti</option>
             <option value="JO">Berca JO</option>
         </select>
@@ -42,7 +43,8 @@
         <a href="/manage-users" class="sidebar-link" id="menu-manage-users">Manajemen &amp; Approval</a>
 
         <div id="group-administrasi" class="sidebar-group" style="display:none;">
-            <span class="sidebar-nav-label collapsible" onclick="toggleSidebarGroup('group-administrasi')" style="color: #f59e0b; font-weight: 700; letter-spacing: 0.08em;">
+            <span class="sidebar-nav-label collapsible" onclick="toggleSidebarGroup('group-administrasi')"
+                style="color: #f59e0b; font-weight: 700; letter-spacing: 0.08em;">
                 ⚙️ ADMINISTRASI <span class="chevron">▼</span>
             </span>
             <div class="sidebar-links-container">
@@ -54,8 +56,9 @@
     </nav>
 
     <div style="padding: 0.75rem 1rem; border-top: 1px solid rgba(255,255,255,0.1); margin-top: auto;">
-        <button id="btn-dark-mode" onclick="window.__toggleDarkMode()" style="position:static; width:100%; display:flex; justify-content:center; align-items:center; gap:0.5rem; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); color:white; padding:0.625rem; border-radius:8px; cursor:pointer;">
+        <button id="btn-dark-mode" onclick="window.__toggleDarkMode()"
+            style="position:static; width:100%; display:flex; justify-content:center; align-items:center; gap:0.5rem; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); color:white; padding:0.625rem; border-radius:8px; cursor:pointer;">
             <span id="dm-icon">🌙</span> <span id="dm-text">Dark Mode</span>
         </button>
     </div>
-</aside>    
+</aside>

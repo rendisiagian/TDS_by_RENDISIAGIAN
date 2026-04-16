@@ -11,6 +11,8 @@
     <script src="/socket.io/socket.io.js"></script>
     <style>
         #tabel-data th { vertical-align: middle; line-height: 1.3; padding: 0.75rem 0.5rem; text-align: center; }
+        #tabel-data thead tr:first-child th { top: 0; z-index: 20; }
+        #tabel-data .filter-row th { top: 48px !important; z-index: 10; background: var(--bg-tertiary); }
         .selected-badge { background: var(--success-50); color: var(--success-700); border: 1px solid var(--success-500); padding: 8px 12px; border-radius: 6px; font-size: 0.9rem; font-weight: 700; display: inline-block; margin-bottom: 15px; width: 100%; text-align: center; }
         .inv-badge { background: var(--primary-50); color: var(--primary-700); border: 1px solid var(--primary-300); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
         .input-rp { text-align: right; font-family: monospace; font-size: 1.05rem; letter-spacing: 0.5px; }
@@ -49,6 +51,10 @@
                         <span class="stat-label">Total Sertifikat/Termin</span>
                         <div class="stat-value" id="stat-transaksi">0</div>
                     </div>
+                    <div class="stat-card accent-yellow" style="border-left-color: #eab308;">
+                        <span class="stat-label">Total Sisa Advance (DP)</span>
+                        <div class="stat-value" id="stat-advance" style="color: #eab308;">Rp 0</div>
+                    </div>
                 </div>
 
                 <div class="card">
@@ -58,6 +64,7 @@
                             <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">🗑️ Hapus Filter</button>
                             <button class="btn-toolbar btn-toolbar-export" onclick="showExportMenu(event, 'tabel-data', 'client_ledger_' + aktifEntitas)">Export</button>
                             <button class="btn-toolbar btn-toolbar-print" onclick="window.print()">Print</button>
+                            <button class="btn-toolbar" style="background: #f59e0b; color: white;" onclick="bukaModalSummaryAdvance()">📊 Ringkasan Saldo DP</button>
                             <button class="btn-toolbar btn-toolbar-inbox" onclick="bukaModalTambah()">➕ Tambah Jurnal</button>
                         </div>
                     </div>
@@ -148,10 +155,17 @@
                 </div>
                 <div class="grid-2-col">
                     <div class="form-group">
-                        <label>Advance (Deduction)</label>
-                        <div style="display:flex; gap:10px;">
+                        <label style="display:flex; justify-content:space-between; align-items:center;">
+                            <span>Advance (Deduction)</span>
+                            <span style="display:flex; gap:5px;">
+                                <button type="button" class="btn-aksi" style="padding:2px 8px; cursor:pointer; background:var(--warning-100); color:var(--warning-700);" onclick="kalkulasiAdvance(5, 'f')">5%</button>
+                                <button type="button" class="btn-aksi" style="padding:2px 8px; cursor:pointer; background:var(--warning-100); color:var(--warning-700);" onclick="kalkulasiAdvance(10, 'f')">10%</button>
+                            </span>
+                        </label>
+                        <div style="display:flex; gap:8px;">
                             <input type="text" class="input-rp" id="f_advance" value="0" style="flex:2;">
-                            <button class="btn-aksi btn-verify" id="btn-tarik-advance" style="flex:1; margin:0; background-color:var(--warning-500);" onclick="bukaModalCariAdvance('f')">🔍 Tarik Saldo DP</button>
+                            <button class="btn-aksi btn-verify" id="btn-tarik-advance" style="flex:1.5; margin:0; background-color:var(--warning-500); padding: 5px;" onclick="bukaModalCariAdvance('f')">🔍 Tarik DP</button>
+                            <button class="btn-aksi" style="flex:0.8; margin:0; background:var(--danger-500); color:white; padding: 5px;" title="Lepas Tarikan DP" onclick="hapusAdvance('f')">❌ Lepas</button>
                             <input type="hidden" id="f_ref_advance">
                         </div>
                     </div>
@@ -208,9 +222,10 @@
 
             <div class="form-group">
                 <label>Advance (Deduction)</label>
-                <div style="display:flex; gap:10px;">
+                <div style="display:flex; gap:8px;">
                     <input type="text" class="input-rp" id="e_advance" value="0" style="flex:2;">
-                    <button class="btn-aksi btn-verify" id="btn-tarik-advance-edit" style="flex:1; margin:0; background-color:var(--warning-500);" onclick="bukaModalCariAdvance('e')">🔍 Tarik Saldo DP</button>
+                    <button class="btn-aksi btn-verify" id="btn-tarik-advance-edit" style="flex:1.5; margin:0; background-color:var(--warning-500); padding: 5px;" onclick="bukaModalCariAdvance('e')">🔍 Tarik DP</button>
+                    <button class="btn-aksi" style="flex:0.8; margin:0; background:var(--danger-500); color:white; padding: 5px;" title="Lepas Tarikan DP" onclick="hapusAdvance('e')">❌ Lepas</button>
                     <input type="hidden" id="e_ref_advance">
                 </div>
             </div>
@@ -283,6 +298,37 @@
         </div>
     </div>
 
+    <!-- Modal Ringkasan Saldo Advance -->
+    <div id="modalSummaryAdvance" class="modal-overlay" style="display: none; z-index: 1000;">
+        <div class="modal-box" style="max-width: 900px; width: 95%;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px;">
+                <h3 style="color: #f59e0b; margin:0;">📊 Ringkasan Saldo Uang Muka (Advance)</h3>
+                <button class="btn-clear-filter" onclick="loadAdvanceSummary()" style="margin:0;">🔄 Refresh Data</button>
+            </div>
+            
+            <div class="table-responsive" style="max-height: 450px;">
+                <table class="table-simple" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: var(--bg-secondary); text-align: left;">
+                            <th style="padding:12px; border-bottom:2px solid var(--border-color);">Client / Project</th>
+                            <th style="padding:12px; border-bottom:2px solid var(--border-color); text-align:right;">Total DP (IDR)</th>
+                            <th style="padding:12px; border-bottom:2px solid var(--border-color); text-align:right;">Sudah Terpakai</th>
+                            <th style="padding:12px; border-bottom:2px solid var(--border-color); text-align:right;">Sisa Saldo</th>
+                            <th style="padding:12px; border-bottom:2px solid var(--border-color); text-align:center;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="summary-advance-body">
+                        <!-- Content will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="margin-top:20px; display:flex; justify-content:flex-end;">
+                <button class="btn-simpan btn-cancel" style="width:auto; padding: 0.5rem 2rem;" onclick="document.getElementById('modalSummaryAdvance').style.display='none'">Tutup</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const socket = io();
         let aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
@@ -312,7 +358,60 @@
             currentPage = 1; currentSearch = {}; 
             await loadBranches();
             loadData();
+            // Pre-load summary if needed
         };
+
+        // Fungsi Load Summary Advance Global
+        async function loadAdvanceSummary() {
+            const tbody = document.getElementById('summary-advance-body');
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">Sedang memuat data...</td></tr>';
+            
+            try {
+                const res = await fetch(`/api/client-advance-summary?entitas=${aktifEntitas}`);
+                const data = await res.json();
+                
+                if(!data || data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-tertiary);">Tidak ada saldo DP aktif yang ditemukan.</td></tr>';
+                    return;
+                }
+                
+                const fRp = (n) => Number(n).toLocaleString('id-ID');
+                let html = '';
+                data.forEach(adv => {
+                    const pct = (adv.terpakai / adv.total_advance) * 100;
+                    let badgeColor = 'var(--success-500)';
+                    if(pct > 80) badgeColor = 'var(--danger-500)';
+                    else if(pct > 40) badgeColor = 'var(--warning-500)';
+                    
+                    html += `
+                        <tr style="border-bottom: 1px solid var(--border-color);">
+                            <td style="padding:12px;">
+                                <div style="font-weight:700; color:var(--text-primary);">${adv.nama_client}</div>
+                                <div style="font-size:0.85rem; color:var(--primary-600); font-family:monospace;">${adv.inv_no}</div>
+                                <div style="font-size:0.75rem; color:var(--text-tertiary);">Input: ${new Date(adv.waktu_input).toLocaleDateString('id-ID')}</div>
+                            </td>
+                            <td style="padding:12px; text-align:right; font-family:monospace;">${fRp(adv.total_advance)}</td>
+                            <td style="padding:12px; text-align:right; font-family:monospace; color:var(--danger-600);">${fRp(adv.terpakai)}</td>
+                            <td style="padding:12px; text-align:right; font-family:monospace; font-weight:700; color:var(--success-600);">${fRp(adv.sisa_saldo)}</td>
+                            <td style="padding:12px; text-align:center;">
+                                <div style="display:inline-block; width:100px; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden; position:relative;">
+                                    <div style="width:${pct}%; height:100%; background:${badgeColor};"></div>
+                                </div>
+                                <div style="font-size:0.7rem; margin-top:4px; font-weight:bold; color:var(--text-tertiary);">${Math.round(pct)}% Terpakai</div>
+                            </td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+            } catch(e) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--danger-600);">Gagal memuat data dari server.</td></tr>';
+            }
+        }
+
+        function bukaModalSummaryAdvance() {
+            document.getElementById('modalSummaryAdvance').style.display = 'flex';
+            loadAdvanceSummary();
+        }
 
         initPagination('pg-container', (p, l) => loadData(p, l), 50);
 
@@ -349,13 +448,17 @@
                 const res = await fetch(url);
                 const result = await res.json();
                 const tbody = document.getElementById('tabel-body'); tbody.innerHTML = ''; 
-                const fRp = (n) => "Rp " + Number(n).toLocaleString('id-ID');
+                const fRp = (n) => {
+                    const num = Number(n);
+                    return "Rp " + (isNaN(num) ? "0" : num.toLocaleString('id-ID'));
+                };
 
                 // Statistik dihitung di Backend
                 document.getElementById('stat-transaksi').textContent = result.total || 0;
-                document.getElementById('stat-income').textContent = fRp(result.stats ? result.stats.income : 0);
-                document.getElementById('stat-receipt').textContent = fRp(result.stats ? result.stats.receipt : 0);
-                document.getElementById('stat-debtor').textContent = fRp(result.stats ? result.stats.debtor : 0);
+                document.getElementById('stat-income').textContent = fRp(result.stats?.income || 0);
+                document.getElementById('stat-receipt').textContent = fRp(result.stats?.receipt || 0);
+                document.getElementById('stat-debtor').textContent = fRp(result.stats?.debtor || 0);
+                document.getElementById('stat-advance').textContent = fRp(result.stats?.outstanding_advance || 0);
 
                 if (!result.data || result.data.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="18" class="text-center" style="padding:20px; color:var(--text-tertiary);">Data belum tersedia. Silakan tambah jurnal.</td></tr>`;
@@ -365,12 +468,27 @@
                 result.data.forEach((baris, index) => {
                     const tr = document.createElement('tr');
                     let bNo = ((currentPage - 1) * currentLimit) + index + 1;
+                    
+                    // Highlight row jika ini adalah Uang Muka (Advance)
+                    if (baris.is_advance) {
+                        tr.style.background = 'rgba(245, 158, 11, 0.08)'; // Subtle yellow/orange
+                    }
+                    
+                    const invDisplay = baris.inv_no || '-';
+                    const advanceBadge = baris.is_advance 
+                        ? `<span class="inv-badge" style="background:#fef3c7; color:#92400e; border:1px solid #fcd34d; font-size:0.7rem; padding: 2px 4px; margin-left:4px;">DP</span>`
+                        : '';
+                        
+                    const deductionDisplay = (baris.ref_advance && baris.ref_advance !== '-')
+                        ? `<div style="font-size:0.7rem; color:var(--text-tertiary); margin-top:2px;">Ref DP: <span style="color:var(--primary-600); font-weight:bold;">${baris.ref_advance}</span></div>`
+                        : '';
+
                     tr.innerHTML = `
                         <td class="text-center">${bNo}</td>
                         <td class="text-center"><button class="btn-tbl btn-tbl-edit" onclick="bukaModalEdit('${encodeURIComponent(JSON.stringify(baris))}')">Edit</button></td>
                         <td class="text-center font-bold" style="color:var(--primary-700);">${extractBranch(baris.inv_no)}</td>
-                        <td class="text-bold">${baris.nama_client || '-'}</td>
-                        <td class="text-center">${baris.inv_no || '-'}</td>
+                        <td class="text-bold">${baris.nama_client || '-'}${advanceBadge}</td>
+                        <td class="text-center">${invDisplay}${deductionDisplay}</td>
                         <td class="text-right">${fRp(baris.contract_income)}</td>
                         <td class="text-right">${fRp(baris.discount)}</td>
                         <td class="text-right">${fRp(baris.advance)}</td>
@@ -454,10 +572,20 @@
                 return nama.includes(q) || noFaktur.includes(q) || noInv.includes(q);
             });
 
-            // Urutkan List (Yang Sudah Dipakai Ditaruh di Paling Bawah)
+            // Urutkan List: 
+            // 1. Yang Belum Dipakai di atas (sudah_dipakai = false)
+            // 2. Berdasarkan No Invoice Internal / No Faktur (Ascending - Kecil ke Besar)
             list.sort((a, b) => {
-                if(a.sudah_dipakai === b.sudah_dipakai) return 0;
-                return a.sudah_dipakai ? 1 : -1;
+                // Prioritas 1: Ketersediaan
+                if (a.sudah_dipakai !== b.sudah_dipakai) {
+                    return a.sudah_dipakai ? 1 : -1;
+                }
+                
+                // Prioritas 2: Urutan Nomor (Natural Sort)
+                const valA = a.no_invoice_internal && a.no_invoice_internal !== '-' ? a.no_invoice_internal : a.no_faktur;
+                const valB = b.no_invoice_internal && b.no_invoice_internal !== '-' ? b.no_invoice_internal : b.no_faktur;
+                
+                return valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
             });
 
             if (list.length === 0) {
@@ -509,6 +637,18 @@
             document.getElementById('inv_search').value = '';
             document.getElementById('f_is_advance').checked = false;
             document.getElementById('f_ref_advance').value = '';
+            document.getElementById('f_ref_bppu').value = '';
+            
+            // Reset fields
+            const fields = [
+                'f_contract_income', 'f_discount', 'f_advance', 'f_retention', 
+                'f_wht', 'f_bank_charge', 'f_remarks', 'f_net_cert', 'f_vat', 'f_gross_cert'
+            ];
+            fields.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = el.classList.contains('input-rp') ? '0' : '';
+            });
+
             toggleAdvanceMode(false);
             document.getElementById('modalFormJurnal').style.display = 'none';
         }
@@ -620,20 +760,24 @@
 
         async function bukaModalCariBupot(prefix) {
             targetBupotPrefix = prefix;
-            let invNo = '';
+            let searchArr = [];
             if(prefix === 'f') {
                 if(!selectedInvoiceData || !selectedInvoiceData.no_faktur) return alert("Pilih faktur/invoice terlebih dahulu di Step 1!");
-                invNo = selectedInvoiceData.no_faktur;
+                searchArr.push(selectedInvoiceData.no_faktur);
+                if(selectedInvoiceData.no_invoice_internal && selectedInvoiceData.no_invoice_internal !== '-') {
+                    searchArr.push(selectedInvoiceData.no_invoice_internal);
+                }
             } else {
-                invNo = document.getElementById('e_inv_no').value;
+                searchArr.push(document.getElementById('e_inv_no').value);
             }
+            const queryParam = searchArr.join(',');
 
-            document.getElementById('bupot-inv-target').innerText = invNo;
+            document.getElementById('bupot-inv-target').innerText = searchArr[searchArr.length - 1]; // Tampilkan yang paling readable
             document.getElementById('bupot-list-container').innerHTML = '<i style="color:var(--text-secondary);">Sedang mencari data...</i>';
             document.getElementById('modalCariBupot').style.display = 'flex';
 
             try {
-                const res = await fetch('/api/search-prepaid-for-ledger?inv_no=' + encodeURIComponent(invNo));
+                const res = await fetch('/api/search-prepaid-for-ledger?inv_no=' + encodeURIComponent(queryParam));
                 const data = await res.json();
                 
                 if(!data || data.length === 0) {
@@ -759,6 +903,16 @@
             document.getElementById(prefix + '_retention').value = Math.round(ret).toLocaleString('id-ID');
         }
 
+        function kalkulasiAdvance(pct, prefix) {
+            // Kita hitung dari Contract Income (NJ Net)
+            let contractIncomeStr = document.getElementById(prefix + '_contract_income');
+            if(!contractIncomeStr) return; 
+            let cleanStr = contractIncomeStr.value.replace(/[^0-9,-]+/g, "").replace(",", ".");
+            let ci = parseFloat(cleanStr) || 0;
+            let adv = ci * (pct / 100);
+            document.getElementById(prefix + '_advance').value = Math.round(adv).toLocaleString('id-ID');
+        }
+
         let targetAdvancePrefix = 'f';
         async function bukaModalCariAdvance(prefix) {
             targetAdvancePrefix = prefix;
@@ -821,6 +975,13 @@
             document.getElementById(targetAdvancePrefix + '_ref_advance').value = inv_no;
             document.getElementById(targetAdvancePrefix + '_advance').value = Math.round(saldo).toLocaleString('id-ID');
             document.getElementById('modalCariAdvance').style.display = 'none';
+        }
+
+        function hapusAdvance(prefix) {
+            document.getElementById(prefix + '_advance').value = '0';
+            document.getElementById(prefix + '_ref_advance').value = '';
+            if(prefix === 'e') kalkulasiEdit();
+            alert("Referensi tarikan DP telah dilepas.");
         }
 
         loadBranches().then(() => loadData());
