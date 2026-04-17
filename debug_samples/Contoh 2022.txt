@@ -1,0 +1,35 @@
+Faktur Pajak
+Pengusaha Kena Pajak
+Pembeli Barang Kena Pajak / Penerima Jasa Kena Pajak
+Nama : PT. TOTAL BANGUN PERSADA TBK - PT. BERCA BUANA SAKTI JO
+Alamat : JL. SULTAN ISKANDAR MUDA, KOMPLEK PONDOK INDAH SEKTOR V-TA Blok 000 No.000 RT:000
+RW:000 Kel.PONDOK PINANG Kec.KEBAYORAN LAMA Kota/Kab.JAKARTA SELATAN DKI JAKARTA 00000
+NPWP : 838476562013000
+NITKU : -
+Kode dan Nomor Seri Faktur Pajak : 010.002-22.72796803
+Nama : PT BERCA BUANA SAKTI
+Alamat : JL. RC. VETERAN NO. 4 RT 006 RW 003 , JAKARTA SELATAN
+NPWP : 010002210059000 / 0010002210059000
+NITKU : 0010002210059000000000
+No.
+Harga Jual/Penggantian/Uang
+Muka/Termin
+Nama Barang Kena Pajak / Jasa Kena Pajak
+1 MANPOWER, PER. DECEMBER 2021 43.650.000,00
+Rp 43.650.000 x 1
+Harga Jual / Penggantian 43.650.000,00
+Dikurangi Potongan Harga 0,00
+Dikurangi Uang Muka 0,00
+Total PPN 4.365.000,00
+Total PPnBM (Pajak Penjualan Barang Mewah) 0,00
+Dasar Pengenaan Pajak 43.650.000,00
+Sesuai dengan ketentuan yang berlaku, Direktorat Jenderal Pajak mengatur bahwa Faktur Pajak ini telah ditandatangani
+secara elektronik sehingga tidak diperlukan tanda tangan basah pada Faktur Pajak ini.
+JAKARTA SELATAN, 12 Januari 2022
+ERICK PURWANTO
+INVOICE NO. : 001/BBS-FA/I/2022
+PIM-3 PROJECT
+PEMBERITAHUAN: Faktur Pajak ini telah dilaporkan ke Direktorat Jenderal Pajak dan telah memperoleh persetujuan sesuai 1 dari 1
+dengan ketentuan peraturan perpajakan yang berlaku. PERINGATAN: PKP yang menerbitkan Faktur Pajak yang tidak sesuai
+dengan keadaan yang sebenarnya dan/atau sesungguhnya sebagaimana dimaksud Pasal 13 ayat (9) UU PPN dikenai sanksi
+sesuai dengan Pasal 14 ayat (4) UU KUP
