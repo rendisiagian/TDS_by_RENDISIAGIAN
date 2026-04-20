@@ -216,12 +216,32 @@ function parseItems(teks) {
     return items;
 }
 
+// Helper function untuk update master data dengan logic cerdas
+async function updateMasterData(tableName, npwp, nama, alamat, formatTipe, tanggalFaktur) {
+    if (!npwp) return;
+
+    // Cek apakah data sudah ada
+    const existing = await dbGet(`SELECT format_tipe, tanggal_terakhir FROM ${tableName} WHERE npwp = ?`, [npwp]);
+
+    if (existing) {
+        // Jika format berbeda, jangan replace
+        if (existing.format_tipe !== formatTipe) return;
+
+        // Jika format sama tapi tanggal faktur tidak lebih baru, jangan replace
+        if (tanggalFaktur <= existing.tanggal_terakhir) return;
+    }
+
+    // Insert atau replace dengan data baru
+    await dbRun(`INSERT OR REPLACE INTO ${tableName} (npwp, nama, alamat, format_tipe, tanggal_terakhir) VALUES (?, ?, ?, ?, ?)`,
+        [npwp, nama, alamat, formatTipe, tanggalFaktur]);
+}
+
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT, nama_lengkap TEXT, role TEXT)`);
     db.run(`CREATE TABLE IF NOT EXISTS user_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, username TEXT, jenis_request TEXT, nilai_baru TEXT, status TEXT DEFAULT 'Pending', waktu DATETIME DEFAULT CURRENT_TIMESTAMP)`);
     db.run(`CREATE TABLE IF NOT EXISTS master_cabang (kode_cabang TEXT PRIMARY KEY, nama_cabang TEXT, entitas TEXT)`);
-    db.run(`CREATE TABLE IF NOT EXISTS master_vendor (npwp TEXT PRIMARY KEY, nama TEXT, alamat TEXT)`);
-    db.run(`CREATE TABLE IF NOT EXISTS master_client (npwp TEXT PRIMARY KEY, nama TEXT, alamat TEXT)`);
+    db.run(`CREATE TABLE IF NOT EXISTS master_vendor (npwp TEXT PRIMARY KEY, nama TEXT, alamat TEXT, format_tipe TEXT, tanggal_terakhir DATE)`);
+    db.run(`CREATE TABLE IF NOT EXISTS master_client (npwp TEXT PRIMARY KEY, nama TEXT, alamat TEXT, format_tipe TEXT, tanggal_terakhir DATE)`);
     db.run(`CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, username TEXT, action TEXT, module TEXT, details TEXT, waktu DATETIME DEFAULT CURRENT_TIMESTAMP)`);
 
     global.insertAuditLog = function (user_id, username, action, module, details) {
@@ -947,6 +967,9 @@ io.on('connection', (socket) => {
                 let isDup = await checkDuplicateAsync('data_vatin', 'inbox_vatin', 'no_faktur', mNo[1]);
                 if (isDup) { duplikat++; continue; }
 
+                // VAT IN selalu MODERN (format 2025+)
+                const formatTipe = 'MODERN';
+
                 let mVen = teks.match(/Pengusaha Kena Pajak[\s\S]*?Nama\s*:\s*(.*?)Alamat/i);
                 let mAlmVen = teks.match(/Pengusaha Kena Pajak[\s\S]*?Alamat\s*:\s*([\s\S]*?)NPWP\s*:/i);
                 let mNpwpVen = teks.match(/Pengusaha Kena Pajak[\s\S]*?NPWP\s*:\s*([\d\.\-]+)/i);
@@ -978,7 +1001,7 @@ io.on('connection', (socket) => {
                     noFaktur: mNo[1],
                     namaVendor: mVen?.[1].trim(), alamatVendor: mAlmVen ? mAlmVen[1].replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : "-", npwpVendor: mNpwpVen?.[1].trim(),
                     namaPembeli: mPem?.[1].trim(), alamatPembeli: mAlmPem ? mAlmPem[1].replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : "-", npwpPembeli: mNpwpPem?.[1].trim(),
-                    tanggalFaktur: mTgl ? formatTanggal(mTgl[2]) : "-", kotaPenerbit: mTgl ? mTgl[1].trim() : "-",
+                    tanggalFaktur: mTgl ? formatTanggal(mTgl[2]) : "-", kotaPenerbit: mTgl ? mTgl[1].trim() : "-", format_tipe: formatTipe,
                     referensi: mRef ? mRef[1].trim() : "-", penandatangan: mTTD ? mTTD[1].trim() : "-",
                     hargaJual: bersihkanAngka(mHargaJual?.[1]), dpp: bersihkanAngka(mDPP?.[1]), ppn: bersihkanAngka(mPPN?.[1]),
                     diskon: bersihkanAngka(mDiskon?.[1]), uangMuka: bersihkanAngka(mDP?.[1]),
@@ -986,7 +1009,7 @@ io.on('connection', (socket) => {
                 };
 
                 if (data.npwpVendor) {
-                    await dbRun(`INSERT OR REPLACE INTO master_vendor (npwp, nama, alamat) VALUES (?, ?, ?)`, [data.npwpVendor, data.namaVendor, data.alamatVendor]);
+                    await updateMasterData('master_vendor', data.npwpVendor, data.namaVendor, data.alamatVendor, data.format_tipe, data.tanggalFaktur);
                 }
 
                 await fsPromises.writeFile(path.join(__dirname, 'vat_in', namaFileLokal), Buffer.from(file.fileBuffer));
@@ -1015,8 +1038,8 @@ io.on('connection', (socket) => {
 
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
-            db.run(`INSERT INTO data_vatin (no_faktur, entitas, kode_cabang, npwp_penjual, nama_penjual, alamat_penjual, npwp_pembeli, nama_pembeli, alamat_pembeli, tanggal_faktur, harga_jual, diskon, uang_muka, referensi, kota_penerbit, penandatangan, dpp, ppn, no_invoice_internal, tgl_tukar_faktur, diinput_oleh, link_pdf_lokal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [d.noFaktur, d.entitas, d.branchInput, d.npwpVendor, d.namaVendor, d.alamatVendor, d.npwpPembeli, d.namaPembeli, d.alamatPembeli, d.tanggalFaktur, d.hargaJual, d.diskon, d.uangMuka, d.referensi, d.kotaPenerbit, d.penandatangan, d.dpp, d.ppn, d.invoiceInput, d.tglTukarInput, d.username, d.link_pdf_lokal], function (err) {
+            db.run(`INSERT INTO data_vatin (no_faktur, entitas, kode_cabang, npwp_penjual, nama_penjual, alamat_penjual, npwp_pembeli, nama_pembeli, alamat_pembeli, tanggal_faktur, harga_jual, diskon, uang_muka, referensi, kota_penerbit, penandatangan, dpp, ppn, no_invoice_internal, tgl_tukar_faktur, diinput_oleh, link_pdf_lokal, format_tipe) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [d.noFaktur, d.entitas, d.branchInput, d.npwpVendor, d.namaVendor, d.alamatVendor, d.npwpPembeli, d.namaPembeli, d.alamatPembeli, d.tanggalFaktur, d.hargaJual, d.diskon, d.uangMuka, d.referensi, d.kotaPenerbit, d.penandatangan, d.dpp, d.ppn, d.invoiceInput, d.tglTukarInput, d.username, d.link_pdf_lokal, d.format_tipe], function (err) {
                     if (err) { db.run("ROLLBACK"); return; }
 
                     let stmt = db.prepare(`INSERT INTO item_vatin (no_faktur, nama_barang, harga_satuan, qty, satuan, diskon, total_harga) VALUES (?, ?, ?, ?, ?, ?, ?)`);
@@ -1150,7 +1173,7 @@ io.on('connection', (socket) => {
                 };
 
                 if (data.npwpPembeli) {
-                    await dbRun(`INSERT OR REPLACE INTO master_client (npwp, nama, alamat) VALUES (?, ?, ?)`, [data.npwpPembeli, data.namaPembeli, data.alamatPembeli]);
+                    await updateMasterData('master_client', data.npwpPembeli, data.namaPembeli, data.alamatPembeli, data.format_tipe, data.tanggalFaktur);
                 }
 
                 await fsPromises.writeFile(path.join(__dirname, 'vat_out', namaFileLokal), Buffer.from(file.fileBuffer));
