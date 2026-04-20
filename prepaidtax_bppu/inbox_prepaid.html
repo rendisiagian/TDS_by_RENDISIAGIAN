@@ -9,6 +9,8 @@
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="/export.js"></script>
+<script src="/sidebar.js"></script>
 </head>
 <body>
     <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
@@ -28,7 +30,10 @@
                         <h3 class="title-primary" style="border-left-color: #4f46e5; margin: 0;">Dokumen Menunggu Verifikasi</h3>
                         
                         <div style="display: flex; gap: 10px; align-items: center;">
-                            <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">🗑️ Hapus Filter</button>
+                            <button id="btnHapusFilter" class="btn-clear-filter" style="display:none;" onclick="resetSemuaFilter()">🗑️ Hapus Filter</button>
+                            <button class="btn-simpan" style="margin:0; background-color: #059669;" onclick="showExportMenu(event, 'tabel-inbox-induk', 'Inbox_Prepaid_' + aktifEntitas, [8, 9])">
+                                ⬇️ Export
+                            </button>
                             <button class="btn-simpan" style="margin:0; background-color: #4f46e5;" onclick="document.getElementById('filePdfUpload').click()">
                                 📁 Unggah Dokumen PDF
                             </button>

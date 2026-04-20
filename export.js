@@ -1,9 +1,14 @@
 // Export utility - CSV and Excel
-function exportTableData(tableId, filename, format) {
+function exportTableData(tableId, filename, format, ignoreCols) {
     var table = document.getElementById(tableId);
     if (!table) return alert('Tabel tidak ditemukan.');
     
-    // Collect visible rows, skip filter row, skip Aksi/PDF columns (col 1,2)
+    // Default ignore parameter for backward compatibility
+    if (typeof ignoreCols === 'undefined') {
+        ignoreCols = [0, 1, 2]; // Legacy Dashboard: No (0), Aksi (1), Arsip PDF (2)
+    }
+    
+    // Collect visible rows, skip filter row
     var rows = table.querySelectorAll('tr:not(.filter-row)');
     var data = [];
     
@@ -12,8 +17,8 @@ function exportTableData(tableId, filename, format) {
         var cols = row.querySelectorAll('th, td');
         var rowData = [];
         cols.forEach(function(col, i) {
-            // Skip No (0), Aksi (1), Arsip PDF (2) columns
-            if (i === 0 || i === 1 || i === 2) return;
+            // Skip specified columns
+            if (ignoreCols && ignoreCols.includes(i)) return;
             var text = col.innerText.replace(/\n/g, ' ').trim();
             rowData.push(text);
         });
@@ -71,7 +76,7 @@ function downloadBlob(blob, filename) {
 }
 
 // Show export menu dropdown
-function showExportMenu(event, tableId, filenameBase) {
+function showExportMenu(event, tableId, filenameBase, ignoreCols) {
     event.stopPropagation();
     
     // Remove existing menu
@@ -85,9 +90,11 @@ function showExportMenu(event, tableId, filenameBase) {
     menu.id = 'export-menu-dropdown';
     menu.style.cssText = 'position:fixed; top:' + (rect.bottom + 4) + 'px; left:' + rect.left + 'px; background:var(--bg-primary); border:1px solid var(--border-color); border-radius:6px; box-shadow:0 8px 24px rgba(0,0,0,0.15); z-index:1000; min-width:160px; overflow:hidden;';
     
+    var ignoreStr = (typeof ignoreCols !== 'undefined') ? JSON.stringify(ignoreCols) : 'undefined';
+
     menu.innerHTML = '<div style="padding:0.5rem; font-size:0.7rem; font-weight:700; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.5px;">Pilih Format</div>' +
-        '<div onclick="exportTableData(\'' + tableId + '\', \'' + filenameBase + '\', \'csv\')" style="padding:0.625rem 0.75rem; cursor:pointer; font-size:0.85rem; font-weight:600; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s;" onmouseover="this.style.background=\'var(--primary-50)\'" onmouseout="this.style.background=\'transparent\'"><span style="color:var(--success-600);">CSV</span> <span style="color:var(--text-tertiary); font-size:0.75rem;">(.csv)</span></div>' +
-        '<div onclick="exportTableData(\'' + tableId + '\', \'' + filenameBase + '\', \'excel\')" style="padding:0.625rem 0.75rem; cursor:pointer; font-size:0.85rem; font-weight:600; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s;" onmouseover="this.style.background=\'var(--primary-50)\'" onmouseout="this.style.background=\'transparent\'"><span style="color:var(--success-600);">Excel</span> <span style="color:var(--text-tertiary); font-size:0.75rem;">(.xls)</span></div>';
+        '<div onclick="exportTableData(\'' + tableId + '\', \'' + filenameBase + '\', \'csv\', ' + ignoreStr + ')" style="padding:0.625rem 0.75rem; cursor:pointer; font-size:0.85rem; font-weight:600; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s;" onmouseover="this.style.background=\'var(--primary-50)\'" onmouseout="this.style.background=\'transparent\'"><span style="color:var(--success-600);">CSV</span> <span style="color:var(--text-tertiary); font-size:0.75rem;">(.csv)</span></div>' +
+        '<div onclick="exportTableData(\'' + tableId + '\', \'' + filenameBase + '\', \'excel\', ' + ignoreStr + ')" style="padding:0.625rem 0.75rem; cursor:pointer; font-size:0.85rem; font-weight:600; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s;" onmouseover="this.style.background=\'var(--primary-50)\'" onmouseout="this.style.background=\'transparent\'"><span style="color:var(--success-600);">Excel</span> <span style="color:var(--text-tertiary); font-size:0.75rem;">(.xls)</span></div>';
     
     document.body.appendChild(menu);
     

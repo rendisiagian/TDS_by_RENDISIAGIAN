@@ -18,6 +18,7 @@
         .input-rp { text-align: right; font-family: monospace; font-size: 1.05rem; letter-spacing: 0.5px; }
         .table-responsive { max-height: calc(100vh - 320px); }
     </style>
+<script src="/sidebar.js"></script>
 </head>
 <body>
     <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
@@ -95,7 +96,7 @@
                                     <th>REMARKS<br>&nbsp;</th>
                                 </tr>
                                 <tr class="filter-row">
-                                    <th></th><th></th><th><input type="text" class="filter-input" data-col="d.inv_no" placeholder="🔍 Inv. No..."></th>
+                                    <th></th><th></th><th><input type="text" class="filter-input" data-col="c.nama_cabang" placeholder="🔍 Cari Project..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.nama_client" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.inv_no" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.contract_income" placeholder="🔍 Cari..."></th>
@@ -339,8 +340,17 @@
         let isLoadingInvoices = false; // Flag status memuat dari server
         let selectedInvoiceData = null;
 
-        fetch('/api/me').then(res => res.json()).then(u => currentUser = u);
-        fetch('/sidebar.html').then(res => res.text()).then(html => document.getElementById('sidebar-container').innerHTML = html);
+        fetch('/api/me').then(res => res.json()).then(u => {
+            currentUser = u;
+            const el = document.getElementById('header-user-name');
+            if (el) el.textContent = u.nama || u.username || '';
+        });
+        fetch('/sidebar.html').then(res => res.text()).then(html => {
+            document.getElementById('sidebar-container').innerHTML = html;
+            // UI-04 FIX: Sinkronkan entity select di sidebar dengan nilai aktif
+            const sidebarSelect = document.getElementById('global-entity-select');
+            if (sidebarSelect) sidebarSelect.value = aktifEntitas;
+        });
 
         // Dengarkan pembaruan data dari server
         socket.on('data-baru-ledger', () => loadData(currentPage, currentLimit));

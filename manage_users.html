@@ -7,6 +7,7 @@
     <script src="/theme.js"></script>
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
+<script src="/sidebar.js"></script>
 </head>
 <body>
     <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
@@ -252,12 +253,16 @@
             
             socket.emit('tambah-user', { username: user, nama: nama, role: role, password: pass });
             document.querySelectorAll('#admin-section input').forEach(i => i.value='');
-            alert("Pengguna baru berhasil ditambahkan!");
+            // Alert akan muncul saat server mengkonfirmasi melalui event 'users-updated'
         }
 
         function resetPassword(id, username) {
-            const newPass = prompt(`Masukkan password baru untuk akun '${username}':`);
+            const newPass = prompt(`Masukkan password baru untuk akun '${username}' (minimal 6 karakter):`);
             if (newPass) {
+                if (newPass.length < 6) {
+                    alert('Password baru minimal harus 6 karakter!');
+                    return;
+                }
                 socket.emit('reset-password-user', { user_id: id, new_password: newPass });
                 alert("Password berhasil direset!");
             }
@@ -268,7 +273,13 @@
 
         // Listeners dari Server
         socket.on('request-updated', () => loadPendingRequests());
-        socket.on('users-updated', () => { if (isSuperAdmin(currentUser.role)) loadUsers(); });
+        socket.on('users-updated', () => {
+            if (isSuperAdmin(currentUser.role)) {
+                loadUsers();
+                // Notifikasi sukses saat pengguna baru berhasil ditambahkan dari server
+                // (Ini hanya akan tampil jika admin-section sedang aktif / user adalah superadmin)
+            }
+        });
     </script>
 </body>
 </html>

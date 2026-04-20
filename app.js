@@ -108,15 +108,111 @@ function sanitizeFilename(name) {
 
 function parseItems(teks) {
     let items = [];
-    let itemRegex = /(?:^|\s)(\d+)\s+([A-Z0-9]{6})\s+(.*?)\s+Rp\s*([\d\.,]+)\s*x\s*([\d\.,]+)\s*([A-Za-z\s]+?)\s+Potongan Harga\s*=\s*Rp\s*([\d\.,]+)\s+PPnBM[^=]*=\s*Rp\s*([\d\.,]+)\s+([\d\.,]+)/g;
+
+    // ============================================================
+    // POLA 1: Format MODERN 2025 (Ada Kode Produk 6 Karakter)
+    // Contoh: "1 AB1234 Jasa Manpower Rp 1.000.000 x 1 Unit ..."
+    // ============================================================
+    let itemRegexModern = /(?:^|\s)(\d+)\s+([A-Z0-9]{6})\s+(.*?)\s+Rp\s*([\d\.,]+)\s*x\s*([\d\.,]+)\s*([A-Za-z\s]+?)\s+Potongan Harga\s*=\s*Rp\s*([\d\.,]+)\s+PPnBM[^=]*=\s*Rp\s*([\d\.,]+)\s+([\d\.,]+)/g;
     let match;
-    while ((match = itemRegex.exec(teks)) !== null) {
+    while ((match = itemRegexModern.exec(teks)) !== null) {
         items.push({
             no: match[1], kode: match[2], nama_barang: match[3].trim(),
             harga_satuan: bersihkanAngka(match[4]), qty: bersihkanAngka(match[5]), satuan: match[6].trim(),
             diskon: bersihkanAngka(match[7]), total_harga: bersihkanAngka(match[9])
         });
     }
+    if (items.length > 0) return items;
+
+    // ============================================================
+    // POLA 2 & 3: Format LEGACY (2022-2024)
+    // Teks di-flatten jadi 1 baris oleh pdf.js:
+    // "No. ... Nama Barang ... 1 MANPOWER, PER. DECEMBER 2021 43.650.000,00 Rp 43.650.000 x 1 Harga Jual ..."
+    //
+    // Strategi: Gunakan jangkar ganda:
+    //   - DEPAN: nomor item (1, 2, 3, ...)
+    //   - BELAKANG: pola "[Total],00 Rp [Harga] x [Qty]"
+    // Nama item = teks di antara nomor dan angka total
+    // ============================================================
+
+    // Ambil seksi antara judul tabel dan baris ringkasan
+    const sectionRe = /(?:Nama Barang Kena Pajak[^\n]*?)((?:\s|.)*?)(?=Harga Jual\s*\/\s*Penggantian|Dikurangi Potongan|$)/i;
+    const sectionMatch = teks.match(sectionRe);
+    const sect = sectionMatch ? sectionMatch[0] : teks;
+
+    // Pola jangkar: [Total harga],xx Rp [Harga Satuan] x [Qty]
+    // Menangkap: total sebelum Rp, harga satuan, qty
+    const itemAnchorRe = /\b((?:\d{1,3}\.)*\d{1,3},\d{2})\s+Rp\s*((?:\d{1,3}\.)*\d{1,3})\s*x\s*(\d+)/g;
+    let anchors = [];
+    while ((match = itemAnchorRe.exec(sect)) !== null) {
+        anchors.push({
+            idx: match.index,
+            fullLen: match[0].length,
+            total: match[1],
+            harga: match[2],
+            qty: match[3]
+        });
+    }
+
+    anchors.forEach((anchor, i) => {
+        // Teks sebelum jangkar ini (sejak akhir jangkar sebelumnya)
+        const prevEnd = i === 0 ? 0 : anchors[i - 1].idx + anchors[i - 1].fullLen;
+        const block = sect.substring(prevEnd, anchor.idx).trim();
+
+        // Format block: "[Header tabel?] [No] [Nama Item] [TotalAngka]"
+        // Total sudah ada di anchor.total — hapus dari ujung block
+        const escapedTotal = anchor.total.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const blockBefore = block.replace(new RegExp(escapedTotal + '$'), '').trim();
+
+        // Gunakan match dari AKHIR string: cari nomor item + nama (bukan dari awal,
+        // karena block mungkin diawali header tabel 'Nama Barang Kena Pajak...')
+        const mItem = blockBefore.match(/(\d+)\s+([\s\S]+)$/);
+        if (mItem) {
+            const no = mItem[1];
+            const nama = mItem[2].trim();
+            items.push({
+                no: no,
+                kode: "-",
+                nama_barang: nama || 'Item ' + no,
+                harga_satuan: bersihkanAngka(anchor.harga),
+                qty: bersihkanAngka(anchor.qty),
+                satuan: 'Unit',
+                diskon: 0,
+                total_harga: bersihkanAngka(anchor.total)
+            });
+        }
+    });
+
+    // ============================================================
+    // POLA 3: Fallback — jika anchors tidak ditemukan, coba pola "Rp x" sederhana
+    // Digunakan jika format agak menyimpang
+    // ============================================================
+    if (items.length === 0) {
+        const fallbackRe = /Rp\s*([\d\.,]+)\s*x\s*([\d\.,]+)/g;
+        let fallbackAnchors = [];
+        while ((match = fallbackRe.exec(sect)) !== null) {
+            fallbackAnchors.push({ idx: match.index, fullLen: match[0].length, harga: match[1], qty: match[2] });
+        }
+        fallbackAnchors.forEach((anchor, i) => {
+            const prevEnd = i === 0 ? 0 : fallbackAnchors[i - 1].idx + fallbackAnchors[i - 1].fullLen;
+            const block = sect.substring(prevEnd, anchor.idx).trim();
+            const lines = block.split('\n').map(l => l.trim()).filter(l => l);
+            const firstLine = (lines.length > 0 ? lines[0] : block);
+            const mItem = firstLine.match(/^(\d+)\s+([\s\S]*)$/);
+            if (mItem) {
+                let no = mItem[1], sisa = mItem[2];
+                let mTotal = sisa.match(/([\d\.,]+)$/);
+                let total = mTotal ? mTotal[1] : '0';
+                let nama = mTotal ? sisa.replace(total, '').trim() : sisa;
+                items.push({
+                    no, kode: '-', nama_barang: nama || 'Item ' + no,
+                    harga_satuan: bersihkanAngka(anchor.harga), qty: bersihkanAngka(anchor.qty),
+                    satuan: 'Unit', diskon: 0, total_harga: bersihkanAngka(total)
+                });
+            }
+        });
+    }
+
     return items;
 }
 
@@ -128,7 +224,7 @@ db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS master_client (npwp TEXT PRIMARY KEY, nama TEXT, alamat TEXT)`);
     db.run(`CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, username TEXT, action TEXT, module TEXT, details TEXT, waktu DATETIME DEFAULT CURRENT_TIMESTAMP)`);
 
-    global.insertAuditLog = function(user_id, username, action, module, details) {
+    global.insertAuditLog = function (user_id, username, action, module, details) {
         db.run(`INSERT INTO audit_logs (user_id, username, action, module, details) VALUES (?, ?, ?, ?, ?)`, [user_id, username, action, module, details], (err) => {
             if (err) console.error("Audit Log Error:", err);
         });
@@ -168,7 +264,7 @@ db.serialize(() => {
             // SECURITY: Naikkan salt rounds ke 12 untuk keamanan lebih baik (BUG-08)
             const defaultPass = bcrypt.hashSync('Emergent@2024!', 12);
             db.run(`INSERT INTO users (username, password, nama_lengkap, role) VALUES ('admin', ?, 'Administrator', 'administrator')`, [defaultPass]);
-            db.run(`INSERT INTO users (username, password, nama_lengkap, role) VALUES ('rendi siagian', ?, 'Rendi Siagian', 'supervisor')`, [defaultPass]);
+            db.run(`INSERT INTO users (username, password, nama_lengkap, role) VALUES ('rendisiagian', ?, 'Rendi Siagian', 'supervisor')`, [defaultPass]);
             console.log('\x1b[33m[SETUP] User default dibuat. Password default: Emergent@2024! — Segera ganti setelah login pertama!\x1b[0m');
         }
     });
@@ -194,7 +290,7 @@ db.serialize(() => {
 // ==========================================
 const cekAuth = (req, res, next) => { if (req.session.user) return next(); res.redirect('/login'); };
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'login.html')));
-app.get('/sidebar.html', (req, res) => {
+app.get('/sidebar.html', cekAuth, (req, res) => {
     const sidebarPath = path.join(__dirname, 'sidebar.html');
     fs.readFile(sidebarPath, 'utf8', (err, html) => {
         if (err) return res.status(500).send('');
@@ -263,7 +359,7 @@ app.get('/api/prepaid-comparison/:noBppu', cekAuth, (req, res) => {
         const placeholders = refs.map(() => '?').join(',');
         const sql = `SELECT * FROM data_vatout 
                      WHERE no_invoice_internal IN (${placeholders}) OR no_faktur IN (${placeholders})`;
-        
+
         // Kita masukkan array refs dua kali untuk mencakup kedua kolom di IN clause
         db.all(sql, [...refs, ...refs], (err2, rows) => {
             if (err2 || !rows || rows.length === 0) {
@@ -278,14 +374,14 @@ app.get('/api/prepaid-comparison/:noBppu', cekAuth, (req, res) => {
             }, { dpp: 0, ppn: 0 });
 
             // Kirim balik sebagai objek vatout tunggal agar UI tetap kompatibel
-            res.json({ 
-                prepaid, 
+            res.json({
+                prepaid,
                 vatout: {
                     dpp: aggregated.dpp,
                     ppn: aggregated.ppn,
                     is_aggregated: rows.length > 1,
                     count: rows.length
-                } 
+                }
             });
         });
     });
@@ -297,7 +393,9 @@ app.get('/api/data-client-ledger', cekAuth, (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = req.query.limit === 'all' ? null : (parseInt(req.query.limit) || 50);
 
-    let baseSql = `FROM data_client_ledger d WHERE d.entitas = ?`;
+    let baseSql = `FROM data_client_ledger d 
+                   LEFT JOIN master_cabang c ON c.kode_cabang = SUBSTR(d.inv_no, INSTR(d.inv_no, '/') + 1, INSTR(SUBSTR(d.inv_no, INSTR(d.inv_no, '/') + 1), '/') - 1) AND c.entitas = d.entitas
+                   WHERE d.entitas = ?`;
     let params = [entitas];
 
     if (req.query.search) {
@@ -319,7 +417,7 @@ app.get('/api/data-client-ledger', cekAuth, (req, res) => {
 
     db.get(`SELECT count(*) as total ${baseSql}`, params, (err, countRow) => {
         const total = countRow ? countRow.total : 0;
-        let selectSql = `SELECT d.*, strftime('%d-%m-%Y', d.waktu_input) AS tanggal_format ${baseSql} ORDER BY CAST(SUBSTR(d.inv_no, 1, MAX(1, INSTR(d.inv_no, '/') - 1)) AS INTEGER) ASC, d.id DESC`;
+        let selectSql = `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.waktu_input) AS tanggal_format ${baseSql} ORDER BY CAST(SUBSTR(d.inv_no, 1, MAX(1, INSTR(d.inv_no, '/') - 1)) AS INTEGER) ASC, d.id DESC`;
         const queryParams = [...params]; // Salinan bersih untuk query SELECT
 
         if (limit) {
@@ -370,6 +468,12 @@ modules.forEach(mod => {
             : `FROM data_${mod.id} d LEFT JOIN master_cabang c ON d.kode_cabang = c.kode_cabang WHERE d.entitas = ?`;
 
         let params = [entitas];
+
+        if (req.query.year && req.query.year !== 'all') {
+            const colTgl = mod.id.startsWith('vat') ? 'tanggal_faktur' : 'tanggal_dokumen';
+            baseSql += ` AND strftime('%Y', d.${colTgl}) = ?`;
+            params.push(req.query.year);
+        }
 
         if (req.query.search) {
             try {
@@ -451,6 +555,57 @@ modules.forEach(mod => {
     });
 });
 
+// ==============================================================
+// API: Re-Ekstrak Items dari data tersimpan (untuk inbox lama yang itemsnya kosong)
+// Dipanggil saat modal Lengkapi dibuka dan parsed.items kosong
+// ==============================================================
+app.get('/api/reextract-items-vatout/:id', cekAuth, async (req, res) => {
+    try {
+        const row = await dbGet(`SELECT data_ekstraksi FROM inbox_vatout WHERE id = ?`, [req.params.id]);
+        if (!row) return res.json({ items: [] });
+
+        // Jika data_ekstraksi sudah punya items, kembalikan langsung
+        let parsed = {};
+        try { parsed = JSON.parse(row.data_ekstraksi); } catch(e) {}
+        if (parsed.items && parsed.items.length > 0) return res.json({ items: parsed.items });
+
+        // Jika ada teks asli tersimpan (teksPDF field), re-ekstrak sekarang
+        if (parsed.teksPDF) {
+            const items = parseItems(parsed.teksPDF);
+            return res.json({ items });
+        }
+
+        // Fallback: tidak ada teks tersimpan, kembalikan kosong
+        res.json({ items: [] });
+    } catch(e) {
+        res.json({ items: [] });
+    }
+});
+
+// ==============================================================
+// API: Ambil daftar tahun yang tersedia untuk VAT OUT (per entitas)
+// Digunakan oleh sidebar.js untuk membangun sub-menu dinamis
+// ==============================================================
+app.get('/api/years-vatout', cekAuth, (req, res) => {
+    const entitas = req.query.entitas || 'BBS';
+    const sql = `
+        SELECT DISTINCT strftime('%Y', tanggal_faktur) AS year
+        FROM data_vatout
+        WHERE entitas = ? AND tanggal_faktur IS NOT NULL AND tanggal_faktur NOT IN ('', '-')
+        UNION
+        SELECT DISTINCT substr(json_extract(data_ekstraksi, '$.tanggalFaktur'), 1, 4) AS year
+        FROM inbox_vatout
+        WHERE entitas = ? AND data_ekstraksi IS NOT NULL
+        ORDER BY year DESC
+    `;
+    db.all(sql, [entitas, entitas], (err, rows) => {
+        const years = (rows || [])
+            .map(r => (r.year || '').toString().trim())
+            .filter(y => /^\d{4}$/.test(y));
+        res.json([...new Set(years)]);
+    });
+});
+
 app.post('/login', loginLimiter, (req, res) => {
     if (!req.body.username || !req.body.password) {
         return res.send(`<script>alert('Username dan password wajib diisi!'); window.location.href='/login';</script>`);
@@ -479,18 +634,18 @@ app.get('/api/dashboard-summary', cekAuth, (req, res) => {
     const ent = req.query.entitas || 'BBS';
 
     const queries = {
-        vatout_total:   `SELECT COUNT(*) as jml, COALESCE(SUM(dpp),0) as total_dpp, COALESCE(SUM(ppn),0) as total_ppn FROM data_vatout WHERE entitas = ?`,
-        vatout_inbox:   `SELECT COUNT(*) as jml FROM inbox_vatout WHERE entitas = ?`,
-        vatin_total:    `SELECT COUNT(*) as jml, COALESCE(SUM(dpp),0) as total_dpp, COALESCE(SUM(ppn),0) as total_ppn FROM data_vatin WHERE entitas = ?`,
-        vatin_inbox:    `SELECT COUNT(*) as jml FROM inbox_vatin WHERE entitas = ?`,
-        payable_total:  `SELECT COUNT(*) as jml, COALESCE(SUM(dpp),0) as total_dpp, COALESCE(SUM(nilai_pph),0) as total_pph FROM data_payable WHERE entitas = ?`,
-        payable_inbox:  `SELECT COUNT(*) as jml FROM inbox_payable WHERE entitas = ?`,
-        prepaid_total:  `SELECT COUNT(*) as jml, COALESCE(SUM(dpp),0) as total_dpp, COALESCE(SUM(nilai_pph),0) as total_pph FROM data_prepaid WHERE entitas = ?`,
-        prepaid_inbox:  `SELECT COUNT(*) as jml FROM inbox_prepaid WHERE entitas = ?`,
-        ledger_total:   `SELECT COUNT(*) as jml, COALESCE(SUM(contract_income),0) as total_income, COALESCE(SUM(net_receipt),0) as total_receipt, COALESCE(SUM(contract_debtor),0) as total_debtor FROM data_client_ledger WHERE entitas = ? AND is_advance = 0`,
-        recent_vatout:  `SELECT no_faktur, nama_pembeli, dpp, ppn, strftime('%d-%m-%Y', tanggal_faktur) AS tgl FROM data_vatout WHERE entitas = ? ORDER BY waktu_input DESC LIMIT 5`,
-        recent_vatin:   `SELECT no_faktur, nama_penjual, dpp, ppn, strftime('%d-%m-%Y', tanggal_faktur) AS tgl FROM data_vatin WHERE entitas = ? ORDER BY waktu_input DESC LIMIT 5`,
-        pending_req:    `SELECT COUNT(*) as jml FROM user_requests WHERE status = 'Pending'`
+        vatout_total: `SELECT COUNT(*) as jml, COALESCE(SUM(dpp),0) as total_dpp, COALESCE(SUM(ppn),0) as total_ppn FROM data_vatout WHERE entitas = ?`,
+        vatout_inbox: `SELECT COUNT(*) as jml FROM inbox_vatout WHERE entitas = ?`,
+        vatin_total: `SELECT COUNT(*) as jml, COALESCE(SUM(dpp),0) as total_dpp, COALESCE(SUM(ppn),0) as total_ppn FROM data_vatin WHERE entitas = ?`,
+        vatin_inbox: `SELECT COUNT(*) as jml FROM inbox_vatin WHERE entitas = ?`,
+        payable_total: `SELECT COUNT(*) as jml, COALESCE(SUM(dpp),0) as total_dpp, COALESCE(SUM(nilai_pph),0) as total_pph FROM data_payable WHERE entitas = ?`,
+        payable_inbox: `SELECT COUNT(*) as jml FROM inbox_payable WHERE entitas = ?`,
+        prepaid_total: `SELECT COUNT(*) as jml, COALESCE(SUM(dpp),0) as total_dpp, COALESCE(SUM(nilai_pph),0) as total_pph FROM data_prepaid WHERE entitas = ?`,
+        prepaid_inbox: `SELECT COUNT(*) as jml FROM inbox_prepaid WHERE entitas = ?`,
+        ledger_total: `SELECT COUNT(*) as jml, COALESCE(SUM(contract_income),0) as total_income, COALESCE(SUM(net_receipt),0) as total_receipt, COALESCE(SUM(contract_debtor),0) as total_debtor FROM data_client_ledger WHERE entitas = ? AND is_advance = 0`,
+        recent_vatout: `SELECT no_faktur, nama_pembeli, dpp, ppn, strftime('%d-%m-%Y', tanggal_faktur) AS tgl FROM data_vatout WHERE entitas = ? ORDER BY waktu_input DESC LIMIT 5`,
+        recent_vatin: `SELECT no_faktur, nama_penjual, dpp, ppn, strftime('%d-%m-%Y', tanggal_faktur) AS tgl FROM data_vatin WHERE entitas = ? ORDER BY waktu_input DESC LIMIT 5`,
+        pending_req: `SELECT COUNT(*) as jml FROM user_requests WHERE status = 'Pending'`
     };
 
     const execQuery = (sql, params) => new Promise((resolve) => {
@@ -501,27 +656,27 @@ app.get('/api/dashboard-summary', cekAuth, (req, res) => {
     });
 
     Promise.all([
-        execQuery(queries.vatout_total,  [ent]),
-        execQuery(queries.vatout_inbox,  [ent]),
-        execQuery(queries.vatin_total,   [ent]),
-        execQuery(queries.vatin_inbox,   [ent]),
+        execQuery(queries.vatout_total, [ent]),
+        execQuery(queries.vatout_inbox, [ent]),
+        execQuery(queries.vatin_total, [ent]),
+        execQuery(queries.vatin_inbox, [ent]),
         execQuery(queries.payable_total, [ent]),
         execQuery(queries.payable_inbox, [ent]),
         execQuery(queries.prepaid_total, [ent]),
         execQuery(queries.prepaid_inbox, [ent]),
-        execQuery(queries.ledger_total,  [ent]),
-        execAll(queries.recent_vatout,   [ent]),
-        execAll(queries.recent_vatin,    [ent]),
-        execQuery(queries.pending_req,   [])
+        execQuery(queries.ledger_total, [ent]),
+        execAll(queries.recent_vatout, [ent]),
+        execAll(queries.recent_vatin, [ent]),
+        execQuery(queries.pending_req, [])
     ]).then(([vatoutT, vatoutI, vatinT, vatinI, payableT, payableI, prepaidT, prepaidI, ledgerT, recentOut, recentIn, pendingReq]) => {
         res.json({
-            vatout:  { jml: vatoutT?.jml || 0, dpp: vatoutT?.total_dpp || 0, ppn: vatoutT?.total_ppn || 0, pending: vatoutI?.jml || 0 },
-            vatin:   { jml: vatinT?.jml || 0,  dpp: vatinT?.total_dpp || 0,  ppn: vatinT?.total_ppn || 0,  pending: vatinI?.jml || 0 },
+            vatout: { jml: vatoutT?.jml || 0, dpp: vatoutT?.total_dpp || 0, ppn: vatoutT?.total_ppn || 0, pending: vatoutI?.jml || 0 },
+            vatin: { jml: vatinT?.jml || 0, dpp: vatinT?.total_dpp || 0, ppn: vatinT?.total_ppn || 0, pending: vatinI?.jml || 0 },
             payable: { jml: payableT?.jml || 0, dpp: payableT?.total_dpp || 0, pph: payableT?.total_pph || 0, pending: payableI?.jml || 0 },
             prepaid: { jml: prepaidT?.jml || 0, dpp: prepaidT?.total_dpp || 0, pph: prepaidT?.total_pph || 0, pending: prepaidI?.jml || 0 },
-            ledger:  { jml: ledgerT?.jml || 0, income: ledgerT?.total_income || 0, receipt: ledgerT?.total_receipt || 0, debtor: ledgerT?.total_debtor || 0 },
+            ledger: { jml: ledgerT?.jml || 0, income: ledgerT?.total_income || 0, receipt: ledgerT?.total_receipt || 0, debtor: ledgerT?.total_debtor || 0 },
             recent_vatout: recentOut,
-            recent_vatin:  recentIn,
+            recent_vatin: recentIn,
             pending_requests: pendingReq?.jml || 0
         });
     }).catch(err => res.status(500).json({ error: err.message }));
@@ -577,21 +732,21 @@ app.get('/api/available-vatout', cekAuth, (req, res) => {
 
         let paramData = [];
         if (mode !== 'ledger' && currentDoc) {
-             usedSql += ` AND no_bppu != ?`;
-             paramData.push(currentDoc);
+            usedSql += ` AND no_bppu != ?`;
+            paramData.push(currentDoc);
         }
 
         db.all(usedSql, paramData, (err2, usedRows) => {
             const usedInvoices = new Set();
             (usedRows || []).forEach(r => {
-                if(r.used_ref) {
+                if (r.used_ref) {
                     r.used_ref.split(',').forEach(item => usedInvoices.add(item.trim()));
                 }
             });
 
             const result = vatoutRows.filter(row => {
-               // Jangan tampilkan faktur yang sudah dipakai di list
-               return !(usedInvoices.has(row.no_faktur) || usedInvoices.has(row.no_invoice_internal));
+                // Jangan tampilkan faktur yang sudah dipakai di list
+                return !(usedInvoices.has(row.no_faktur) || usedInvoices.has(row.no_invoice_internal));
             }).map(row => ({
                 no_faktur: row.no_faktur,
                 nama_pembeli: row.nama_pembeli,
@@ -623,7 +778,7 @@ app.get('/api/available-vatout', cekAuth, (req, res) => {
 app.get('/api/search-prepaid-for-ledger', cekAuth, (req, res) => {
     const queryTerm = req.query.inv_no || '';
     if (!queryTerm) return res.json([]);
-    
+
     // Pecah search term ke array (siapa tahu dari frontend mengirim koma)
     const searchTerms = queryTerm.split(',').map(s => s.trim()).filter(Boolean);
 
@@ -642,20 +797,20 @@ app.get('/api/search-prepaid-for-ledger', cekAuth, (req, res) => {
 // API: SUMMARY SALDO ADVANCE GLOBAL
 app.get('/api/client-advance-summary', cekAuth, (req, res) => {
     const entitas = req.query.entitas || 'BBS';
-    
+
     // Ambil semua transaksi DP (is_advance = 1)
     const sqlMain = `SELECT id, inv_no, nama_client, net_certificate as total_advance, waktu_input FROM data_client_ledger WHERE entitas = ? AND is_advance = 1`;
-    
+
     db.all(sqlMain, [entitas], (err, advances) => {
         if (err || !advances) return res.json([]);
-        
+
         // Ambil semua potongan DP yang pernah dilakukan
         const sqlDeductions = `SELECT ref_advance, SUM(advance) as total_terpakai FROM data_client_ledger WHERE entitas = ? AND ref_advance IS NOT NULL AND ref_advance != '' AND ref_advance != '-' GROUP BY ref_advance`;
-        
+
         db.all(sqlDeductions, [entitas], (err2, deductions) => {
             const dedMap = {};
             (deductions || []).forEach(d => { dedMap[d.ref_advance] = d.total_terpakai; });
-            
+
             const results = advances.map(adv => {
                 const terpakai = dedMap[adv.inv_no] || 0;
                 return {
@@ -664,7 +819,7 @@ app.get('/api/client-advance-summary', cekAuth, (req, res) => {
                     sisa_saldo: adv.total_advance - terpakai
                 };
             }).filter(adv => adv.sisa_saldo > 0); // Hanya tampilkan yang masih ada sisa
-            
+
             res.json(results);
         });
     });
@@ -722,6 +877,12 @@ io.use((socket, next) => {
 });
 
 io.on('connection', (socket) => {
+
+    // SECURITY: Helper functions didefinisikan di ATAS agar tidak terjadi ReferenceError
+    // 'const' tidak di-hoist, jadi harus didefinisikan sebelum digunakan (BUG-C FIX)
+    const isAdministrator = (socket) => ['administrator', 'superadmin'].includes((socket.user && socket.user.role || '').toLowerCase());
+    const isSupervisorOrAbove = (socket) => ['supervisor', 'administrator', 'superadmin'].includes((socket.user && socket.user.role || '').toLowerCase());
+    const isDummy = (socket) => (socket.user && socket.user.role || '').toLowerCase() === 'dummy';
 
     const checkDuplicateAsync = async (tableFinal, tableInbox, column, value) => {
         let row = await dbGet(`SELECT 1 FROM ${tableFinal} WHERE ${column} = ?`, [value]);
@@ -891,44 +1052,98 @@ io.on('connection', (socket) => {
         for (let file of files) {
             try {
                 const teks = file.teksPDF;
-                let mNo = teks.match(/Kode dan Nomor Seri Faktur Pajak:\s*([\d]+)/i);
+                let mNo = teks.match(/Kode dan Nomor Seri Faktur Pajak:\s*([\d\.\-]+)/i) || teks.match(/Kode dan Nomor Seri Faktur Pajak\s*:\s*([\d\.\-]+)/i);
                 if (!mNo) { gagal++; continue; }
 
-                let isDup = await checkDuplicateAsync('data_vatout', 'inbox_vatout', 'no_faktur', mNo[1]);
+                // Sanitasi no faktur: Ambil hanya angka jika mengandung pemisah legacy
+                let cleanNoFaktur = mNo[1].replace(/[\.\-]/g, '');
+
+                let isDup = await checkDuplicateAsync('data_vatout', 'inbox_vatout', 'no_faktur', cleanNoFaktur);
                 if (isDup) { duplikat++; continue; }
 
-                let mVen = teks.match(/Pengusaha Kena Pajak[\s\S]*?Nama\s*:\s*(.*?)Alamat/i);
-                let mAlmVen = teks.match(/Pengusaha Kena Pajak[\s\S]*?Alamat\s*:\s*([\s\S]*?)NPWP\s*:/i);
-                let mNpwpVen = teks.match(/Pengusaha Kena Pajak[\s\S]*?NPWP\s*:\s*([\d\.\-]+)/i);
-                let mPem = teks.match(/Pembeli Barang Kena Pajak[\s\S]*?Nama\s*:\s*(.*?)Alamat/i);
-                let mAlmPem = teks.match(/Pembeli Barang Kena Pajak[\s\S]*?Alamat\s*:\s*([\s\S]*?)NPWP\s*:/i);
-                let mNpwpPem = teks.match(/Pembeli Barang Kena Pajak[\s\S]*?NPWP\s*:\s*([\d\.\-]+)/i);
+                // --- SMART DETECTION: LEGACY vs MODERN ---
+                // Format lama (2022-2024) punya nomor seri berformat: 010.002-22.72796803 (ada titik & strip)
+                // Format baru (2025+): 0100022272796803 (angka murni tanpa pemisah)
+                const isLegacy = /^\d{3}\.\d{3}-\d{2}\./.test(mNo[1].trim());
+
+                let mVen, mAlmVen, mNpwpVen, mPem, mAlmPem, mNpwpPem;
+
+                if (isLegacy) {
+                    // LEGACY: Nama Pembeli muncul di atas Nomor Faktur, Penjual (BBS) muncul di bawah Nomor Faktur
+                    const parts = teks.split(/Kode dan Nomor Seri Faktur Pajak/i);
+                    const beforeNo = parts[0] || "";
+                    const afterNo = parts[1] || "";
+
+                    mPem = beforeNo.match(/Nama\s*:\s*(.*?)Alamat/i);
+                    mAlmPem = beforeNo.match(/Alamat\s*:\s*([\s\S]*?)NPWP\s*:/i);
+                    mNpwpPem = beforeNo.match(/NPWP\s*:\s*([\d\.\-]+)/i);
+
+                    mVen = afterNo.match(/Nama\s*:\s*(.*?)Alamat/i);
+                    mAlmVen = afterNo.match(/Alamat\s*:\s*([\s\S]*?)NPWP\s*:/i);
+                    // NPWP legacy bisa berformat "010002210059000 / 0010002210059000" — ambil bagian pertama saja
+                    mNpwpVen = afterNo.match(/NPWP\s*:\s*([\d\.]+)/i);
+                } else {
+                    // MODERN: Penjual (BBS) di atas, Pembeli di bawah
+                    mVen = teks.match(/Pengusaha Kena Pajak[\s\S]*?Nama\s*:\s*(.*?)Alamat/i);
+                    mAlmVen = teks.match(/Pengusaha Kena Pajak[\s\S]*?Alamat\s*:\s*([\s\S]*?)NPWP\s*:/i);
+                    mNpwpVen = teks.match(/Pengusaha Kena Pajak[\s\S]*?NPWP\s*:\s*([\d\.\-]+)/i);
+                    mPem = teks.match(/Pembeli Barang Kena Pajak[\s\S]*?Nama\s*:\s*(.*?)Alamat/i);
+                    mAlmPem = teks.match(/Pembeli Barang Kena Pajak[\s\S]*?Alamat\s*:\s*([\s\S]*?)NPWP\s*:/i);
+                    mNpwpPem = teks.match(/Pembeli Barang Kena Pajak[\s\S]*?NPWP\s*:\s*([\d\.\-]+)/i);
+                }
 
                 const namaEntitasPenjual = mVen?.[1].trim().toUpperCase() || "";
                 const entitasMapOut = { 'BBS': ['BERCA BUANA SAKTI'], 'JO': ['BERCA JO', 'BBS JO', 'BMP JO'] };
                 let validNamesOut = entitasMapOut[entitas] || [];
                 let isValidOut = validNamesOut.some(name => namaEntitasPenjual.includes(name));
 
+                // Jika Nama Penjual tidak cocok, coba cari BBS di NPWP (sebagai fallback terakhir)
+                if (!isValidOut) {
+                    const npwpVen = mNpwpVen?.[1].replace(/[\.\-]/g, '') || "";
+                    if (npwpVen.includes("010002210059")) isValidOut = true;
+                }
+
                 if (!isValidOut) { gagal++; continue; }
 
-                let mHargaJual = teks.match(/Harga Jual \/ Penggantian \/ Uang Muka \/ Termin\s+([\d\.,]+)/i);
-                let mDPP = teks.match(/Dasar Pengenaan Pajak[^\d]*?((?:\d{1,3}\.)*\d{1,3},\d{2})/i);
-                let mPPN = teks.match(/Jumlah PPN[^\d]*?((?:\d{1,3}\.)*\d{1,3},\d{2})/i);
+                let mHargaJual = teks.match(/Harga Jual \/ Penggantian \/ Uang Muka \/ Termin\s+([\d\.,]+)/i) || teks.match(/Harga Jual \/ Penggantian\s+([\d\.,]+)/i);
+                let mDPP = teks.match(/Dasar Pengenaan Pajak[^\d]*?((?:\d{1,3}\.)*\d{1,3},\d{2})/i) || teks.match(/Dasar Pengenaan Pajak\s+([\d\.,]+)/i);
+                let mPPN = teks.match(/Jumlah PPN[^\d]*?((?:\d{1,3}\.)*\d{1,3},\d{2})/i) || teks.match(/Total PPN\s+([\d\.,]+)/i);
                 let mDiskon = teks.match(/Dikurangi Potongan Harga\s+([\d\.,]+)/i);
-                let mDP = teks.match(/Dikurangi Uang Muka yang telah diterima\s+([\d\.,]+)/i);
-                let mTgl = teks.match(/([A-Za-z\s\.]+),\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})/i);
+                let mDP = teks.match(/Dikurangi Uang Muka yang telah diterima\s+([\d\.,]+)/i) || teks.match(/Dikurangi Uang Muka\s+([\d\.,]+)/i);
+                // Tanggal: pola "[KOTA], DD BULAN YYYY" — batasi kota max 3 kata agar tidak cocok kalimat panjang
+                let mTgl = teks.match(/([A-Za-z]{3,}(?:\s+[A-Za-z]+){0,2}),\s+(\d{1,2}\s+(?:Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+\d{4})/i);
+
+                // Ekstraksi Referensi:
+                // - MODERN: ambil isi dalam (Referensi: ...) saja → mRef[1]
+                // - LEGACY: ambil FULL teks mulai dari "INVOICE NO. : ..." sampai sebelum PEMBERITAHUAN
+                //   sehingga label "INVOICE NO. :" ikut tercantum sebagai bagian referensi
                 let mRef = teks.match(/\(Referensi[\s:,]+([^)]+)\)/i);
-                let mTTD = teks.match(/Ditandatangani secara elektronik\s*\n(.*?)\s*\n/i);
+                let mRefLegacy = teks.match(/(INVOICE\s*NO\.\s*:[\s\S]*?)(?=\s*PEMBERITAHUAN)/i);
+
+                // Ekstraksi Penandatangan:
+                // - MODERN: nama muncul setelah "Ditandatangani secara elektronik\n"
+                // - LEGACY: nama muncul tepat setelah tanggal (sebelum INVOICE NO.)
+                let mTTD = teks.match(/Ditandatangani secara elektronik[\s\S]*?\n([^\n]+)\s*\n/i);
+                let mTTDLegacy = isLegacy
+                    ? teks.match(/\d{4}[\s\n,]+([A-Z][A-Z\s\.]+?)(?=[\s\n]+INVOICE\s*NO\.)/i)
+                    : null;
 
                 let namaClientSafe = sanitizeFilename(mPem?.[1]);
-                let namaFileLokal = `arsip_vatout/${mNo[1]}_${namaClientSafe}.pdf`;
+                let namaFileLokal = `arsip_vatout/${cleanNoFaktur}_${namaClientSafe}.pdf`;
 
                 let data = {
-                    noFaktur: mNo[1],
+                    noFaktur: cleanNoFaktur,
                     namaVendor: mVen?.[1].trim(), alamatVendor: mAlmVen ? mAlmVen[1].replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : "-", npwpVendor: mNpwpVen?.[1].trim(),
                     namaPembeli: mPem?.[1].trim(), alamatPembeli: mAlmPem ? mAlmPem[1].replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : "-", npwpPembeli: mNpwpPem?.[1].trim(),
                     tanggalFaktur: mTgl ? formatTanggal(mTgl[2]) : "-", kotaPenerbit: mTgl ? mTgl[1].trim() : "-",
-                    referensi: mRef ? mRef[1].trim() : "-", penandatangan: mTTD ? mTTD[1].trim() : "-",
+                    // Referensi: legacy ambil full teks sejak label "INVOICE NO. :", modern ambil isi grup tangkap saja
+                    referensi: isLegacy
+                        ? (mRefLegacy ? mRefLegacy[1].trim().replace(/\s*\d+\s+dari\s+\d+\s*$/i, '').replace(/\s+/g, ' ') : "-")
+                        : (mRef ? mRef[1].trim().replace(/\s*\d+\s+dari\s+\d+\s*$/i, '').replace(/\s+/g, ' ') : "-"),
+                    // Penandatangan: legacy dari nama setelah tanggal, modern setelah tanda elektronik
+                    penandatangan: isLegacy
+                        ? (mTTDLegacy ? mTTDLegacy[1].trim() : "-")
+                        : (mTTD ? mTTD[1].trim() : "-"),
                     hargaJual: bersihkanAngka(mHargaJual?.[1]), dpp: bersihkanAngka(mDPP?.[1]), ppn: bersihkanAngka(mPPN?.[1]),
                     diskon: bersihkanAngka(mDiskon?.[1]), uangMuka: bersihkanAngka(mDP?.[1]),
                     items: parseItems(teks), link_pdf_lokal: namaFileLokal, entitas: entitas
@@ -950,6 +1165,11 @@ io.on('connection', (socket) => {
     });
 
     socket.on('simpan-final-vatout', (d) => {
+        // BUG-A FIX: Dummy user tidak boleh menyimpan data nyata ke database
+        if (isDummy(socket)) {
+            socket.emit('simpan-final-sukses', { message: 'Mode Dummy: Verifikasi disimulasi.' });
+            return io.emit('update-tabel-vatout');
+        }
         let namaClientSafe = sanitizeFilename(d.namaPembeli);
         let namaFileFinal = `arsip_vatout/${d.branchInput}_${d.noFaktur}_${namaClientSafe}.pdf`;
 
@@ -977,6 +1197,8 @@ io.on('connection', (socket) => {
     });
 
     socket.on('hapus-inbox-vatout', (id) => {
+        // BUG-B FIX: Dummy user tidak boleh menghapus file PDF asli
+        if (isDummy(socket)) return io.emit('update-tabel-vatout');
         db.get(`SELECT link_pdf_lokal FROM inbox_vatout WHERE id = ?`, [id], (err, row) => {
             if (row) { try { fs.unlinkSync(path.join(__dirname, 'vat_out', row.link_pdf_lokal)); } catch (e) { } }
             db.run(`DELETE FROM inbox_vatout WHERE id = ?`, [id], () => io.emit('update-tabel-vatout'));
@@ -1165,10 +1387,8 @@ io.on('connection', (socket) => {
     });
 
     // --- MODUL ADMIN & PROSES REQUEST ---
-    // SECURITY: Validasi role di backend untuk operasi sensitif (BUG-07)
-    const isAdministrator = (socket) => ['administrator', 'superadmin'].includes((socket.user && socket.user.role || '').toLowerCase());
-    const isSupervisorOrAbove = (socket) => ['supervisor', 'administrator', 'superadmin'].includes((socket.user && socket.user.role || '').toLowerCase());
-    const isDummy = (socket) => (socket.user && socket.user.role || '').toLowerCase() === 'dummy';
+    // SECURITY: Helper functions sudah dipindah ke atas (awal connection handler) pada BUG-C FIX
+    // Baris lama dihapus untuk menghindari redeclaration error
 
     // ==============================================================
     // CRUD MASTER CABANG (Khusus Administrator)
@@ -1185,7 +1405,7 @@ io.on('connection', (socket) => {
         db.run(
             `INSERT INTO master_cabang (kode_cabang, nama_cabang, entitas) VALUES (?, ?, ?)`,
             [kode_cabang.trim().toUpperCase(), nama_cabang.trim(), entitas],
-            function(err) {
+            function (err) {
                 if (err) {
                     return socket.emit('error-cabang', err.code === 'SQLITE_CONSTRAINT' ? `Kode cabang '${kode_cabang}' sudah terdaftar!` : err.message);
                 }
@@ -1207,7 +1427,7 @@ io.on('connection', (socket) => {
         db.run(
             `UPDATE master_cabang SET nama_cabang = ?, entitas = ? WHERE kode_cabang = ?`,
             [nama_cabang.trim(), entitas, kode_cabang],
-            function(err) {
+            function (err) {
                 if (err) return socket.emit('error-cabang', err.message);
                 if (this.changes === 0) return socket.emit('error-cabang', `Cabang '${kode_cabang}' tidak ditemukan.`);
                 insertAuditLog(socket.user.id, user, 'EDIT', 'MASTER CABANG', `Mengubah cabang ${kode_cabang} menjadi ${nama_cabang} (${entitas})`);
@@ -1225,7 +1445,7 @@ io.on('connection', (socket) => {
         if (!kode_cabang || kode_cabang === 'PUSAT') {
             return socket.emit('error-cabang', 'Data cabang \'PUSAT\' tidak dapat dihapus (protected).');
         }
-        db.run(`DELETE FROM master_cabang WHERE kode_cabang = ?`, [kode_cabang], function(err) {
+        db.run(`DELETE FROM master_cabang WHERE kode_cabang = ?`, [kode_cabang], function (err) {
             if (err) return socket.emit('error-cabang', err.message);
             if (this.changes === 0) return socket.emit('error-cabang', `Cabang '${kode_cabang}' tidak ditemukan.`);
             insertAuditLog(socket.user.id, user, 'HAPUS', 'MASTER CABANG', `Menghapus cabang ${kode_cabang}`);
@@ -1240,7 +1460,7 @@ io.on('connection', (socket) => {
         if (isDummy(socket)) return io.emit('data-baru-kontak');
         if (!isAdministrator(socket)) return socket.emit('error-kontak', 'Akses ditolak.');
         const t = d.tipe === 'vendor' ? 'master_vendor' : 'master_client';
-        db.run(`INSERT INTO ${t} (npwp, nama, alamat) VALUES (?, ?, ?)`, [d.npwp, d.nama, d.alamat], function(err) {
+        db.run(`INSERT INTO ${t} (npwp, nama, alamat) VALUES (?, ?, ?)`, [d.npwp, d.nama, d.alamat], function (err) {
             if (err) return socket.emit('error-kontak', err.message);
             insertAuditLog(socket.user.id, d.user, 'TAMBAH', `MASTER ${d.tipe.toUpperCase()}`, `Menambah ${d.tipe}: ${d.nama} (${d.npwp})`);
             io.emit('data-baru-kontak');
@@ -1252,7 +1472,7 @@ io.on('connection', (socket) => {
         if (!isAdministrator(socket)) return socket.emit('error-kontak', 'Akses ditolak.');
         const t = d.tipe === 'vendor' ? 'master_vendor' : 'master_client';
         // NPWP sebagai primary key tidak diubah, kita ubah nama dan alamat
-        db.run(`UPDATE ${t} SET nama = ?, alamat = ? WHERE npwp = ?`, [d.nama, d.alamat, d.npwp], function(err) {
+        db.run(`UPDATE ${t} SET nama = ?, alamat = ? WHERE npwp = ?`, [d.nama, d.alamat, d.npwp], function (err) {
             if (err) return socket.emit('error-kontak', err.message);
             insertAuditLog(socket.user.id, d.user, 'EDIT', `MASTER ${d.tipe.toUpperCase()}`, `Mengubah detail ${d.tipe}: ${d.npwp}`);
             io.emit('data-baru-kontak');
@@ -1263,7 +1483,7 @@ io.on('connection', (socket) => {
         if (isDummy(socket)) return io.emit('data-baru-kontak');
         if (!isAdministrator(socket)) return socket.emit('error-kontak', 'Akses ditolak.');
         const t = d.tipe === 'vendor' ? 'master_vendor' : 'master_client';
-        db.run(`DELETE FROM ${t} WHERE npwp = ?`, [d.npwp], function(err) {
+        db.run(`DELETE FROM ${t} WHERE npwp = ?`, [d.npwp], function (err) {
             if (err) return socket.emit('error-kontak', err.message);
             insertAuditLog(socket.user.id, d.user, 'HAPUS', `MASTER ${d.tipe.toUpperCase()}`, `Menghapus ${d.tipe} ber-NPWP: ${d.npwp}`);
             io.emit('data-baru-kontak');

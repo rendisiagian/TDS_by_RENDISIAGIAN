@@ -320,6 +320,83 @@ body {
     width: 4px;
 }
 
+/* === Sidebar Accordion Groups === */
+.sidebar-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-nav-label.collapsible,
+.sidebar-link.collapsible-sub {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.sidebar-links-container {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+
+.sidebar-group.expanded > .sidebar-links-container {
+    max-height: 500px; /* Cukup besar untuk semua link */
+}
+
+/* Sub-menu VAT OUT (nested) */
+.sidebar-item-nested {
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-sub-menu {
+    flex-direction: column;
+    padding-left: 0.5rem;
+    border-left: 2px solid rgba(255,255,255,0.15);
+    margin-left: 1.25rem;
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.3s ease;
+    display: block !important; /* Override inline style — kontrol via max-height */
+}
+
+.sidebar-item-nested.open > .sidebar-sub-menu {
+    max-height: 300px;
+}
+
+.sidebar-sub-menu .sidebar-link {
+    font-size: 0.82rem;
+    padding: 0.5rem 0.875rem;
+    opacity: 0.85;
+}
+
+.sidebar-sub-menu .sidebar-link:hover {
+    opacity: 1;
+    padding-left: 1.25rem;
+}
+
+/* Chevron — rotate berdasarkan state */
+.chevron {
+    font-size: 0.7rem;
+    display: inline-block;
+    transition: transform 0.25s ease;
+    transform: rotate(0deg); /* Default: ▼ mengarah bawah */
+    margin-left: auto;
+    opacity: 0.7;
+}
+
+/* Group MODUL PAJAK / AKUNTANSI terbuka → chevron ▼ menjadi ▲ */
+.sidebar-group.expanded .sidebar-nav-label.collapsible > .chevron {
+    transform: rotate(180deg);
+}
+
+/* Sub-item "Faktur Keluaran" terbuka → chevron juga rotate */
+.sidebar-item-nested.open > .sidebar-link.collapsible-sub > .chevron {
+    transform: rotate(180deg);
+}
+
 /* === 7. MAIN CONTENT === */
 .main-content {
     flex: 1;
@@ -2486,3 +2563,32 @@ tbody:empty::after {
     justify-content: space-between;
     align-items: center;
 }
+
+/* === 41. SIDEBAR SUB-MENUS === */
+.sidebar-sub-menu {
+    padding-left: 1rem;
+    background: rgba(0, 0, 0, 0.1);
+    display: none;
+    flex-direction: column;
+}
+
+.sub-link {
+    font-size: 0.85rem !important;
+    padding: 0.6rem 1rem !important;
+}
+
+.collapsible-sub {
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chevron {
+    font-size: 0.7rem;
+    transition: transform var(--transition-base);
+}
+
+.sidebar-item-nested.open .chevron {
+    transform: rotate(180deg);
+}

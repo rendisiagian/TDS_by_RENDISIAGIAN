@@ -35,41 +35,72 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Fungsi Global untuk Sidebar Accordion
 window.toggleSidebarGroup = function(groupId) {
-    const groups = document.querySelectorAll('.sidebar-group');
-    groups.forEach(group => {
-        if (group.id === groupId) {
-            group.classList.toggle('expanded');
-        } else {
-            // Tutup group lain agar rapi
-            group.classList.remove('expanded');
-        }
-    });
+    const target = document.getElementById(groupId);
+    if (!target) return;
+    const isExpanded = target.classList.contains('expanded');
+    // Tutup semua group lain
+    document.querySelectorAll('.sidebar-group').forEach(g => g.classList.remove('expanded'));
+    // Toggle target
+    if (!isExpanded) target.classList.add('expanded');
+};
+
+window.toggleSubMenu = function(menuId) {
+    const menu = document.getElementById(menuId);
+    if (!menu) return;
+    const parent = menu.closest('.sidebar-item-nested');
+    if (!parent) return;
+    // Toggle class 'open' — animasi dikontrol CSS via max-height
+    const isOpen = parent.classList.contains('open');
+    parent.classList.toggle('open', !isOpen);
+    // Refresh tahun jika sub-vatout dibuka
+    if (!isOpen && menuId === 'sub-vatout' && typeof window.refreshSidebarYears === 'function') {
+        window.refreshSidebarYears();
+    }
 };
 
 // Pastikan modul yang aktif otomatis terbuka saat halaman dimuat
 document.addEventListener('DOMContentLoaded', () => {
     // Gunakan interval singkat karena sidebar dimuat secara asinkron (fetch)
+    // dan karena sidebar.js mungkin masih mengisi link tahun secara dinamis
     const checkSidebar = setInterval(() => {
-        let currentPath = window.location.pathname;
-        
-        // --- LOGIKA PINTAR UNTUK INBOX ---
-        // Jika sedang di halaman inbox, arahkan penanda aktif ke tombol dashboard-nya
-        if (currentPath.startsWith('/inbox-')) {
-            currentPath = currentPath.replace('/inbox-', '/dashboard-');
+        const rawPath   = window.location.pathname;
+        const rawSearch = window.location.search; // e.g. "?year=2026"
+
+        // Buat daftar kandidat path yang akan dicoba, urut prioritas:
+        // 1. Path asli + query (misal /dashboard-vatout?year=2026)
+        // 2. Path asli saja  (misal /inbox-vatout)
+        // 3. Jika ini halaman inbox → coba ekuivalennya di dashboard
+        const candidates = [
+            rawPath + rawSearch,
+            rawPath,
+        ];
+        if (rawPath.startsWith('/inbox-')) {
+            const dashPath = rawPath.replace('/inbox-', '/dashboard-');
+            candidates.push(dashPath + rawSearch, dashPath);
         }
 
-        const activeLink = document.querySelector(`.sidebar-link[href="${currentPath}"]`);
-        
+        // Coba satu per satu sampai ada yang ketemu
+        let activeLink = null;
+        for (const p of candidates) {
+            activeLink = document.querySelector(`.sidebar-link[href="${p}"]`);
+            if (activeLink) break;
+        }
+
         if (activeLink) {
             activeLink.classList.add('active');
+
+            // Buka parent sidebar-group (MODUL PAJAK, AKUNTANSI, dll)
             const parentGroup = activeLink.closest('.sidebar-group');
-            if (parentGroup) {
-                parentGroup.classList.add('expanded');
-            }
-            clearInterval(checkSidebar); // Hentikan pengecekan jika sudah ketemu
+            if (parentGroup) parentGroup.classList.add('expanded');
+
+            // Buka parent sub-menu nested (Faktur Keluaran, dst)
+            const parentNested = activeLink.closest('.sidebar-item-nested');
+            if (parentNested) parentNested.classList.add('open');
+
+            clearInterval(checkSidebar);
         }
     }, 100);
-    
-    // Berhenti cek setelah 3 detik jika tidak ketemu
-    setTimeout(() => clearInterval(checkSidebar), 3000);
+
+    // Berhenti cek setelah 4 detik (lebih lama karena sidebar.js fetch API tahun)
+    setTimeout(() => clearInterval(checkSidebar), 4000);
 });
