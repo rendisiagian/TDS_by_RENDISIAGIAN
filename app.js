@@ -275,8 +275,8 @@ db.serialize(() => {
         db.run(`CREATE TABLE IF NOT EXISTS inbox_${mod.id} (id INTEGER PRIMARY KEY AUTOINCREMENT, entitas TEXT, link_pdf_lokal TEXT, status TEXT DEFAULT 'Menunggu Lengkapi', diinput_oleh TEXT, data_ekstraksi TEXT, waktu DATETIME DEFAULT CURRENT_TIMESTAMP)`);
 
         if (mod.id.startsWith('vat')) {
-            db.run(`CREATE TABLE IF NOT EXISTS data_${mod.id} (no_faktur TEXT PRIMARY KEY, entitas TEXT, kode_cabang TEXT, npwp_penjual TEXT, nama_penjual TEXT, alamat_penjual TEXT, npwp_pembeli TEXT, nama_pembeli TEXT, alamat_pembeli TEXT, tanggal_faktur DATE, harga_jual REAL, diskon REAL, uang_muka REAL, dpp REAL, ppn REAL, referensi TEXT, kota_penerbit TEXT, penandatangan TEXT, no_invoice_internal TEXT, tgl_tukar_faktur DATE, diinput_oleh TEXT, link_pdf_lokal TEXT, waktu_input DATETIME DEFAULT CURRENT_TIMESTAMP)`);
-            const alterCols = ['alamat_penjual TEXT', 'alamat_pembeli TEXT', 'diskon REAL', 'uang_muka REAL', 'kota_penerbit TEXT', 'penandatangan TEXT', 'harga_jual REAL'];
+            db.run(`CREATE TABLE IF NOT EXISTS data_${mod.id} (no_faktur TEXT PRIMARY KEY, entitas TEXT, kode_cabang TEXT, npwp_penjual TEXT, nama_penjual TEXT, alamat_penjual TEXT, npwp_pembeli TEXT, nama_pembeli TEXT, alamat_pembeli TEXT, tanggal_faktur DATE, harga_jual REAL, diskon REAL, uang_muka REAL, dpp REAL, ppn REAL, referensi TEXT, kota_penerbit TEXT, penandatangan TEXT, no_invoice_internal TEXT, tgl_tukar_faktur DATE, diinput_oleh TEXT, link_pdf_lokal TEXT, format_tipe TEXT DEFAULT 'LEGACY', waktu_input DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+            const alterCols = ['alamat_penjual TEXT', 'alamat_pembeli TEXT', 'diskon REAL', 'uang_muka REAL', 'kota_penerbit TEXT', 'penandatangan TEXT', 'harga_jual REAL', 'format_tipe TEXT'];
             alterCols.forEach(col => { db.run(`ALTER TABLE data_${mod.id} ADD COLUMN ${col}`, () => { }); });
             db.run(`CREATE TABLE IF NOT EXISTS item_${mod.id} (id INTEGER PRIMARY KEY AUTOINCREMENT, no_faktur TEXT, nama_barang TEXT, harga_satuan REAL, qty REAL, satuan TEXT, diskon REAL, total_harga REAL)`);
         } else {
@@ -1135,7 +1135,7 @@ io.on('connection', (socket) => {
                     noFaktur: cleanNoFaktur,
                     namaVendor: mVen?.[1].trim(), alamatVendor: mAlmVen ? mAlmVen[1].replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : "-", npwpVendor: mNpwpVen?.[1].trim(),
                     namaPembeli: mPem?.[1].trim(), alamatPembeli: mAlmPem ? mAlmPem[1].replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : "-", npwpPembeli: mNpwpPem?.[1].trim(),
-                    tanggalFaktur: mTgl ? formatTanggal(mTgl[2]) : "-", kotaPenerbit: mTgl ? mTgl[1].trim() : "-",
+                    tanggalFaktur: mTgl ? formatTanggal(mTgl[2]) : "-", kotaPenerbit: mTgl ? mTgl[1].trim() : "-", format_tipe: isLegacy ? 'LEGACY' : 'MODERN',
                     // Referensi: legacy ambil full teks sejak label "INVOICE NO. :", modern ambil isi grup tangkap saja
                     referensi: isLegacy
                         ? (mRefLegacy ? mRefLegacy[1].trim().replace(/\s*\d+\s+dari\s+\d+\s*$/i, '').replace(/\s+/g, ' ') : "-")
@@ -1180,8 +1180,8 @@ io.on('connection', (socket) => {
 
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
-            db.run(`INSERT INTO data_vatout (no_faktur, entitas, kode_cabang, npwp_penjual, nama_penjual, alamat_penjual, npwp_pembeli, nama_pembeli, alamat_pembeli, tanggal_faktur, harga_jual, diskon, uang_muka, referensi, kota_penerbit, penandatangan, dpp, ppn, no_invoice_internal, tgl_tukar_faktur, diinput_oleh, link_pdf_lokal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [d.noFaktur, d.entitas, d.branchInput, d.npwpVendor, d.namaVendor, d.alamatVendor, d.npwpPembeli, d.namaPembeli, d.alamatPembeli, d.tanggalFaktur, d.hargaJual, d.diskon, d.uangMuka, d.referensi, d.kotaPenerbit, d.penandatangan, d.dpp, d.ppn, d.invoiceInput, d.tglTukarInput, d.username, d.link_pdf_lokal], function (err) {
+            db.run(`INSERT INTO data_vatout (no_faktur, entitas, kode_cabang, npwp_penjual, nama_penjual, alamat_penjual, npwp_pembeli, nama_pembeli, alamat_pembeli, tanggal_faktur, harga_jual, diskon, uang_muka, referensi, kota_penerbit, penandatangan, dpp, ppn, no_invoice_internal, tgl_tukar_faktur, diinput_oleh, link_pdf_lokal, format_tipe) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [d.noFaktur, d.entitas, d.branchInput, d.npwpVendor, d.namaVendor, d.alamatVendor, d.npwpPembeli, d.namaPembeli, d.alamatPembeli, d.tanggalFaktur, d.hargaJual, d.diskon, d.uangMuka, d.referensi, d.kotaPenerbit, d.penandatangan, d.dpp, d.ppn, d.invoiceInput, d.tglTukarInput, d.username, d.link_pdf_lokal, d.format_tipe], function (err) {
                     if (err) { db.run("ROLLBACK"); return; }
 
                     let stmt = db.prepare(`INSERT INTO item_vatout (no_faktur, nama_barang, harga_satuan, qty, satuan, diskon, total_harga) VALUES (?, ?, ?, ?, ?, ?, ?)`);
