@@ -244,6 +244,14 @@ db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS master_client (npwp TEXT PRIMARY KEY, nama TEXT, alamat TEXT, format_tipe TEXT, tanggal_terakhir DATE)`);
     db.run(`CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, username TEXT, action TEXT, module TEXT, details TEXT, waktu DATETIME DEFAULT CURRENT_TIMESTAMP)`);
 
+    const ensureColumn = (table, columnDef) => {
+        db.run(`ALTER TABLE ${table} ADD COLUMN ${columnDef}`, () => { });
+    };
+    ensureColumn('master_vendor', 'format_tipe TEXT');
+    ensureColumn('master_vendor', 'tanggal_terakhir DATE');
+    ensureColumn('master_client', 'format_tipe TEXT');
+    ensureColumn('master_client', 'tanggal_terakhir DATE');
+
     global.insertAuditLog = function (user_id, username, action, module, details) {
         db.run(`INSERT INTO audit_logs (user_id, username, action, module, details) VALUES (?, ?, ?, ?, ?)`, [user_id, username, action, module, details], (err) => {
             if (err) console.error("Audit Log Error:", err);
@@ -407,6 +415,15 @@ app.get('/api/prepaid-comparison/:noBppu', cekAuth, (req, res) => {
     });
 });
 
+// API: Summary Prepaid Tax
+app.get('/api/summary-prepaid', cekAuth, (req, res) => {
+    const entitas = req.query.entitas || 'BBS';
+    db.all(`SELECT v.no_faktur, v.tanggal_faktur, strftime('%d-%m-%Y', v.tanggal_faktur) AS tanggal_faktur_format, strftime('%m-%Y', v.tanggal_faktur) AS masa_pajak_faktur, d.masa_pajak AS masa_pajak_bppu, COUNT(*) AS jumlah_bppu, COALESCE(SUM(d.dpp), 0) AS total_dpp, COALESCE(SUM(d.nilai_pph), 0) AS total_pph FROM data_prepaid d LEFT JOIN data_vatout v ON d.no_invoice_internal = v.no_invoice_internal AND d.entitas = v.entitas WHERE d.entitas = ? GROUP BY v.no_faktur, v.tanggal_faktur, d.masa_pajak ORDER BY v.tanggal_faktur DESC, d.masa_pajak`, [entitas], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows || []);
+    });
+});
+
 // API: CLIENT LEDGER
 app.get('/api/data-client-ledger', cekAuth, (req, res) => {
     const entitas = req.query.entitas || 'BBS';
@@ -475,6 +492,7 @@ app.get('/api/data-client-ledger', cekAuth, (req, res) => {
 
 modules.forEach(mod => {
     app.get(`/dashboard-${mod.id}`, cekAuth, (req, res) => res.sendFile(path.join(__dirname, mod.path, `dashboard_${mod.id}.html`)));
+    app.get(`/summary-${mod.id}`, cekAuth, (req, res) => res.sendFile(path.join(__dirname, mod.path, `summary_${mod.id}.html`)));
     app.get(`/inbox-${mod.id}`, cekAuth, (req, res) => res.sendFile(path.join(__dirname, mod.path, `inbox_${mod.id}.html`)));
 
     // --- SERVER-SIDE DATATABLES ENGINE ---
@@ -485,6 +503,8 @@ modules.forEach(mod => {
 
         let baseSql = mod.id.startsWith('vat')
             ? `FROM data_${mod.id} d LEFT JOIN master_cabang c ON d.kode_cabang = c.kode_cabang WHERE d.entitas = ?`
+            : mod.id === 'prepaid'
+            ? `FROM data_${mod.id} d LEFT JOIN master_cabang c ON d.kode_cabang = c.kode_cabang LEFT JOIN data_vatout v ON d.no_invoice_internal = v.no_invoice_internal AND d.entitas = v.entitas WHERE d.entitas = ?`
             : `FROM data_${mod.id} d LEFT JOIN master_cabang c ON d.kode_cabang = c.kode_cabang WHERE d.entitas = ?`;
 
         let params = [entitas];
@@ -526,6 +546,8 @@ modules.forEach(mod => {
 
             let selectSql = mod.id.startsWith('vat')
                 ? `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_faktur) AS tanggal_format, strftime('%d-%m-%Y', d.tgl_tukar_faktur) AS tgl_tukar_format ${baseSql} ORDER BY CAST(SUBSTR(d.no_invoice_internal, 1, MAX(1, INSTR(d.no_invoice_internal, '/') - 1)) AS INTEGER) ASC, d.waktu_input DESC`
+                : mod.id === 'prepaid'
+                ? `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_dokumen) AS tgl_dokumen_format, strftime('%m-%Y', v.tanggal_faktur) AS masa_pajak_faktur ${baseSql} ORDER BY d.waktu_input DESC`
                 : `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_dokumen) AS tgl_dokumen_format ${baseSql} ORDER BY d.waktu_input DESC`;
 
             if (limit) {

@@ -621,33 +621,28 @@ tbody tr:hover td { background-color: var(--primary-100) !important; }
 }
 
 .badge-success {
-    background: linear-gradient(135deg, var(--success-50) 0%, #d1fae5 100%);
+    background: transparent;
     color: var(--success-700);
-    border: 1px solid var(--success-500);
 }
 
 .badge-pending {
-    background: linear-gradient(135deg, var(--warning-50) 0%, #fef3c7 100%);
+    background: transparent;
     color: var(--warning-600);
-    border: 1px solid var(--warning-500);
 }
 
 .badge-verified {
-    background: linear-gradient(135deg, var(--success-50) 0%, #d1fae5 100%);
+    background: transparent;
     color: var(--success-700);
-    border: 1px solid var(--success-500);
 }
 
 .badge-pending-edit {
-    background: linear-gradient(135deg, var(--primary-50) 0%, #dbeafe 100%);
+    background: transparent;
     color: var(--primary-700);
-    border: 1px solid var(--primary-500);
 }
 
 .badge-role {
-    background: linear-gradient(135deg, var(--primary-50) 0%, #dbeafe 100%);
+    background: transparent;
     color: var(--primary-700);
-    border: 1px solid var(--primary-500);
 }
 
 /* === 14. BUTTONS === */
@@ -843,6 +838,7 @@ textarea,
     padding: 0.2rem 0.4rem !important;
     font-size: 0.7rem !important;
     border-radius: 3px !important;
+    background-color: transparent !important;
 }
 
 input:focus,
@@ -2591,4 +2587,4 @@ tbody:empty::after {
 
 .sidebar-item-nested.open .chevron {
     transform: rotate(180deg);
-}
+}

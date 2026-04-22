@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Summary Prepaid Tax | Tax Upload and Database</title>
+    <script src="/theme.js"></script>
+    <script src="/export.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@latest/dist/xlsx.full.min.js"></script>
+    <script src="/pagination.js"></script>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        .modal-item-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
+        .modal-item-table th, .modal-item-table td { border: 1px solid var(--border-color); padding: 10px; text-align: left; }
+        .modal-item-table th { background-color: var(--bg-secondary); font-weight: 600; }
+        .btn-icon-aksi { cursor: pointer; border: none; background: none; font-size: 1.1rem; padding: 5px; transition: 0.2s; text-decoration: none; }
+        .btn-icon-aksi:hover { transform: scale(1.2); }
+        .mt-15 { margin-top: 15px; }
+        .btn-clear-filter { background-color: var(--danger-500); color: white; border: none; padding: 6px 15px; border-radius: 5px; font-size: 0.85rem; cursor: pointer; display: none; font-weight: bold; }
+        .btn-clear-filter:hover { background-color: var(--danger-600); }
+        .table-responsive { max-height: calc(100vh - 320px); }
+    </style>
+<script src="/sidebar.js"></script>
+</head>
+<body>
+    <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
+
+    <div class="app-wrapper">
+        <div id="sidebar-container"></div>
+
+        <main class="main-content">
+            <header class="header">
+                <h2>Summary Prepaid Tax</h2>
+                <div class="user-profile"><span id="header-user-name"></span>
+                    <a href="/logout" class="btn-logout">Logout</a>
+                </div>
+            </header>
+
+            <div class="container">
+                <div class="card">
+                    <div class="card-header-padding" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                        <h3 class="title-primary" style="border-left-color: var(--primary-500); margin: 0;">Perbandingan Masa Pajak Faktur vs BPPU</h3>
+                        
+                        <div class="toolbar-actions">
+                            <button class="btn-toolbar btn-toolbar-export" onclick="showExportMenu(event, 'tabel-data', 'summary_prepaid_' + aktifEntitas)" data-testid="btn-export">Export</button>
+                            <button class="btn-toolbar btn-toolbar-print" onclick="window.print()" data-testid="btn-print">&#128424; Print</button>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table id="tabel-data">
+                            <thead>
+                                <tr>
+                                    <th class="col-no text-center">No.</th>
+                                    <th class="text-center">No. Faktur</th>
+                                    <th class="text-center">Tanggal Faktur</th>
+                                    <th class="text-center">Masa Pajak Faktur</th>
+                                    <th class="text-center">Masa Pajak BPPU</th>
+                                    <th class="text-center">Jumlah BPPU</th>
+                                    <th class="text-center">Total DPP</th>
+                                    <th class="text-center">Total PPh Dipotong</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabel-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const socket = io();
+        let aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
+        let currentUser = {};
+
+        function bersihkanAngka(t) {
+            if (t === null || t === undefined || t === '') return 0;
+            return parseFloat(t.toString().replace(/\./g, '').replace(',', '.')) || 0;
+        }
+
+        fetch('/api/me').then(res => res.json()).then(u => currentUser = u);
+
+        fetch('/sidebar.html').then(res => res.text()).then(html => {
+            document.getElementById('sidebar-container').innerHTML = html;
+            const currentPath = window.location.pathname;
+            document.querySelectorAll('.sidebar-link').forEach(link => {
+                if (link.getAttribute('href') === currentPath) link.classList.add('active');
+            });
+            const sidebarSelect = document.getElementById('global-entity-select');
+            if (sidebarSelect) sidebarSelect.value = aktifEntitas;
+        });
+
+        socket.on('data-baru-prepaid', () => loadSummary());
+
+        window.gantiEntitas = function(entitas) {
+            aktifEntitas = entitas;
+            localStorage.setItem('lastEntitas', entitas); 
+            const sidebarSelect = document.getElementById('global-entity-select');
+            if (sidebarSelect && sidebarSelect.value !== entitas) sidebarSelect.value = entitas;
+            loadSummary();
+        };
+
+        async function loadSummary() {
+            const res = await fetch('/api/summary-prepaid?entitas=' + aktifEntitas);
+            const data = await res.json();
+            
+            const tbody = document.getElementById('tabel-body');
+            tbody.innerHTML = '';
+            const formatRupiah = (n) => "Rp " + bersihkanAngka(n).toLocaleString('id-ID');
+
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding:20px; color:var(--text-tertiary);">Data tidak ditemukan.</td></tr>`;
+            }
+
+            data.forEach((baris, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="text-center">${index + 1}</td>
+                    <td class="text-center" style="color:var(--primary-600); font-weight:bold;">${baris.no_faktur || '-'}</td>
+                    <td class="text-center">${baris.tanggal_faktur_format || '-'}</td>
+                    <td class="text-center"><span class="badge-success">${baris.masa_pajak_faktur || '-'}</span></td>
+                    <td class="text-center"><span class="badge-success">${baris.masa_pajak_bppu || '-'}</span></td>
+                    <td class="text-center">${baris.jumlah_bppu || 0}</td>
+                    <td class="text-right">${formatRupiah(baris.total_dpp)}</td>
+                    <td class="text-right" style="font-weight:600; color:var(--primary-600);">${formatRupiah(baris.total_pph)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        loadSummary();
+    </script>
+</body>
+</html>

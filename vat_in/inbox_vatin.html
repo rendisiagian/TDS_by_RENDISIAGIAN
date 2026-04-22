@@ -154,7 +154,7 @@
         async function loadInbox(page, limit) {
             page = page || 1;
             limit = limit || 50;
-            const res = await fetch('/api/inbox-vatin?page=' + page + '&limit=' + limit);
+            const res = await fetch('/api/inbox-vatin?page=' + page + '&limit=' + limit + '&entitas=' + encodeURIComponent(aktifEntitas));
             const result = await res.json();
             const data = result.data || result;
             const total = result.total || data.length;
@@ -164,10 +164,7 @@
             tbody.innerHTML = '';
             const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
 
-            // Logika Penyaringan Data berdasarkan Entitas Aktif
-            const filteredData = data.filter(row => row.entitas === aktifEntitas);
-
-            filteredData.forEach((row, index) => {
+            data.forEach((row, index) => {
                 const tr = document.createElement('tr');
                 let parsed = {};
                 try { parsed = JSON.parse(row.data_ekstraksi); } catch(e) {}

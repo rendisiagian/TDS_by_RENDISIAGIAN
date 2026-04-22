@@ -40,7 +40,15 @@
                 </div>
                 <a href="/dashboard-vatin" class="sidebar-link">Faktur Masukan</a>
                 <a href="/dashboard-payable" class="sidebar-link">Tax Payable</a>
-                <a href="/dashboard-prepaid" class="sidebar-link">Prepaid Tax</a>
+                <div class="sidebar-item-nested">
+                    <span class="sidebar-link collapsible-sub" onclick="toggleSubMenu('sub-prepaid')">
+                        Prepaid Tax <span class="chevron">▼</span>
+                    </span>
+                    <div id="sub-prepaid" class="sidebar-sub-menu">
+                        <a href="/dashboard-prepaid" class="sidebar-link sub-link">📊 Dashboard</a>
+                        <a href="/summary-prepaid" class="sidebar-link sub-link">📊 Summary Masa Pajak</a>
+                    </div>
+                </div>
             </div>
         </div>
 

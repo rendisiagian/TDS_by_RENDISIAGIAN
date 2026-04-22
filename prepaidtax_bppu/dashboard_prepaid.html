@@ -6,6 +6,7 @@
     <title>Prepaid Tax | Tax Upload and Database</title>
     <script src="/theme.js"></script>
     <script src="/export.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@latest/dist/xlsx.full.min.js"></script>
     <script src="/pagination.js"></script>
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
@@ -84,9 +85,11 @@
                                     <th class="text-center">Masa Pajak</th>
                                     <th class="text-center">Nama Client (Pemotong)</th>
                                     <th class="text-center">No. BPPU</th>
+                                    <th class="text-center">Masa Faktur Pajak</th>
                                     <th class="text-center">DPP</th>
                                     <th class="text-center">Tarif (%)</th>
                                     <th class="text-center">Nilai PPh Dipotong</th>
+                                    <th class="text-center">Selisih DPP</th>
                                     <th class="text-center">No. Internal Tagihan</th>
                                     <th class="text-center">Diinput Oleh</th>
                                 </tr>
@@ -96,9 +99,11 @@
                                     <th><input type="text" class="filter-input" data-col="d.masa_pajak" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.nama_pemotong" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.no_bppu" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="masa_pajak_faktur" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.dpp" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.tarif" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.nilai_pph" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..." disabled style="background-color: var(--bg-secondary); cursor: not-allowed;"></th>
                                     <th><input type="text" class="filter-input" data-col="d.no_invoice_internal" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.diinput_oleh" placeholder="🔍 Cari..."></th>
                                 </tr>
@@ -157,6 +162,11 @@
         let currentLimit = 50;
         let currentSearch = {};
 
+        function bersihkanAngka(t) {
+            if (t === null || t === undefined || t === '') return 0;
+            return parseFloat(t.toString().replace(/\./g, '').replace(',', '.')) || 0;
+        }
+
         fetch('/api/me').then(res => res.json()).then(u => currentUser = u);
 
         fetch('/sidebar.html').then(res => res.text()).then(html => {
@@ -200,15 +210,15 @@
             const result = await res.json();
             const data = result.data || [];
             const total = result.total || 0;
-            const offset = (currentPage - 1) * currentLimit;
+            const offset = currentLimit === 'all' ? 0 : ((currentPage - 1) * currentLimit);
             
             const tbody = document.getElementById('tabel-body');
             tbody.innerHTML = ''; 
-            const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
+            const formatRupiah = (n) => "Rp " + bersihkanAngka(n).toLocaleString('id-ID');
 
             // Update Statistics Cards
             let totalDPP = 0, totalPPh = 0;
-            data.forEach(d => { totalDPP += Number(d.dpp || 0); totalPPh += Number(d.nilai_pph || 0); });
+            data.forEach(d => { totalDPP += bersihkanAngka(d.dpp); totalPPh += bersihkanAngka(d.nilai_pph); });
             document.getElementById('stat-total').textContent = total + ' BPPU';
             document.getElementById('stat-ppn').textContent = formatRupiah(totalPPh);
             document.getElementById('stat-dpp').textContent = formatRupiah(totalDPP);
@@ -225,15 +235,15 @@
             var lastMonthData = data.filter(function(d) { var dt = new Date(d.tanggal_dokumen); return dt.getMonth() === lastMonth && dt.getFullYear() === lastYear; });
             
             updateMoM('mom-total', thisMonthData.length, lastMonthData.length, ' BPPU');
-            var thisMonthPPh = thisMonthData.reduce(function(s,d){return s+Number(d.nilai_pph||0)},0);
-            var lastMonthPPh = lastMonthData.reduce(function(s,d){return s+Number(d.nilai_pph||0)},0);
+            var thisMonthPPh = thisMonthData.reduce(function(s,d){return s+bersihkanAngka(d.nilai_pph)},0);
+            var lastMonthPPh = lastMonthData.reduce(function(s,d){return s+bersihkanAngka(d.nilai_pph)},0);
             updateMoM('mom-ppn', thisMonthPPh, lastMonthPPh, '');
 
             if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="12" class="text-center" style="padding:20px; color:var(--text-tertiary);">Data tidak ditemukan.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="14" class="text-center" style="padding:20px; color:var(--text-tertiary);">Data tidak ditemukan.</td></tr>`;
             }
 
-            data.forEach((baris, index) => {
+            data.forEach(async (baris, index) => {
                 const tr = document.createElement('tr');
                 let curBr = baris.kode_cabang || '';
                 let curInv = baris.no_invoice_internal || '';
@@ -244,6 +254,26 @@
                 let btnDel  = `<button class="btn-tbl btn-tbl-del" title="Hapus Data" onclick="handleAction('${baris.no_bppu}', 'DELETE')">Hapus</button>`;
                 let btnPdf = baris.link_pdf_lokal ? `<a href="/${baris.link_pdf_lokal}" target="_blank" class="btn-tbl btn-tbl-pdf">PDF</a>` : `-`;
 
+                // Hitung selisih DPP
+                let selisihText = '<span style="color:var(--text-tertiary);">Menghitung...</span>';
+                let selisihValue = 0;
+                try {
+                    const res = await fetch(`/api/prepaid-comparison/${baris.no_bppu}`);
+                    const comparisonData = await res.json();
+                    if (comparisonData.prepaid && comparisonData.vatout) {
+                        const dppBP = comparisonData.prepaid.dpp || 0;
+                        const dppVO = comparisonData.vatout.dpp || 0;
+                        const selisih = dppBP - dppVO;
+                        selisihValue = selisih;
+                        const selisihClass = selisih === 0 ? 'color:var(--text-primary)' : (selisih > 0 ? 'color:var(--success-600)' : 'color:var(--danger-600)');
+                        selisihText = `<span style="${selisihClass}; font-weight:600;" data-selisih="${selisih}">${formatRupiah(selisih)}</span>`;
+                    } else {
+                        selisihText = '<span style="color:var(--text-tertiary);" data-selisih="0">-</span>';
+                    }
+                } catch (err) {
+                    selisihText = '<span style="color:var(--text-tertiary);" data-selisih="0">-</span>';
+                }
+
                 tr.innerHTML = `
                     <td class="text-center">${barisNo}</td>
                     <td class="text-center" style="white-space:nowrap;">${btnView} ${btnEdit} ${btnDel}</td>
@@ -252,9 +282,11 @@
                     <td class="text-center"><span class="badge-success">${baris.masa_pajak || '-'}</span></td>
                     <td class="text-bold">${baris.nama_pemotong || '-'}</td>
                     <td class="text-center" style="color:var(--primary-600); font-weight:bold;">${baris.no_bppu || '-'}</td>
+                    <td class="text-center"><span class="badge-success">${baris.masa_pajak_faktur || '-'}</span></td>
                     <td class="text-right">${formatRupiah(baris.dpp)}</td>
                     <td class="text-center">${baris.tarif}%</td>
                     <td class="text-right" style="font-weight:600; color:var(--primary-600);">${formatRupiah(baris.nilai_pph)}</td>
+                    <td class="text-center" data-selisih="${selisihValue}">${selisihText}</td>
                     <td class="text-center">${baris.no_invoice_internal || '-'}</td>
                     <td class="text-center text-diinput">${baris.diinput_oleh || '-'}</td>
                 `;

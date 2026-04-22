@@ -6,6 +6,7 @@
     <title>VAT IN | Tax Upload and Database</title>
     <script src="/theme.js"></script>
     <script src="/export.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@latest/dist/xlsx.full.min.js"></script>
     <script src="/pagination.js"></script>
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
@@ -183,7 +184,7 @@
             const result = await res.json();
             const data = result.data || [];
             const total = result.total || 0;
-            const offset = (currentPage - 1) * currentLimit;
+            const offset = currentLimit === 'all' ? 0 : ((currentPage - 1) * currentLimit);
             
             const tbody = document.getElementById('tabel-body');
             tbody.innerHTML = ''; 
