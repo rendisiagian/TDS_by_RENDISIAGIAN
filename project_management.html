@@ -3,11 +3,365 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Management Report</title>
+    <title>Project Management Report & Profitability</title>
     <script src="/theme.js"></script>
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
-<script src="/sidebar.js"></script>
+    <script src="/sidebar.js"></script>
+    
+    <!-- Google Fonts for Modern Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+            --bg-body: #f8fafc;
+            
+            --card-budget: linear-gradient(135deg, #4f46e5 0%, #818cf8 100%);
+            --card-revenue: linear-gradient(135deg, #059669 0%, #34d399 100%);
+            --card-cost: linear-gradient(135deg, #dc2626 0%, #f87171 100%);
+            --card-margin-pos: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%);
+            --card-margin-neg: linear-gradient(135deg, #ea580c 0%, #fb923c 100%);
+        }
+
+        [data-theme="dark"] {
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            --bg-body: #0f172a;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--surface-50);
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(253,16%,7%,0.05) 0, transparent 50%), 
+                radial-gradient(at 50% 0%, hsla(225,39%,30%,0.05) 0, transparent 50%), 
+                radial-gradient(at 100% 0%, hsla(339,49%,30%,0.05) 0, transparent 50%);
+            background-attachment: fixed;
+        }
+
+        h1, h2, h3, h4, h5 {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .header {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 10px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            min-height: 52px;
+        }
+
+        .header h2 {
+            margin: 0;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--primary-600), var(--primary-400));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 1.5rem;
+        }
+
+        .filter-section {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-top: 24px;
+            box-shadow: var(--glass-shadow);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            transition: transform 0.3s ease;
+        }
+
+        .filter-section:hover {
+            transform: translateY(-2px);
+        }
+
+        .filter-section select {
+            flex: 1;
+            padding: 14px 20px;
+            font-size: 1.1rem;
+            border-radius: 12px;
+            border: 2px solid var(--primary-200);
+            background: var(--surface-100);
+            color: var(--text-900);
+            font-family: 'Outfit', sans-serif;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%234f46e5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 15px center;
+            background-size: 20px;
+        }
+
+        .filter-section select:focus {
+            outline: none;
+            border-color: var(--primary-500);
+            box-shadow: 0 0 0 4px var(--primary-100);
+        }
+
+        /* Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            margin-top: 10px;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @media (max-width: 1200px) {
+            .dashboard-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        .dashboard-grid.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .stat-card {
+            border-radius: 14px;
+            padding: 14px 16px;
+            color: white;
+            box-shadow: 0 6px 16px -3px rgba(0, 0, 0, 0.12);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 20px -4px rgba(0, 0, 0, 0.2);
+        }
+
+        .stat-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(rgba(255,255,255,0.2), rgba(255,255,255,0));
+            border-radius: 50%;
+            transform: translate(30%, -30%);
+            pointer-events: none;
+        }
+
+        .stat-card h5 {
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin: 0 0 6px 0;
+            opacity: 0.85;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .stat-card h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0;
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+        }
+
+        .stat-card h2 span.currency {
+            font-size: 0.85rem;
+            opacity: 0.8;
+            font-weight: 500;
+        }
+
+        .bg-budget { background: var(--card-budget); }
+        .bg-revenue { background: var(--card-revenue); }
+        .bg-cost { background: var(--card-cost); }
+        .bg-margin-pos { background: var(--card-margin-pos); }
+        .bg-margin-neg { background: var(--card-margin-neg); }
+
+        /* Progress Bar for Billing */
+        .progress-container {
+            margin-top: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            height: 5px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: white;
+            border-radius: 6px;
+            width: 0%;
+            transition: width 1.5s cubic-bezier(0.22, 1, 0.36, 1);
+            position: relative;
+        }
+
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            margin-top: 4px;
+            font-weight: 600;
+            opacity: 0.9;
+        }
+
+        /* Tables Layout */
+        .tables-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-top: 32px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s;
+        }
+
+        @media (max-width: 1100px) {
+            .tables-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .tables-grid.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .table-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: var(--glass-shadow);
+        }
+
+        .table-card h3 {
+            margin-top: 0;
+            font-size: 1.4rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--surface-200);
+            margin-bottom: 20px;
+        }
+
+        .table-card h3.out { color: var(--success-600); }
+        .table-card h3.in { color: var(--danger-600); }
+
+        .modern-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 8px;
+        }
+
+        .modern-table th {
+            background: transparent;
+            color: var(--text-500);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+            padding: 10px 15px;
+            border: none;
+        }
+
+        .modern-table tbody tr {
+            background: var(--surface-100);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .modern-table tbody tr:hover {
+            transform: scale(1.01);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            background: var(--surface-200);
+        }
+
+        .modern-table td {
+            padding: 16px 15px;
+            border: none;
+            color: var(--text-800);
+        }
+
+        .modern-table td:first-child { border-radius: 12px 0 0 12px; }
+        .modern-table td:last-child { border-radius: 0 12px 12px 0; }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-500);
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.2rem;
+        }
+        
+        .empty-state span {
+            display: block;
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .amount-cell {
+            font-family: 'Inter', monospace;
+            font-weight: 600;
+            text-align: right;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--glass-bg);
+            backdrop-filter: blur(5px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 20px;
+            z-index: 10;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .loading-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--primary-200);
+            border-top: 4px solid var(--primary-600);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .val-animate {
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+    </style>
 </head>
 <body>
     <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
@@ -17,82 +371,126 @@
 
         <main class="main-content">
             <header class="header">
-                <h2>Branch Invoice Report</h2>
+                <h2>Project Profitability Control</h2>
                 <div class="user-profile">
-                    <span id="user-name-display"></span>
-                    <a href="/logout" class="btn-logout">Logout</a>
+                    <span id="user-name-display" style="font-weight: 600; font-family: 'Outfit', sans-serif;"></span>
+                    <a href="/logout" class="btn-logout" style="border-radius: 20px; font-weight: 500;">Logout</a>
                 </div>
             </header>
 
-            <div class="container">
-                <div id="restricted-notice" class="d-none" style="padding: 20px; background: var(--danger-50); color: var(--danger-700); border: 1px solid var(--danger-300); border-radius: 8px; margin-bottom: 20px; font-weight: bold;">
-                    ⚠️ Anda tidak memiliki hak akses (Administrator) untuk mengelola proyek. Anda hanya dapat melihat data.
-                </div>
+            <div class="container" style="max-width: 100%; padding: 0 32px; padding-bottom: 50px; overflow: visible;">
 
-
-
-                <!-- Project Summary Section -->
-                <div class="card" id="project-summary-section" style="margin-top: 20px;">
-                    <h3 class="title-primary">📊 Summary Branch</h3>
-                    
-                    <div class="form-group">
-                        <label>Pilih Branch</label>
-                        <select id="project-select" onchange="loadProjectSummary()">
-                            <option value="">-- Pilih Branch --</option>
+                <div class="sticky-controls" style="position: sticky; top: 0; z-index: 90; padding: 0 0 12px 0; background: var(--bg-secondary); box-shadow: 0 4px 16px rgba(0,0,0,0.07); border-bottom: 1px solid var(--border-color);">
+                    <div class="filter-section" style="margin-top: 0; padding: 15px 24px;">
+                        <div style="font-size: 1.5rem;">🏢</div>
+                        <select id="project-select" onchange="handleProjectChange()" style="max-width: 400px; padding: 10px 20px;">
+                            <option value="">Pilih Branch / Project untuk dianalisis...</option>
+                        </select>
+                        
+                        <div style="font-size: 1.5rem; margin-left: 20px;">📅</div>
+                        <select id="year-select" onchange="handleProjectChange()" style="max-width: 250px; padding: 10px 20px;">
+                            <option value="all">Seluruh Tahun</option>
+                            <option value="2026">2026</option>
+                            <option value="2025">2025</option>
+                            <option value="2024">2024</option>
+                            <option value="2023">2023</option>
+                            <option value="2022">2022</option>
                         </select>
                     </div>
 
-                    <!-- Summary Cards -->
-                    <div id="summary-cards" style="display: none; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                        <div class="card" style="background-color: var(--primary-50); border: 1px solid var(--primary-200); padding: 15px;">
-                            <h5 style="color: var(--primary-700); margin-top: 0; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Total DPP Keluaran</h5>
-                            <h3 id="tot-keluaran-dpp" style="color: var(--primary-800); margin-bottom: 0; font-size: 1.8em;">Rp 0</h3>
-                        </div>
-                        <div class="card" style="background-color: var(--success-50); border: 1px solid var(--success-200); padding: 15px;">
-                            <h5 style="color: var(--success-700); margin-top: 0; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Total DPP Masukan</h5>
-                            <h3 id="tot-masukan-dpp" style="color: var(--success-800); margin-bottom: 0; font-size: 1.8em;">Rp 0</h3>
-                        </div>
-                        <div class="card" id="margin-card" style="background-color: var(--warning-50); border: 1px solid var(--warning-200); padding: 15px;">
-                            <h5 style="color: var(--warning-700); margin-top: 0; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Margin DPP (Keluaran - Masukan)</h5>
-                            <h3 id="margin-dpp" style="color: var(--warning-800); margin-bottom: 0; font-size: 1.8em;">Rp 0</h3>
+                <!-- Dashboard Statistics Grid -->
+                <div class="dashboard-grid" id="stats-grid">
+                    <div class="stat-card bg-budget">
+                        <h5>Target / Nilai Kontrak</h5>
+                        <h2 id="val-budget"><span class="currency">Rp</span> 0</h2>
+                        <div class="progress-text" style="opacity: 0.8; font-weight: 400; margin-top: 8px;">
+                            <span>Anggaran Proyek</span>
                         </div>
                     </div>
 
-                    <h4>Faktur Pajak Keluaran</h4>
-                    <div class="table-responsive">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Tanggal</th>
-                                    <th>No Faktur</th>
-                                    <th>Client</th>
-                                    <th>DPP</th>
-                                    <th>PPN</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tabel-keluaran">
-                                <tr><td colspan="5" class="text-center">Pilih project untuk melihat data</td></tr>
-                            </tbody>
-                        </table>
+                    <div class="stat-card bg-revenue">
+                        <h5>Total Tagihan (DPP Keluaran)</h5>
+                        <h2 id="val-revenue"><span class="currency">Rp</span> 0</h2>
+                        <div class="progress-container">
+                            <div class="progress-bar" id="bar-billed"></div>
+                        </div>
+                        <div class="progress-text">
+                            <span>Progress Tertagih</span>
+                            <span id="txt-billed-pct">0%</span>
+                        </div>
                     </div>
 
-                    <h4>Faktur Pajak Masukan</h4>
-                    <div class="table-responsive">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Tanggal</th>
-                                    <th>No Faktur</th>
-                                    <th>Supplier</th>
-                                    <th>DPP</th>
-                                    <th>PPN</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tabel-masukan">
-                                <tr><td colspan="5" class="text-center">Pilih project untuk melihat data</td></tr>
-                            </tbody>
-                        </table>
+                    <div class="stat-card bg-cost">
+                        <h5>Total Biaya (DPP Masukan)</h5>
+                        <h2 id="val-cost"><span class="currency">Rp</span> 0</h2>
+                        <div class="progress-container" style="background: rgba(255,255,255,0.3);">
+                            <div class="progress-bar" id="bar-cost" style="background: rgba(255,255,255,0.9);"></div>
+                        </div>
+                        <div class="progress-text">
+                            <span>Cost Ratio (vs Tagihan)</span>
+                            <span id="txt-cost-pct">0%</span>
+                        </div>
                     </div>
+
+                    <div class="stat-card bg-margin-pos" id="card-margin">
+                        <h5>Margin Proyek (Keluaran - Masukan)</h5>
+                        <h2 id="val-margin"><span class="currency">Rp</span> 0</h2>
+                        <div class="progress-text" style="opacity: 0.8; font-weight: 400; margin-top: 8px;" id="txt-margin-status">
+                            <span>Potensi Keuntungan Berdasarkan Pajak</span>
+                        </div>
+                    </div>
+                </div> <!-- End Dashboard Grid -->
+                </div> <!-- End Sticky Controls -->
+
+                <!-- Data Tables Grid -->
+                <div class="tables-grid" id="tables-grid">
+                    
+                    <!-- Table Keluaran -->
+                    <div class="table-card" style="position: relative;">
+                        <div class="loading-overlay" id="loading-keluaran">
+                            <div class="spinner"></div>
+                        </div>
+                        <h3 class="out">📈 Rincian Pendapatan (Faktur Keluaran)</h3>
+                        <div style="overflow-x: auto;">
+                            <table class="modern-table">
+                                <thead>
+                                    <tr>
+                                        <th>Tanggal</th>
+                                        <th>No. Faktur</th>
+                                        <th>Klien</th>
+                                        <th style="text-align: right;">DPP</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-keluaran">
+                                    <tr><td colspan="4"><div class="empty-state"><span>📊</span>Pilih project untuk melihat data tagihan.</div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Table Masukan -->
+                    <div class="table-card" style="position: relative;">
+                        <div class="loading-overlay" id="loading-masukan">
+                            <div class="spinner"></div>
+                        </div>
+                        <h3 class="in">📉 Rincian Biaya (Faktur Masukan)</h3>
+                        <div style="overflow-x: auto;">
+                            <table class="modern-table">
+                                <thead>
+                                    <tr>
+                                        <th>Tanggal</th>
+                                        <th>No. Faktur</th>
+                                        <th>Supplier</th>
+                                        <th style="text-align: right;">DPP</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-masukan">
+                                    <tr><td colspan="4"><div class="empty-state"><span>🛒</span>Pilih project untuk melihat data pengeluaran.</div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </main>
@@ -103,178 +501,202 @@
         let currentUser = {};
         let projectData = [];
 
-        // Sinkronisasi Sidebar
-        let aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
-        fetch('/sidebar.html')
-            .then(res => res.text())
-            .then(html => {
-                document.getElementById('sidebar-container').innerHTML = html;
-                initSidebar();
-            });
+        // Formatting Helpers
+        const formatRp = (angka) => {
+            if (!angka && angka !== 0) return '-';
+            return new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(angka);
+        };
+        const animateValue = (id, value) => {
+            const el = document.getElementById(id);
+            el.innerHTML = `<span class="currency">Rp</span> ${formatRp(value)}`;
+            el.classList.remove('val-animate');
+            void el.offsetWidth; // trigger reflow
+            el.classList.add('val-animate');
+        };
 
-        // Inisialisasi
-        document.addEventListener('DOMContentLoaded', function() {
+        // Initialize UI
+        document.addEventListener('DOMContentLoaded', () => {
+            fetch('/sidebar.html')
+                .then(res => res.text())
+                .then(html => {
+                    document.getElementById('sidebar-container').innerHTML = html;
+                    if (typeof initSidebar === 'function') initSidebar();
+                });
             loadUserData();
         });
 
-        // Load user data
+        // Sinkronisasi Tab Entitas (BBS / JO)
+        function initSidebar() {
+            const entSelect = document.getElementById('global-entity-select');
+            const aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
+            if (entSelect) {
+                entSelect.value = aktifEntitas;
+            }
+        }
+
         function loadUserData() {
-            fetch('/api/user/current')
-                .then(res => res.json())
+            fetch('/api/me')
+                .then(res => {
+                    if (!res.ok) throw new Error('Network response was not ok');
+                    return res.json();
+                })
                 .then(data => {
                     currentUser = data;
                     document.getElementById('user-name-display').textContent = data.nama || 'User';
-                    checkAdminAccess();
-                    loadProjects(); // Load projects after user data
+                    loadProjects();
                 })
-                .catch(err => console.error('Error loading user data:', err));
+                .catch(err => {
+                    console.error('Failed to load user data:', err);
+                    loadProjects(); // Fallback agar dropdown tetap dimuat
+                });
         }
 
-        // Check admin access
-        function checkAdminAccess() {
-            const allowedRoles = ['supervisor', 'administrator'];
-            if (!allowedRoles.includes(currentUser.role.toLowerCase())) {
-                // Hide the entire main content and show access denied
-                document.querySelector('main').innerHTML = '<div class="text-center" style="padding: 50px;"><h2>🚫 Akses Ditolak</h2><p>Anda tidak memiliki izin untuk mengakses halaman ini. Hanya Supervisor dan Administrator yang dapat mengakses.</p></div>';
-                return;
-            }
-
-            // If supervisor, show view only
-            if (currentUser.role.toLowerCase() === 'supervisor') {
-                document.getElementById('admin-form-section').style.display = 'none';
-                document.getElementById('restricted-notice').classList.remove('d-none');
-                document.getElementById('restricted-notice').innerHTML = '⚠️ Anda memiliki akses view-only sebagai Supervisor. Hanya Administrator yang dapat mengelola proyek.';
-            } else if (currentUser.role.toLowerCase() === 'administrator') {
-                document.getElementById('admin-form-section').style.display = 'block';
-            }
-        }
-
-        // Load projects
         function loadProjects() {
             fetch('/api/projects')
                 .then(res => res.json())
                 .then(data => {
-                    projectData = data;
-                    populateProjectSelect();
+                    const select = document.getElementById('project-select');
+                    if (data.error || !Array.isArray(data)) {
+                        console.error('Failed to load projects:', data.error || 'Data is not an array');
+                        select.innerHTML = '<option value="">⚠️ Gagal memuat data (Restart server Anda)</option>';
+                        return;
+                    }
+                    projectData = data || [];
+                    data.forEach(p => {
+                        const opt = document.createElement('option');
+                        opt.value = p.id;
+                        opt.textContent = `${p.kode} - ${p.nama}`;
+                        select.appendChild(opt);
+                    });
                 })
                 .catch(err => {
-                    console.error('Error loading projects:', err);
-                    document.getElementById('tabel-proyek').innerHTML = '<tr><td colspan="6" class="text-center" style="padding: 20px; color:var(--danger-600);">❌ Gagal memuat data proyek</td></tr>';
+                    console.error('Fetch error:', err);
+                    const select = document.getElementById('project-select');
+                    select.innerHTML = '<option value="">⚠️ Error koneksi ke server</option>';
                 });
         }
 
-        // Populate project select
-        function populateProjectSelect() {
-            const select = document.getElementById('project-select');
-            select.innerHTML = '<option value="">-- Pilih Branch --</option>';
-            if (projectData.length === 0) {
-                console.warn('No project data available');
-                return;
-            }
-            projectData.forEach(project => {
-                select.innerHTML += `<option value="${project.id}">${project.nama}</option>`;
-            });
-            console.log('Project select populated with', projectData.length, 'projects');
-        }
-
-        // Load project summary
-        function loadProjectSummary() {
+        function handleProjectChange() {
             const projectId = document.getElementById('project-select').value;
-            const summaryCards = document.getElementById('summary-cards');
-
+            const statsGrid = document.getElementById('stats-grid');
+            const tablesGrid = document.getElementById('tables-grid');
+            
             if (!projectId) {
-                document.getElementById('tabel-keluaran').innerHTML = '<tr><td colspan="5" class="text-center">Pilih project untuk melihat data</td></tr>';
-                document.getElementById('tabel-masukan').innerHTML = '<tr><td colspan="5" class="text-center">Pilih project untuk melihat data</td></tr>';
-                if(summaryCards) summaryCards.style.display = 'none';
+                statsGrid.classList.remove('visible');
+                tablesGrid.classList.remove('visible');
                 return;
             }
 
-            // Placeholder for loading
-            document.getElementById('tabel-keluaran').innerHTML = '<tr><td colspan="5" class="text-center">⏳ Memuat data...</td></tr>';
-            document.getElementById('tabel-masukan').innerHTML = '<tr><td colspan="5" class="text-center">⏳ Memuat data...</td></tr>';
-            if(summaryCards) summaryCards.style.display = 'none';
+            statsGrid.classList.add('visible');
+            tablesGrid.classList.add('visible');
+            
+            document.getElementById('loading-keluaran').classList.add('active');
+            document.getElementById('loading-masukan').classList.add('active');
 
-            // Format Rupiah Helper
-            const formatRp = (angka) => {
-                if (!angka) return '-';
-                return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
-            };
+            // Find selected project details
+            const project = projectData.find(p => p.id === projectId);
+            const budget = parseFloat(project?.contract_income || project?.anggaran || 0);
 
-            // Fetch summary data (assuming API exists)
+            // Fetch Tax Summary Data
             fetch(`/api/project-summary/${projectId}`)
                 .then(res => res.json())
                 .then(data => {
-                    let totalKeluaranDPP = 0;
-                    let totalMasukanDPP = 0;
-
-                    // Render faktur keluaran
-                    let htmlKeluaran = '';
-                    if (!data.keluaran || data.keluaran.length === 0) {
-                        htmlKeluaran = '<tr><td colspan="5" class="text-center">Tidak ada data faktur keluaran</td></tr>';
-                    } else {
-                        data.keluaran.forEach(f => {
-                            totalKeluaranDPP += parseFloat(f.dpp || 0);
-                            htmlKeluaran += `<tr>
-                                <td>${f.tanggal || '-'}</td>
-                                <td>${f.no_faktur || '-'}</td>
-                                <td>${f.client || '-'}</td>
-                                <td>${formatRp(f.dpp)}</td>
-                                <td>${formatRp(f.ppn)}</td>
-                            </tr>`;
-                        });
-                    }
-                    document.getElementById('tabel-keluaran').innerHTML = htmlKeluaran;
-
-                    // Render faktur masukan
-                    let htmlMasukan = '';
-                    if (!data.masukan || data.masukan.length === 0) {
-                        htmlMasukan = '<tr><td colspan="5" class="text-center">Tidak ada data faktur masukan</td></tr>';
-                    } else {
-                        data.masukan.forEach(f => {
-                            totalMasukanDPP += parseFloat(f.dpp || 0);
-                            htmlMasukan += `<tr>
-                                <td>${f.tanggal || '-'}</td>
-                                <td>${f.no_faktur || '-'}</td>
-                                <td>${f.supplier || '-'}</td>
-                                <td>${formatRp(f.dpp)}</td>
-                                <td>${formatRp(f.ppn)}</td>
-                            </tr>`;
-                        });
-                    }
-                    document.getElementById('tabel-masukan').innerHTML = htmlMasukan;
+                    let totalDppOut = 0;
+                    let totalDppIn = 0;
                     
-                    // Render Summary Cards
-                    if (summaryCards) {
-                        document.getElementById('tot-keluaran-dpp').textContent = formatRp(totalKeluaranDPP);
-                        document.getElementById('tot-masukan-dpp').textContent = formatRp(totalMasukanDPP);
-                        
-                        const margin = totalKeluaranDPP - totalMasukanDPP;
-                        const marginEl = document.getElementById('margin-dpp');
-                        const marginCard = document.getElementById('margin-card');
-                        
-                        marginEl.textContent = formatRp(margin);
-                        if (margin < 0) {
-                            marginCard.style.backgroundColor = 'var(--danger-50)';
-                            marginCard.style.borderColor = 'var(--danger-200)';
-                            marginEl.style.color = 'var(--danger-800)';
-                            marginCard.querySelector('h5').style.color = 'var(--danger-700)';
-                        } else {
-                            marginCard.style.backgroundColor = 'var(--success-50)';
-                            marginCard.style.borderColor = 'var(--success-200)';
-                            marginEl.style.color = 'var(--success-800)';
-                            marginCard.querySelector('h5').style.color = 'var(--success-700)';
-                        }
+                    const yearFilter = document.getElementById('year-select') ? document.getElementById('year-select').value : 'all';
 
-                        summaryCards.style.display = 'grid';
+                    // Filter Keluaran
+                    let dataKeluaran = data.keluaran || [];
+                    if (yearFilter !== 'all') {
+                        dataKeluaran = dataKeluaran.filter(f => f.tanggal && f.tanggal.startsWith(yearFilter));
                     }
+
+                    // Render Keluaran
+                    let htmlOut = '';
+                    if (dataKeluaran.length === 0) {
+                        htmlOut = '<tr><td colspan="4"><div class="empty-state"><span>📭</span>Tidak ada faktur keluaran untuk filter ini.</div></td></tr>';
+                    } else {
+                        dataKeluaran.forEach(f => {
+                            totalDppOut += parseFloat(f.dpp || 0);
+                            htmlOut += `<tr>
+                                <td><div style="font-weight: 500;">${f.tanggal || '-'}</div></td>
+                                <td><div style="font-family: monospace; font-size: 0.95rem; color: var(--primary-600);">${f.no_faktur || '-'}</div></td>
+                                <td>${f.client || '-'}</td>
+                                <td class="amount-cell text-success">${formatRp(f.dpp)}</td>
+                            </tr>`;
+                        });
+                    }
+                    document.getElementById('tbody-keluaran').innerHTML = htmlOut;
+
+                    // Filter Masukan
+                    let dataMasukan = data.masukan || [];
+                    if (yearFilter !== 'all') {
+                        dataMasukan = dataMasukan.filter(f => f.tanggal && f.tanggal.startsWith(yearFilter));
+                    }
+
+                    // Render Masukan
+                    let htmlIn = '';
+                    if (dataMasukan.length === 0) {
+                        htmlIn = '<tr><td colspan="4"><div class="empty-state"><span>📭</span>Tidak ada faktur masukan untuk filter ini.</div></td></tr>';
+                    } else {
+                        dataMasukan.forEach(f => {
+                            totalDppIn += parseFloat(f.dpp || 0);
+                            htmlIn += `<tr>
+                                <td><div style="font-weight: 500;">${f.tanggal || '-'}</div></td>
+                                <td><div style="font-family: monospace; font-size: 0.95rem; color: var(--primary-600);">${f.no_faktur || '-'}</div></td>
+                                <td>${f.supplier || '-'}</td>
+                                <td class="amount-cell text-danger">${formatRp(f.dpp)}</td>
+                            </tr>`;
+                        });
+                    }
+                    document.getElementById('tbody-masukan').innerHTML = htmlIn;
+
+                    // Calculate Metrics
+                    const margin = totalDppOut - totalDppIn;
+                    let billedPct = budget > 0 ? (totalDppOut / budget) * 100 : 0;
+                    let costPct = totalDppOut > 0 ? (totalDppIn / totalDppOut) * 100 : 0;
+                    
+                    // Cap percentage visuals at 100% for progress bar
+                    const billedBarWidth = billedPct > 100 ? 100 : billedPct;
+                    const costBarWidth = costPct > 100 ? 100 : costPct;
+
+                    // Update UI Statistics
+                    animateValue('val-budget', budget);
+                    animateValue('val-revenue', totalDppOut);
+                    animateValue('val-cost', totalDppIn);
+                    animateValue('val-margin', margin);
+
+                    // Update Progress Bars
+                    setTimeout(() => {
+                        document.getElementById('bar-billed').style.width = `${billedBarWidth}%`;
+                        document.getElementById('txt-billed-pct').textContent = `${billedPct.toFixed(1)}%`;
+                        
+                        document.getElementById('bar-cost').style.width = `${costBarWidth}%`;
+                        document.getElementById('txt-cost-pct').textContent = `${costPct.toFixed(1)}%`;
+                    }, 100);
+
+                    // Margin Styling
+                    const marginCard = document.getElementById('card-margin');
+                    const txtStatus = document.getElementById('txt-margin-status');
+                    if (margin < 0) {
+                        marginCard.className = 'stat-card bg-margin-neg';
+                        txtStatus.innerHTML = `<span>⚠️ Sedang dalam status Rugi/Defisit</span>`;
+                    } else {
+                        marginCard.className = 'stat-card bg-margin-pos';
+                        txtStatus.innerHTML = `<span>✨ Proyek dalam status Untung/Surplus</span>`;
+                    }
+
+                    // Remove Loaders
+                    document.getElementById('loading-keluaran').classList.remove('active');
+                    document.getElementById('loading-masukan').classList.remove('active');
                 })
                 .catch(err => {
-                    console.error('Error loading project summary:', err);
-                    document.getElementById('tabel-keluaran').innerHTML = '<tr><td colspan="5" class="text-center">❌ Gagal memuat data</td></tr>';
-                    document.getElementById('tabel-masukan').innerHTML = '<tr><td colspan="5" class="text-center">❌ Gagal memuat data</td></tr>';
+                    console.error(err);
+                    document.getElementById('loading-keluaran').classList.remove('active');
+                    document.getElementById('loading-masukan').classList.remove('active');
                 });
         }
-
     </script>
 </body>
 </html>

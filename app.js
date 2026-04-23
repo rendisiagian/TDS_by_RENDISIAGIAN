@@ -257,15 +257,7 @@ db.serialize(() => {
     ensureColumn('master_client', 'format_tipe TEXT');
     ensureColumn('master_client', 'tanggal_terakhir DATE');
     // Tambahkan kolom untuk project management di master_cabang
-    ensureColumn('master_cabang', 'deskripsi TEXT');
-    ensureColumn('master_cabang', 'status TEXT DEFAULT \'planning\'');
-    ensureColumn('master_cabang', 'progress INTEGER DEFAULT 0');
-    ensureColumn('master_cabang', 'tanggal_mulai DATE');
-    ensureColumn('master_cabang', 'tanggal_selesai DATE');
-    ensureColumn('master_cabang', 'pm TEXT');
-    ensureColumn('master_cabang', 'anggaran REAL DEFAULT 0');
-    ensureColumn('master_cabang', 'diinput_oleh TEXT');
-    ensureColumn('master_cabang', 'waktu_input DATETIME DEFAULT CURRENT_TIMESTAMP');
+    ensureColumn('master_cabang', 'contract_income REAL DEFAULT 0');
     // Tambahkan kolom project_id untuk relasi dengan projects
     ensureColumn('data_vatout', 'project_id INTEGER');
     ensureColumn('data_vatin', 'project_id INTEGER');
@@ -413,68 +405,9 @@ app.get('/api/audit-logs', cekRoleAPI(['administrator', 'supervisor', 'superadmi
 
 // API: PROJECT MANAGEMENT
 app.get('/api/projects', cekAuth, (req, res) => {
-    db.all(`SELECT kode_cabang as kode, nama_cabang as nama, deskripsi, status, progress, tanggal_mulai, tanggal_selesai, pm, anggaran, diinput_oleh, waktu_input, kode_cabang as id FROM master_cabang ORDER BY waktu_input DESC`, (err, rows) => {
+    db.all(`SELECT kode_cabang as kode, nama_cabang as nama, contract_income, kode_cabang as id FROM master_cabang ORDER BY nama ASC`, (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows || []);
-    });
-});
-
-app.post('/api/projects', cekRoleAPI(['administrator', 'supervisor', 'superadmin']), (req, res) => {
-    const { kode, nama, deskripsi, status, progress, tanggal_mulai, tanggal_selesai, pm, anggaran } = req.body;
-    const diinput_oleh = req.session.user.nama;
-
-    if (!kode || !nama) {
-        return res.status(400).json({ success: false, message: 'Kode dan nama proyek wajib diisi' });
-    }
-
-    db.run(`INSERT INTO master_cabang (kode_cabang, nama_cabang, entitas, deskripsi, status, progress, tanggal_mulai, tanggal_selesai, pm, anggaran, diinput_oleh) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [kode, nama, 'BBS', deskripsi, status, progress, tanggal_mulai, tanggal_selesai, pm, anggaran, diinput_oleh],
-        function(err) {
-            if (err) {
-                return res.status(500).json({ success: false, message: err.message });
-            }
-            insertAuditLog(req.session.user.id, req.session.user.username, 'TAMBAH', 'PROJECT MANAGEMENT', `Menambahkan proyek baru: ${kode} - ${nama}`);
-            res.json({ success: true, id: this.lastID });
-        });
-});
-
-app.put('/api/projects/:id', cekRoleAPI(['administrator', 'supervisor', 'superadmin']), (req, res) => {
-    const { kode, nama, deskripsi, status, progress, tanggal_mulai, tanggal_selesai, pm, anggaran } = req.body;
-    const id = req.params.id;
-
-    if (!kode || !nama) {
-        return res.status(400).json({ success: false, message: 'Kode dan nama proyek wajib diisi' });
-    }
-
-    db.run(`UPDATE master_cabang SET kode_cabang = ?, nama_cabang = ?, deskripsi = ?, status = ?, progress = ?, tanggal_mulai = ?, tanggal_selesai = ?, pm = ?, anggaran = ? WHERE kode_cabang = ?`,
-        [kode, nama, deskripsi, status, progress, tanggal_mulai, tanggal_selesai, pm, anggaran, id],
-        function(err) {
-            if (err) {
-                return res.status(500).json({ success: false, message: err.message });
-            }
-            if (this.changes === 0) {
-                return res.status(404).json({ success: false, message: 'Proyek tidak ditemukan' });
-            }
-            insertAuditLog(req.session.user.id, req.session.user.username, 'EDIT', 'PROJECT MANAGEMENT', `Mengubah proyek: ${kode} - ${nama}`);
-            res.json({ success: true });
-        });
-});
-
-app.delete('/api/projects/:id', cekRoleAPI(['administrator', 'supervisor', 'superadmin']), (req, res) => {
-    const id = req.params.id;
-
-    // Get project info for audit log
-    db.get(`SELECT kode_cabang as kode, nama_cabang as nama FROM master_cabang WHERE kode_cabang = ?`, [id], (err, project) => {
-        if (err) return res.status(500).json({ success: false, message: err.message });
-        if (!project) return res.status(404).json({ success: false, message: 'Proyek tidak ditemukan' });
-
-        db.run(`DELETE FROM master_cabang WHERE kode_cabang = ?`, [id], function(err) {
-            if (err) {
-                return res.status(500).json({ success: false, message: err.message });
-            }
-            insertAuditLog(req.session.user.id, req.session.user.username, 'HAPUS', 'PROJECT MANAGEMENT', `Menghapus proyek: ${project.kode} - ${project.nama}`);
-            res.json({ success: true });
-        });
     });
 });
 
@@ -1582,13 +1515,13 @@ io.on('connection', (socket) => {
         if (!isAdministrator(socket)) {
             return socket.emit('error-cabang', 'Akses ditolak: Hanya Administrator yang dapat menambah data cabang.');
         }
-        const { kode_cabang, nama_cabang, entitas, user } = d;
+        const { kode_cabang, nama_cabang, entitas, contract_income, user } = d;
         if (!kode_cabang || !nama_cabang || !entitas) {
             return socket.emit('error-cabang', 'Kode, Nama, dan Entitas wajib diisi.');
         }
         db.run(
-            `INSERT INTO master_cabang (kode_cabang, nama_cabang, entitas) VALUES (?, ?, ?)`,
-            [kode_cabang.trim().toUpperCase(), nama_cabang.trim(), entitas],
+            `INSERT INTO master_cabang (kode_cabang, nama_cabang, entitas, contract_income) VALUES (?, ?, ?, ?)`,
+            [kode_cabang.trim().toUpperCase(), nama_cabang.trim(), entitas, bersihkanAngka(contract_income || 0)],
             function (err) {
                 if (err) {
                     return socket.emit('error-cabang', err.code === 'SQLITE_CONSTRAINT' ? `Kode cabang '${kode_cabang}' sudah terdaftar!` : err.message);
@@ -1604,13 +1537,13 @@ io.on('connection', (socket) => {
         if (!isAdministrator(socket)) {
             return socket.emit('error-cabang', 'Akses ditolak: Hanya Administrator yang dapat mengedit data cabang.');
         }
-        const { kode_cabang, nama_cabang, entitas, user } = d;
+        const { kode_cabang, nama_cabang, entitas, contract_income, user } = d;
         if (!kode_cabang || !nama_cabang || !entitas) {
             return socket.emit('error-cabang', 'Kode, Nama, dan Entitas wajib diisi.');
         }
         db.run(
-            `UPDATE master_cabang SET nama_cabang = ?, entitas = ? WHERE kode_cabang = ?`,
-            [nama_cabang.trim(), entitas, kode_cabang],
+            `UPDATE master_cabang SET nama_cabang = ?, entitas = ?, contract_income = ? WHERE kode_cabang = ?`,
+            [nama_cabang.trim(), entitas, bersihkanAngka(contract_income || 0), kode_cabang],
             function (err) {
                 if (err) return socket.emit('error-cabang', err.message);
                 if (this.changes === 0) return socket.emit('error-cabang', `Cabang '${kode_cabang}' tidak ditemukan.`);

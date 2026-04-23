@@ -57,6 +57,11 @@
                                 <option value="JO">Berca JO (JO)</option>
                             </select>
                         </div>
+                        <div class="form-group">
+                            <label>Nilai Contract Income</label>
+                            <input type="text" id="f_contract_income" placeholder="Cth: 1000000000" autocomplete="off">
+                            <small style="color:var(--text-secondary); display:block; margin-top:5px;">Hanya masukkan angka (contoh: 150000000).</small>
+                        </div>
                         <div style="display:flex; gap:10px;">
                             <button class="btn-simpan btn-manage" style="flex:2;" onclick="simpanCabang()">💾 Simpan Cabang</button>
                             <button class="btn-simpan btn-cancel d-none" id="btn-batal-edit" style="flex:1;" onclick="batalEdit()">Batal</button>
@@ -74,6 +79,7 @@
                                     <tr>
                                         <th>Kode Cabang</th>
                                         <th>Nama Project</th>
+                                        <th class="text-right">Contract Income</th>
                                         <th class="text-center">Entitas</th>
                                         <th class="text-center">Aksi (Admin)</th>
                                     </tr>
@@ -174,15 +180,19 @@
                 if(isAdmin) {
                     btnAksi = `
                         <div style="display:flex; justify-content:center; gap:5px;">
-                            <button class="btn-tbl btn-tbl-edit" onclick="siapkanEdit('${d.kode_cabang}', '${(d.nama_cabang || '').replace(/'/g, "\\'")}', '${d.entitas}')">Edit Nama</button>
+                            <button class="btn-tbl btn-tbl-edit" onclick="siapkanEdit('${d.kode_cabang}', '${(d.nama_cabang || '').replace(/'/g, "\\'")}', '${d.entitas}', '${d.contract_income || 0}')">Edit</button>
                             ${d.kode_cabang !== 'PUSAT' ? `<button class="btn-hapus" onclick="hapusCabang('${d.kode_cabang}')">Hapus</button>` : `<span style="font-size:0.8rem; color:#64748b; padding:5px;">Protected</span>`}
                         </div>
                     `;
                 }
 
+                // Format Rupiah untuk Contract Income
+                const formatRp = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(d.contract_income || 0);
+
                 tr.innerHTML = `
                     <td class="text-bold" style="font-family:monospace; color:var(--primary-700);">${d.kode_cabang}</td>
                     <td>${d.nama_cabang || '-'}</td>
+                    <td class="text-right">${formatRp}</td>
                     <td class="text-center"><span class="badge-role" style="background:var(--primary-50); color:var(--primary-700); border:1px solid var(--primary-200);">${d.entitas}</span></td>
                     <td class="text-center">${btnAksi}</td>
                 `;
@@ -193,8 +203,8 @@
         // ===================================
         // LOGIKA ADMIN CRUD
         // ===================================
-        function siapkanEdit(kode, nama, entitas) {
-            document.getElementById('form-title').innerText = '📝 Edit Nama Cabang';
+        function siapkanEdit(kode, nama, entitas, contract_income) {
+            document.getElementById('form-title').innerText = '📝 Edit Cabang';
             document.getElementById('f_mode').value = 'edit';
             
             document.getElementById('f_kode').value = kode;
@@ -203,6 +213,7 @@
             
             document.getElementById('f_nama').value = nama;
             document.getElementById('f_entitas').value = entitas;
+            document.getElementById('f_contract_income').value = contract_income || '';
             // Entitas tidak boleh dirubah secara logika agar tidak merusak data historical, 
             // tapi kita bebaskan jika admin memaksa (atau bisa disable saja).
             
@@ -220,6 +231,7 @@
             
             document.getElementById('f_nama').value = '';
             document.getElementById('f_entitas').value = aktifEntitas;
+            document.getElementById('f_contract_income').value = '';
             
             document.getElementById('btn-batal-edit').classList.add('d-none');
         }
@@ -231,6 +243,7 @@
             const kode = document.getElementById('f_kode').value.trim();
             const nama = document.getElementById('f_nama').value.trim();
             const entitas = document.getElementById('f_entitas').value;
+            const contract_income = document.getElementById('f_contract_income').value.trim();
 
             if(!kode || !nama) return alert("Kode dan Nama Cabang wajib diisi!");
 
@@ -239,9 +252,9 @@
                 if(masterData.find(d => d.kode_cabang.toLowerCase() === kode.toLowerCase())) {
                     return alert("Kode cabang ini sudah terdaftar! Gunakan kode yang berbeda atau edit yang sudah ada.");
                 }
-                socket.emit('tambah-cabang', { kode_cabang: kode, nama_cabang: nama, entitas: entitas, user: currentUser.username });
+                socket.emit('tambah-cabang', { kode_cabang: kode, nama_cabang: nama, entitas: entitas, contract_income: contract_income, user: currentUser.username });
             } else {
-                socket.emit('edit-cabang', { kode_cabang: kode, nama_cabang: nama, entitas: entitas, user: currentUser.username });
+                socket.emit('edit-cabang', { kode_cabang: kode, nama_cabang: nama, entitas: entitas, contract_income: contract_income, user: currentUser.username });
             }
             
             batalEdit();
