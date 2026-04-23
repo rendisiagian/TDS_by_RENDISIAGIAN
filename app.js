@@ -11,6 +11,7 @@ const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const fsPromises = require('fs').promises; // Untuk proses penulisan file Bulk/Batch
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 
 const PORT = process.env.PORT || 3000;
 const SESSION_SECRET = process.env.SESSION_SECRET;
@@ -59,6 +60,10 @@ const dbRun = (sql, params) => new Promise((resolve, reject) => db.run(sql, para
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(helmet({
+    contentSecurityPolicy: false, // Dinonaktifkan sementara untuk mencegah bentrok dengan inline script bawaan
+    crossOriginEmbedderPolicy: false
+}));
 const sessionMiddleware = session({
     secret: SESSION_SECRET,
     resave: false,
@@ -251,6 +256,19 @@ db.serialize(() => {
     ensureColumn('master_vendor', 'tanggal_terakhir DATE');
     ensureColumn('master_client', 'format_tipe TEXT');
     ensureColumn('master_client', 'tanggal_terakhir DATE');
+    // Tambahkan kolom untuk project management di master_cabang
+    ensureColumn('master_cabang', 'deskripsi TEXT');
+    ensureColumn('master_cabang', 'status TEXT DEFAULT \'planning\'');
+    ensureColumn('master_cabang', 'progress INTEGER DEFAULT 0');
+    ensureColumn('master_cabang', 'tanggal_mulai DATE');
+    ensureColumn('master_cabang', 'tanggal_selesai DATE');
+    ensureColumn('master_cabang', 'pm TEXT');
+    ensureColumn('master_cabang', 'anggaran REAL DEFAULT 0');
+    ensureColumn('master_cabang', 'diinput_oleh TEXT');
+    ensureColumn('master_cabang', 'waktu_input DATETIME DEFAULT CURRENT_TIMESTAMP');
+    // Tambahkan kolom project_id untuk relasi dengan projects
+    ensureColumn('data_vatout', 'project_id INTEGER');
+    ensureColumn('data_vatin', 'project_id INTEGER');
 
     global.insertAuditLog = function (user_id, username, action, module, details) {
         db.run(`INSERT INTO audit_logs (user_id, username, action, module, details) VALUES (?, ?, ?, ?, ?)`, [user_id, username, action, module, details], (err) => {
@@ -287,6 +305,11 @@ db.serialize(() => {
     // CATATAN: Kolom ref_bppu, is_advance, ref_advance sudah didefinisikan di CREATE TABLE di atas.
     // Baris ALTER TABLE lama dihapus untuk mencegah error duplikat setiap server start. (BUG-02)
 
+    // TABEL BARU: PROJECT MANAGEMENT (menggunakan master_cabang yang sudah ada)
+    // Kolom tambahan ditambahkan via ensureColumn di atas
+
+
+
     db.get(`SELECT count(*) as count FROM users`, (err, row) => {
         if (row && row.count === 0) {
             // SECURITY: Naikkan salt rounds ke 12 untuk keamanan lebih baik (BUG-08)
@@ -298,6 +321,8 @@ db.serialize(() => {
     });
 
     db.run(`INSERT OR IGNORE INTO master_cabang (kode_cabang, nama_cabang, entitas) VALUES ('PUSAT', 'Kantor Pusat BBS', 'BBS'), ('20305G', 'BBS JO', 'JO'), ('250310', 'BMP JO', 'JO')`);
+
+
 
     modules.forEach(mod => {
         db.run(`CREATE TABLE IF NOT EXISTS inbox_${mod.id} (id INTEGER PRIMARY KEY AUTOINCREMENT, entitas TEXT, link_pdf_lokal TEXT, status TEXT DEFAULT 'Menunggu Lengkapi', diinput_oleh TEXT, data_ekstraksi TEXT, waktu DATETIME DEFAULT CURRENT_TIMESTAMP)`);
@@ -311,21 +336,38 @@ db.serialize(() => {
             db.run(`CREATE TABLE IF NOT EXISTS data_${mod.id} (no_bppu TEXT PRIMARY KEY, masa_pajak TEXT, entitas TEXT, kode_cabang TEXT, npwp_pemotong TEXT, nama_pemotong TEXT, npwp_dipotong TEXT, nama_dipotong TEXT, dpp REAL, tarif REAL, nilai_pph REAL, tanggal_dokumen DATE, nomor_dokumen TEXT, no_invoice_internal TEXT, diinput_oleh TEXT, link_pdf_lokal TEXT, waktu_input DATETIME DEFAULT CURRENT_TIMESTAMP)`);
         }
     });
+
+    // ------------------------------------------
+    // PERFORMANCE: Tambahkan Database Indexing
+    // ------------------------------------------
+    db.run(`CREATE INDEX IF NOT EXISTS idx_vatout_entitas_tgl ON data_vatout(entitas, tanggal_faktur)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_vatout_no_internal ON data_vatout(no_invoice_internal)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_prepaid_entitas_tgl ON data_prepaid(entitas, tanggal_dokumen)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_prepaid_no_internal ON data_prepaid(no_invoice_internal)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_client_ledger_entitas ON data_client_ledger(entitas)`);
 });
 
 // ==========================================
 // 3. ROUTING & API
 // ==========================================
 const cekAuth = (req, res, next) => { if (req.session.user) return next(); res.redirect('/login'); };
+const cekRoleAPI = (roles) => {
+    return (req, res, next) => {
+        if (!req.session.user) return res.status(401).json({ error: 'Unauthorized' });
+        const role = (req.session.user.role || '').toLowerCase();
+        if (roles.includes(role)) return next();
+        return res.status(403).json({ error: 'Akses ditolak. Peran tidak mencukupi (RBAC).' });
+    };
+};
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'login.html')));
 app.get('/sidebar.html', cekAuth, (req, res) => {
     const sidebarPath = path.join(__dirname, 'sidebar.html');
     fs.readFile(sidebarPath, 'utf8', (err, html) => {
         if (err) return res.status(500).send('');
-        // Jika user adalah administrator, tampilkan menu administrasi
+        // Jika user adalah supervisor atau administrator, tampilkan menu administrasi
         const role = (req.session && req.session.user && req.session.user.role) ? req.session.user.role.toLowerCase() : '';
-        const isAdmin = ['administrator', 'superadmin'].includes(role);
-        if (isAdmin) {
+        const isSupervisorOrAbove = ['supervisor', 'administrator', 'superadmin'].includes(role);
+        if (isSupervisorOrAbove) {
             html = html.replace(
                 'id="group-administrasi" class="sidebar-group" style="display:none;"',
                 'id="group-administrasi" class="sidebar-group"'
@@ -339,6 +381,7 @@ app.get('/profile', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'pr
 app.get('/summary', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'summary.html')));
 app.get('/manage-users', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'manage_users.html')));
 app.get('/master-cabang', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'master_cabang.html')));
+app.get('/project-management', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'project_management.html')));
 app.get('/master-kontak', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'master_kontak.html')));
 app.get('/audit-logs', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'audit_logs.html')));
 app.get('/', (req, res) => req.session.user ? res.redirect('/dashboard-utama') : res.redirect('/login'));
@@ -349,14 +392,14 @@ app.get('/client-ledger', cekAuth, (req, res) => res.sendFile(path.join(__dirnam
 app.use(express.static(__dirname));
 
 // API: MASTER CABANG - Semua data tanpa filter entitas (untuk halaman admin)
-app.get('/api/master-cabang-all', cekAuth, (req, res) => {
+app.get('/api/master-cabang-all', cekRoleAPI(['administrator', 'supervisor', 'superadmin']), (req, res) => {
     db.all(`SELECT * FROM master_cabang ORDER BY entitas, kode_cabang`, (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows || []);
     });
 });
 
-app.get('/api/master-kontak-all', cekAuth, (req, res) => {
+app.get('/api/master-kontak-all', cekRoleAPI(['administrator', 'supervisor', 'superadmin']), (req, res) => {
     db.all(`SELECT * FROM master_client ORDER BY nama`, (err, rowsClient) => {
         db.all(`SELECT * FROM master_vendor ORDER BY nama`, (err, rowsVendor) => {
             res.json({ clients: rowsClient || [], vendors: rowsVendor || [] });
@@ -364,8 +407,101 @@ app.get('/api/master-kontak-all', cekAuth, (req, res) => {
     });
 });
 
-app.get('/api/audit-logs', cekAuth, (req, res) => {
+app.get('/api/audit-logs', cekRoleAPI(['administrator', 'supervisor', 'superadmin']), (req, res) => {
     db.all(`SELECT *, strftime('%d-%m-%Y %H:%M:%S', waktu, 'localtime') as wkt FROM audit_logs ORDER BY id DESC LIMIT 500`, (err, rows) => res.json(rows || []));
+});
+
+// API: PROJECT MANAGEMENT
+app.get('/api/projects', cekAuth, (req, res) => {
+    db.all(`SELECT kode_cabang as kode, nama_cabang as nama, deskripsi, status, progress, tanggal_mulai, tanggal_selesai, pm, anggaran, diinput_oleh, waktu_input, kode_cabang as id FROM master_cabang ORDER BY waktu_input DESC`, (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows || []);
+    });
+});
+
+app.post('/api/projects', cekRoleAPI(['administrator', 'supervisor', 'superadmin']), (req, res) => {
+    const { kode, nama, deskripsi, status, progress, tanggal_mulai, tanggal_selesai, pm, anggaran } = req.body;
+    const diinput_oleh = req.session.user.nama;
+
+    if (!kode || !nama) {
+        return res.status(400).json({ success: false, message: 'Kode dan nama proyek wajib diisi' });
+    }
+
+    db.run(`INSERT INTO master_cabang (kode_cabang, nama_cabang, entitas, deskripsi, status, progress, tanggal_mulai, tanggal_selesai, pm, anggaran, diinput_oleh) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [kode, nama, 'BBS', deskripsi, status, progress, tanggal_mulai, tanggal_selesai, pm, anggaran, diinput_oleh],
+        function(err) {
+            if (err) {
+                return res.status(500).json({ success: false, message: err.message });
+            }
+            insertAuditLog(req.session.user.id, req.session.user.username, 'TAMBAH', 'PROJECT MANAGEMENT', `Menambahkan proyek baru: ${kode} - ${nama}`);
+            res.json({ success: true, id: this.lastID });
+        });
+});
+
+app.put('/api/projects/:id', cekRoleAPI(['administrator', 'supervisor', 'superadmin']), (req, res) => {
+    const { kode, nama, deskripsi, status, progress, tanggal_mulai, tanggal_selesai, pm, anggaran } = req.body;
+    const id = req.params.id;
+
+    if (!kode || !nama) {
+        return res.status(400).json({ success: false, message: 'Kode dan nama proyek wajib diisi' });
+    }
+
+    db.run(`UPDATE master_cabang SET kode_cabang = ?, nama_cabang = ?, deskripsi = ?, status = ?, progress = ?, tanggal_mulai = ?, tanggal_selesai = ?, pm = ?, anggaran = ? WHERE kode_cabang = ?`,
+        [kode, nama, deskripsi, status, progress, tanggal_mulai, tanggal_selesai, pm, anggaran, id],
+        function(err) {
+            if (err) {
+                return res.status(500).json({ success: false, message: err.message });
+            }
+            if (this.changes === 0) {
+                return res.status(404).json({ success: false, message: 'Proyek tidak ditemukan' });
+            }
+            insertAuditLog(req.session.user.id, req.session.user.username, 'EDIT', 'PROJECT MANAGEMENT', `Mengubah proyek: ${kode} - ${nama}`);
+            res.json({ success: true });
+        });
+});
+
+app.delete('/api/projects/:id', cekRoleAPI(['administrator', 'supervisor', 'superadmin']), (req, res) => {
+    const id = req.params.id;
+
+    // Get project info for audit log
+    db.get(`SELECT kode_cabang as kode, nama_cabang as nama FROM master_cabang WHERE kode_cabang = ?`, [id], (err, project) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        if (!project) return res.status(404).json({ success: false, message: 'Proyek tidak ditemukan' });
+
+        db.run(`DELETE FROM master_cabang WHERE kode_cabang = ?`, [id], function(err) {
+            if (err) {
+                return res.status(500).json({ success: false, message: err.message });
+            }
+            insertAuditLog(req.session.user.id, req.session.user.username, 'HAPUS', 'PROJECT MANAGEMENT', `Menghapus proyek: ${project.kode} - ${project.nama}`);
+            res.json({ success: true });
+        });
+    });
+});
+
+// API: PROJECT SUMMARY
+app.get('/api/project-summary/:id', cekAuth, (req, res) => {
+    const projectId = req.params.id;
+
+    // Query faktur keluaran terkait project (menggunakan kode_cabang yang merepresentasikan branch/project)
+    db.all(`SELECT d.tanggal_faktur as tanggal, d.no_faktur as no_faktur, d.nama_pembeli as client, d.dpp, d.ppn FROM data_vatout d WHERE d.kode_cabang = ? OR d.project_id = ?`, [projectId, projectId], (err, keluaran) => {
+        if (err) {
+            console.error('Error querying data_vatout:', err);
+            return res.status(500).json({ error: 'Database error' });
+        }
+
+        // Query faktur masukan
+        db.all(`SELECT d.tanggal_faktur as tanggal, d.no_faktur as no_faktur, d.nama_penjual as supplier, d.dpp, d.ppn FROM data_vatin d WHERE d.kode_cabang = ? OR d.project_id = ?`, [projectId, projectId], (err, masukan) => {
+            if (err) {
+                console.error('Error querying data_vatin:', err);
+                return res.status(500).json({ error: 'Database error' });
+            }
+
+            res.json({
+                keluaran: keluaran || [],
+                masukan: masukan || []
+            });
+        });
+    });
 });
 
 app.get('/api/items/:mod/:faktur', cekAuth, (req, res) => {
@@ -394,18 +530,21 @@ app.get('/api/prepaid-comparison/:noBppu', cekAuth, (req, res) => {
                 return res.json({ prepaid, vatout: null });
             }
 
-            // Agregasi nilai Harga Jual dan PPN dari semua faktur yang ditemukan
+            // Agregasi nilai PPN dari semua faktur yang ditemukan
             const aggregated = rows.reduce((acc, r) => {
-                acc.dpp += (r.harga_jual || 0); // Menggunakan harga_jual sebagai pembanding DPP
                 acc.ppn += (r.ppn || 0);
                 return acc;
-            }, { dpp: 0, ppn: 0 });
+            }, { ppn: 0 });
+
+            // Hitung DPP Sesungguhnya (Actual DPP) melalui reverse calculation
+            // DPP Sesungguhnya = Total PPN / 11% (0.11)
+            const estimatedDpp = Math.round(aggregated.ppn / 0.11);
 
             // Kirim balik sebagai objek vatout tunggal agar UI tetap kompatibel
             res.json({
                 prepaid,
                 vatout: {
-                    dpp: aggregated.dpp,
+                    dpp: estimatedDpp,
                     ppn: aggregated.ppn,
                     is_aggregated: rows.length > 1,
                     count: rows.length
@@ -1532,6 +1671,68 @@ io.on('connection', (socket) => {
             if (err) return socket.emit('error-kontak', err.message);
             insertAuditLog(socket.user.id, d.user, 'HAPUS', `MASTER ${d.tipe.toUpperCase()}`, `Menghapus ${d.tipe} ber-NPWP: ${d.npwp}`);
             io.emit('data-baru-kontak');
+        });
+    });
+
+    // ==============================================================
+    // CRUD PROJECT MANAGEMENT
+    // ==============================================================
+    socket.on('tambah-proyek', (d) => {
+        if (isDummy(socket)) return io.emit('project-updated');
+        if (!isAdministrator(socket)) return socket.emit('error-proyek', 'Akses ditolak: Hanya Administrator yang dapat menambah proyek.');
+
+        const { kode, nama, deskripsi, status, progress, tanggal_mulai, tanggal_selesai, pm, anggaran, user } = d;
+        if (!kode || !nama) {
+            return socket.emit('error-proyek', 'Kode dan Nama proyek wajib diisi.');
+        }
+
+        db.run(`INSERT INTO projects (kode, nama, deskripsi, status, progress, tanggal_mulai, tanggal_selesai, pm, anggaran, diinput_oleh) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [kode, nama, deskripsi, status, progress, tanggal_mulai, tanggal_selesai, pm, anggaran, user], function (err) {
+                if (err) {
+                    return socket.emit('error-proyek', err.code === 'SQLITE_CONSTRAINT' ? `Kode proyek '${kode}' sudah terdaftar!` : err.message);
+                }
+                insertAuditLog(socket.user.id, user, 'TAMBAH', 'PROJECT MANAGEMENT', `Menambahkan proyek baru: ${kode} - ${nama}`);
+                io.emit('project-updated');
+            });
+    });
+
+    socket.on('edit-proyek', (d) => {
+        if (isDummy(socket)) return io.emit('project-updated');
+        if (!isAdministrator(socket)) {
+            return socket.emit('error-proyek', 'Akses ditolak: Hanya Administrator yang dapat mengedit proyek.');
+        }
+
+        const { id, kode, nama, deskripsi, status, progress, tanggal_mulai, tanggal_selesai, pm, anggaran, user } = d;
+        if (!kode || !nama) {
+            return socket.emit('error-proyek', 'Kode dan Nama proyek wajib diisi.');
+        }
+
+        db.run(`UPDATE projects SET kode = ?, nama = ?, deskripsi = ?, status = ?, progress = ?, tanggal_mulai = ?, tanggal_selesai = ?, pm = ?, anggaran = ? WHERE id = ?`,
+            [kode, nama, deskripsi, status, progress, tanggal_mulai, tanggal_selesai, pm, anggaran, id], function (err) {
+                if (err) return socket.emit('error-proyek', err.message);
+                if (this.changes === 0) return socket.emit('error-proyek', `Proyek dengan ID '${id}' tidak ditemukan.`);
+                insertAuditLog(socket.user.id, user, 'EDIT', 'PROJECT MANAGEMENT', `Mengubah proyek ${kode} menjadi ${nama}`);
+                io.emit('project-updated');
+            });
+    });
+
+    socket.on('hapus-proyek', (d) => {
+        if (isDummy(socket)) return io.emit('project-updated');
+        if (!isAdministrator(socket)) {
+            return socket.emit('error-proyek', 'Akses ditolak: Hanya Administrator yang dapat menghapus proyek.');
+        }
+
+        const { id, user } = d;
+        // Get project info for audit log
+        db.get(`SELECT kode, nama FROM projects WHERE id = ?`, [id], (err, project) => {
+            if (err) return socket.emit('error-proyek', err.message);
+            if (!project) return socket.emit('error-proyek', `Proyek dengan ID '${id}' tidak ditemukan.`);
+
+            db.run(`DELETE FROM projects WHERE id = ?`, [id], function (err) {
+                if (err) return socket.emit('error-proyek', err.message);
+                insertAuditLog(socket.user.id, user, 'HAPUS', 'PROJECT MANAGEMENT', `Menghapus proyek ${project.kode} - ${project.nama}`);
+                io.emit('project-updated');
+            });
         });
     });
 
