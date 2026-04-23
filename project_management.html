@@ -272,7 +272,7 @@
         }
 
         .modern-table th {
-            background: transparent;
+            background: var(--bg-primary, #ffffff);
             color: var(--text-500);
             font-weight: 600;
             text-transform: uppercase;
@@ -280,6 +280,13 @@
             letter-spacing: 0.5px;
             padding: 10px 15px;
             border: none;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+
+        [data-theme="dark"] .modern-table th {
+            background: var(--bg-primary, #0f172a);
         }
 
         .modern-table tbody tr {
@@ -378,80 +385,81 @@
                 </div>
             </header>
 
-            <div class="container" style="max-width: 100%; padding: 0 32px; padding-bottom: 50px; overflow: visible;">
+            <!-- Sticky Controls: Filter + Cards — Di luar .container agar sticky bekerja terhadap .main-content -->
+            <div class="sticky-controls" style="position: sticky; top: 0; z-index: 90; padding: 10px 32px 14px 32px; background: var(--bg-secondary); box-shadow: 0 4px 16px rgba(0,0,0,0.07); border-bottom: 1px solid var(--border-color);">
+                <div class="filter-section" style="margin-top: 0; padding: 12px 20px;">
+                    <div style="font-size: 1.5rem;">🏢</div>
+                    <select id="project-select" onchange="handleProjectChange()" style="max-width: 400px; padding: 10px 20px;">
+                        <option value="">Pilih Branch / Project untuk dianalisis...</option>
+                    </select>
+                    
+                    <div style="font-size: 1.5rem; margin-left: 20px;">📅</div>
+                    <select id="year-select" onchange="handleProjectChange()" style="max-width: 250px; padding: 10px 20px;">
+                        <option value="all">Seluruh Tahun</option>
+                        <option value="2026">2026</option>
+                        <option value="2025">2025</option>
+                        <option value="2024">2024</option>
+                        <option value="2023">2023</option>
+                        <option value="2022">2022</option>
+                    </select>
+                </div>
 
-                <div class="sticky-controls" style="position: sticky; top: 0; z-index: 90; padding: 0 0 12px 0; background: var(--bg-secondary); box-shadow: 0 4px 16px rgba(0,0,0,0.07); border-bottom: 1px solid var(--border-color);">
-                    <div class="filter-section" style="margin-top: 0; padding: 15px 24px;">
-                        <div style="font-size: 1.5rem;">🏢</div>
-                        <select id="project-select" onchange="handleProjectChange()" style="max-width: 400px; padding: 10px 20px;">
-                            <option value="">Pilih Branch / Project untuk dianalisis...</option>
-                        </select>
-                        
-                        <div style="font-size: 1.5rem; margin-left: 20px;">📅</div>
-                        <select id="year-select" onchange="handleProjectChange()" style="max-width: 250px; padding: 10px 20px;">
-                            <option value="all">Seluruh Tahun</option>
-                            <option value="2026">2026</option>
-                            <option value="2025">2025</option>
-                            <option value="2024">2024</option>
-                            <option value="2023">2023</option>
-                            <option value="2022">2022</option>
-                        </select>
+            <!-- Dashboard Statistics Grid -->
+            <div class="dashboard-grid" id="stats-grid" style="padding: 0;">
+                <div class="stat-card bg-budget">
+                    <h5>Target / Nilai Kontrak</h5>
+                    <h2 id="val-budget"><span class="currency">Rp</span> 0</h2>
+                    <div class="progress-text" style="opacity: 0.8; font-weight: 400; margin-top: 8px;">
+                        <span>Anggaran Proyek</span>
                     </div>
+                </div>
 
-                <!-- Dashboard Statistics Grid -->
-                <div class="dashboard-grid" id="stats-grid">
-                    <div class="stat-card bg-budget">
-                        <h5>Target / Nilai Kontrak</h5>
-                        <h2 id="val-budget"><span class="currency">Rp</span> 0</h2>
-                        <div class="progress-text" style="opacity: 0.8; font-weight: 400; margin-top: 8px;">
-                            <span>Anggaran Proyek</span>
-                        </div>
+                <div class="stat-card bg-revenue">
+                    <h5>Total Tagihan (DPP Keluaran)</h5>
+                    <h2 id="val-revenue"><span class="currency">Rp</span> 0</h2>
+                    <div class="progress-container">
+                        <div class="progress-bar" id="bar-billed"></div>
                     </div>
+                    <div class="progress-text">
+                        <span>Progress Tertagih</span>
+                        <span id="txt-billed-pct">0%</span>
+                    </div>
+                </div>
 
-                    <div class="stat-card bg-revenue">
-                        <h5>Total Tagihan (DPP Keluaran)</h5>
-                        <h2 id="val-revenue"><span class="currency">Rp</span> 0</h2>
-                        <div class="progress-container">
-                            <div class="progress-bar" id="bar-billed"></div>
-                        </div>
-                        <div class="progress-text">
-                            <span>Progress Tertagih</span>
-                            <span id="txt-billed-pct">0%</span>
-                        </div>
+                <div class="stat-card bg-cost">
+                    <h5>Total Biaya (DPP Masukan)</h5>
+                    <h2 id="val-cost"><span class="currency">Rp</span> 0</h2>
+                    <div class="progress-container" style="background: rgba(255,255,255,0.3);">
+                        <div class="progress-bar" id="bar-cost" style="background: rgba(255,255,255,0.9);"></div>
                     </div>
+                    <div class="progress-text">
+                        <span>Cost Ratio (vs Tagihan)</span>
+                        <span id="txt-cost-pct">0%</span>
+                    </div>
+                </div>
 
-                    <div class="stat-card bg-cost">
-                        <h5>Total Biaya (DPP Masukan)</h5>
-                        <h2 id="val-cost"><span class="currency">Rp</span> 0</h2>
-                        <div class="progress-container" style="background: rgba(255,255,255,0.3);">
-                            <div class="progress-bar" id="bar-cost" style="background: rgba(255,255,255,0.9);"></div>
-                        </div>
-                        <div class="progress-text">
-                            <span>Cost Ratio (vs Tagihan)</span>
-                            <span id="txt-cost-pct">0%</span>
-                        </div>
+                <div class="stat-card bg-margin-pos" id="card-margin">
+                    <h5>Margin Proyek (Keluaran - Masukan)</h5>
+                    <h2 id="val-margin"><span class="currency">Rp</span> 0</h2>
+                    <div class="progress-text" style="opacity: 0.8; font-weight: 400; margin-top: 8px;" id="txt-margin-status">
+                        <span>Potensi Keuntungan Berdasarkan Pajak</span>
                     </div>
+                </div>
+            </div> <!-- End Dashboard Grid -->
+            </div> <!-- End Sticky Controls -->
 
-                    <div class="stat-card bg-margin-pos" id="card-margin">
-                        <h5>Margin Proyek (Keluaran - Masukan)</h5>
-                        <h2 id="val-margin"><span class="currency">Rp</span> 0</h2>
-                        <div class="progress-text" style="opacity: 0.8; font-weight: 400; margin-top: 8px;" id="txt-margin-status">
-                            <span>Potensi Keuntungan Berdasarkan Pajak</span>
-                        </div>
-                    </div>
-                </div> <!-- End Dashboard Grid -->
-                </div> <!-- End Sticky Controls -->
+            <div class="container" style="max-width: 100%; padding: 0 32px; padding-bottom: 50px;">
 
                 <!-- Data Tables Grid -->
                 <div class="tables-grid" id="tables-grid">
                     
                     <!-- Table Keluaran -->
-                    <div class="table-card" style="position: relative;">
+                    <div class="table-card" style="position: relative; display: flex; flex-direction: column;">
                         <div class="loading-overlay" id="loading-keluaran">
                             <div class="spinner"></div>
                         </div>
                         <h3 class="out">📈 Rincian Pendapatan (Faktur Keluaran)</h3>
-                        <div style="overflow-x: auto;">
+                        <div style="overflow: auto; max-height: 420px; flex: 1;">
                             <table class="modern-table">
                                 <thead>
                                     <tr>
@@ -469,12 +477,12 @@
                     </div>
 
                     <!-- Table Masukan -->
-                    <div class="table-card" style="position: relative;">
+                    <div class="table-card" style="position: relative; display: flex; flex-direction: column;">
                         <div class="loading-overlay" id="loading-masukan">
                             <div class="spinner"></div>
                         </div>
                         <h3 class="in">📉 Rincian Biaya (Faktur Masukan)</h3>
-                        <div style="overflow-x: auto;">
+                        <div style="overflow: auto; max-height: 420px; flex: 1;">
                             <table class="modern-table">
                                 <thead>
                                     <tr>
@@ -552,10 +560,13 @@
         }
 
         function loadProjects() {
-            fetch('/api/projects')
+            const entitas = localStorage.getItem('lastEntitas') || 'BBS';
+            const select = document.getElementById('project-select');
+            select.innerHTML = '<option value="">Pilih Branch / Project untuk dianalisis...</option>';
+
+            fetch('/api/projects?entitas=' + encodeURIComponent(entitas))
                 .then(res => res.json())
                 .then(data => {
-                    const select = document.getElementById('project-select');
                     if (data.error || !Array.isArray(data)) {
                         console.error('Failed to load projects:', data.error || 'Data is not an array');
                         select.innerHTML = '<option value="">⚠️ Gagal memuat data (Restart server Anda)</option>';
@@ -571,9 +582,18 @@
                 })
                 .catch(err => {
                     console.error('Fetch error:', err);
-                    const select = document.getElementById('project-select');
                     select.innerHTML = '<option value="">⚠️ Error koneksi ke server</option>';
                 });
+        }
+
+        // Listener jika user ganti entitas dari sidebar
+        function gantiEntitas(entitas) {
+            localStorage.setItem('lastEntitas', entitas);
+            loadProjects();
+            // Reset tampilan data jika project dipilih
+            document.getElementById('stats-grid').classList.remove('visible');
+            document.getElementById('tables-grid').classList.remove('visible');
+            document.getElementById('project-select').value = '';
         }
 
         function handleProjectChange() {

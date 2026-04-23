@@ -405,7 +405,8 @@ app.get('/api/audit-logs', cekRoleAPI(['administrator', 'supervisor', 'superadmi
 
 // API: PROJECT MANAGEMENT
 app.get('/api/projects', cekAuth, (req, res) => {
-    db.all(`SELECT kode_cabang as kode, nama_cabang as nama, contract_income, kode_cabang as id FROM master_cabang ORDER BY nama ASC`, (err, rows) => {
+    const entitas = req.query.entitas || 'BBS';
+    db.all(`SELECT kode_cabang as kode, nama_cabang as nama, contract_income, kode_cabang as id FROM master_cabang WHERE entitas = ? ORDER BY CAST(kode_cabang AS REAL) DESC, kode_cabang DESC`, [entitas], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows || []);
     });
