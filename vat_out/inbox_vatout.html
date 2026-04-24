@@ -148,7 +148,14 @@
                         style="display:none; font-size:0.72rem; font-weight:600; padding:2px 8px; border-radius:20px; background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;">&#9888;
                         Kode tidak ditemukan</span>
                 </label>
-                <select id="input_branch_baru" class="form-select"></select>
+                <select id="input_branch_baru" class="form-select" onchange="autoLoadVOs(this.value)"></select>
+            </div>
+
+            <div class="form-group" id="group-vo" style="display:none;">
+                <label>Variation Order (VO) <small style="color:var(--text-tertiary);">(Opsional)</small></label>
+                <select id="input_vo_baru" class="form-select">
+                    <option value="">-- Pilih VO jika ada --</option>
+                </select>
             </div>
 
             <div style="display:flex; gap:10px; margin-top: 15px;">
@@ -410,12 +417,36 @@
                 badgeOk.style.display = 'none'; badgeErr.style.display = 'inline-block';
                 badgeErr.textContent = `⚠ Kode '${kodeCabangDari}' tidak ditemukan`;
             }
+            autoLoadVOs(select.value);
+        }
+
+        async function autoLoadVOs(branchKode) {
+            const voGroup = document.getElementById('group-vo');
+            const voSelect = document.getElementById('input_vo_baru');
+            if(!branchKode) {
+                voGroup.style.display = 'none';
+                return;
+            }
+            try {
+                const res = await fetch(`/api/vo/${branchKode}`);
+                const vos = await res.json();
+                if(vos && vos.length > 0) {
+                    voSelect.innerHTML = '<option value="">-- Pilih VO jika ada --</option>';
+                    vos.forEach(v => voSelect.innerHTML += `<option value="${v.id}">${v.nama_vo}</option>`);
+                    voGroup.style.display = 'block';
+                } else {
+                    voGroup.style.display = 'none';
+                }
+            } catch(e) {
+                voGroup.style.display = 'none';
+            }
         }
 
         function simpanFinalVatout() {
             tempDataFinal.invoiceInput = document.getElementById('input_invoice_baru').value;
             tempDataFinal.tglTukarInput = "-";
             tempDataFinal.branchInput = document.getElementById('input_branch_baru').value;
+            tempDataFinal.voInput = document.getElementById('input_vo_baru').value;
             tempDataFinal.username = currentUserName;
             if (!tempDataFinal.branchInput) return alert("Branch wajib diisi!");
             if (!tempDataFinal.invoiceInput) return alert("Nomor Invoice wajib diisi agar bisa ditarik oleh modul Prepaid!");

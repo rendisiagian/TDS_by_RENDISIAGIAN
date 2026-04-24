@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id" data-theme="light">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,15 +8,45 @@
     <script src="/theme.js"></script>
     <link rel="stylesheet" href="/style.css">
     <style>
-        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .badge-tambah { background: #d1fae5; color: #065f46; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.8rem; }
-        .badge-edit { background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.8rem; }
-        .badge-hapus { background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.8rem; }
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .badge-tambah {
+            background: #d1fae5;
+            color: #065f46;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+
+        .badge-edit {
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+
+        .badge-hapus {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
     </style>
-<script src="/sidebar.js"></script>
+    <script src="/sidebar.js"></script>
 </head>
+
 <body>
-    <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
+    <script>(function () { var t = localStorage.getItem("theme") || "light"; document.documentElement.setAttribute("data-theme", t) })()</script>
 
     <div class="app-wrapper">
         <div id="sidebar-container"></div>
@@ -30,16 +61,18 @@
             </header>
 
             <div class="container">
-                <div id="restricted-notice" class="card" style="padding: 20px; background: var(--danger-50); color: var(--danger-700); border: 1px solid var(--danger-300); margin-bottom: 20px; font-weight: bold;">
+                <div id="restricted-notice" class="card"
+                    style="padding: 20px; background: var(--danger-50); color: var(--danger-700); border: 1px solid var(--danger-300); margin-bottom: 20px; font-weight: bold;">
                     ⚠️ Halaman ini khusus untuk pemantauan oleh Administrator & Super Admin.
                 </div>
-                
+
                 <div class="card" id="main-content-card" style="display:none;">
                     <div class="page-header">
                         <h3 class="title-primary" style="margin:0;">Riwayat Perubahan Data Master</h3>
-                        <input type="text" id="search_log" placeholder="🔍 Cari username atau aktivitas..." class="filter-input" style="width:250px; padding: 8px 12px;" onkeyup="renderTable()">
+                        <input type="text" id="search_log" placeholder="🔍 Cari username atau aktivitas..."
+                            class="filter-input" style="width:250px; padding: 8px 12px;" onkeyup="renderTable()">
                     </div>
-                    
+
                     <div class="table-responsive" style="max-height: 600px;">
                         <table style="width: 100%;">
                             <thead style="position: sticky; top: 0; background: var(--bg-primary); z-index: 10;">
@@ -52,7 +85,10 @@
                                 </tr>
                             </thead>
                             <tbody id="tabel-log">
-                                <tr><td colspan="5" class="text-center" style="padding: 20px; color:var(--text-tertiary);">⏳ Memuat log audit...</td></tr>
+                                <tr>
+                                    <td colspan="5" class="text-center"
+                                        style="padding: 20px; color:var(--text-tertiary);">⏳ Memuat log audit...</td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -81,7 +117,7 @@
                 }
             });
 
-        window.gantiEntitas = function(ent) {
+        window.gantiEntitas = function (ent) {
             localStorage.setItem('lastEntitas', ent);
             const sel = document.getElementById('global-entity-select');
             if (sel) sel.value = ent;
@@ -103,26 +139,26 @@
                     document.getElementById('main-content-card').style.display = 'block';
                     loadLogs();
                 }
-            } catch(e) {
+            } catch (e) {
                 console.error("Gagal inisiasi", e);
             }
         }
 
         async function loadLogs() {
             try {
-                const res = await fetch('/api/audit-logs'); 
+                const res = await fetch('/api/audit-logs');
                 logsData = await res.json();
                 renderTable();
-            } catch(e) {
+            } catch (e) {
                 console.error("Gagal menarik audit logs", e);
             }
         }
 
         function getAksiBadge(aksi) {
             const a = (aksi || '').toUpperCase();
-            if(a.includes('TAMBAH')) return `<span class="badge-tambah">${a}</span>`;
-            if(a.includes('EDIT') || a.includes('UBAH')) return `<span class="badge-edit">${a}</span>`;
-            if(a.includes('HAPUS')) return `<span class="badge-hapus">${a}</span>`;
+            if (a.includes('TAMBAH')) return `<span class="badge-tambah">${a}</span>`;
+            if (a.includes('EDIT') || a.includes('UBAH')) return `<span class="badge-edit">${a}</span>`;
+            if (a.includes('HAPUS')) return `<span class="badge-hapus">${a}</span>`;
             return `<span style="background:#e2e8f0; padding:2px 8px; border-radius:4px; font-size:0.8rem;">${a}</span>`;
         }
 
@@ -130,15 +166,15 @@
             const tbody = document.getElementById('tabel-log');
             const q = document.getElementById('search_log').value.toLowerCase();
             tbody.innerHTML = '';
-            
-            const filtered = logsData.filter(d => 
-                (d.username && d.username.toLowerCase().includes(q)) || 
+
+            const filtered = logsData.filter(d =>
+                (d.username && d.username.toLowerCase().includes(q)) ||
                 (d.details && d.details.toLowerCase().includes(q)) ||
                 (d.action && d.action.toLowerCase().includes(q)) ||
                 (d.module && d.module.toLowerCase().includes(q))
             );
 
-            if(filtered.length === 0) {
+            if (filtered.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" class="text-center" style="padding:20px; color:var(--text-tertiary);">Data log tidak ditemukan.</td></tr>';
                 return;
             }
@@ -159,4 +195,5 @@
         initPage();
     </script>
 </body>
+
 </html>

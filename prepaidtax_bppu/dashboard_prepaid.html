@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id" data-theme="light">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,20 +12,68 @@
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        .modal-item-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
-        .modal-item-table th, .modal-item-table td { border: 1px solid var(--border-color); padding: 10px; text-align: left; }
-        .modal-item-table th { background-color: var(--bg-secondary); font-weight: 600; }
-        .btn-icon-aksi { cursor: pointer; border: none; background: none; font-size: 1.1rem; padding: 5px; transition: 0.2s; text-decoration: none; }
-        .btn-icon-aksi:hover { transform: scale(1.2); }
-        .mt-15 { margin-top: 15px; }
-        .btn-clear-filter { background-color: var(--danger-500); color: white; border: none; padding: 6px 15px; border-radius: 5px; font-size: 0.85rem; cursor: pointer; display: none; font-weight: bold; }
-        .btn-clear-filter:hover { background-color: var(--danger-600); }
-        .table-responsive { max-height: calc(100vh - 320px); }
+        .modal-item-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 0.85rem;
+        }
+
+        .modal-item-table th,
+        .modal-item-table td {
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            text-align: left;
+        }
+
+        .modal-item-table th {
+            background-color: var(--bg-secondary);
+            font-weight: 600;
+        }
+
+        .btn-icon-aksi {
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 1.1rem;
+            padding: 5px;
+            transition: 0.2s;
+            text-decoration: none;
+        }
+
+        .btn-icon-aksi:hover {
+            transform: scale(1.2);
+        }
+
+        .mt-15 {
+            margin-top: 15px;
+        }
+
+        .btn-clear-filter {
+            background-color: var(--danger-500);
+            color: white;
+            border: none;
+            padding: 6px 15px;
+            border-radius: 5px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: none;
+            font-weight: bold;
+        }
+
+        .btn-clear-filter:hover {
+            background-color: var(--danger-600);
+        }
+
+        .table-responsive {
+            max-height: calc(100vh - 320px);
+        }
     </style>
-<script src="/sidebar.js"></script>
+    <script src="/sidebar.js"></script>
 </head>
+
 <body>
-    <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
+    <script>(function () { var t = localStorage.getItem("theme") || "light"; document.documentElement.setAttribute("data-theme", t) })()</script>
 
     <div class="app-wrapper">
         <div id="sidebar-container"></div>
@@ -61,13 +110,19 @@
                 </div>
 
                 <div class="card">
-                    <div class="card-header-padding" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                        <h3 class="title-primary" style="border-left-color: var(--primary-500); margin: 0;">Register Bukti Potong Prepaid</h3>
-                        
+                    <div class="card-header-padding"
+                        style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                        <h3 class="title-primary" style="border-left-color: var(--primary-500); margin: 0;">Register
+                            Bukti Potong Prepaid</h3>
+
                         <div class="toolbar-actions">
-                            <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">&#128465; Hapus Filter</button>
-                            <button class="btn-toolbar btn-toolbar-export" onclick="showExportMenu(event, 'tabel-data', 'data_prepaid_' + aktifEntitas)" data-testid="btn-export">Export</button>
-                            <button class="btn-toolbar btn-toolbar-print" onclick="window.print()" data-testid="btn-print">&#128424; Print</button>
+                            <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">&#128465;
+                                Hapus Filter</button>
+                            <button class="btn-toolbar btn-toolbar-export"
+                                onclick="showExportMenu(event, 'tabel-data', 'data_prepaid_' + aktifEntitas)"
+                                data-testid="btn-export">Export</button>
+                            <button class="btn-toolbar btn-toolbar-print" onclick="window.print()"
+                                data-testid="btn-print">&#128424; Print</button>
                             <a href="/inbox-prepaid" class="btn-toolbar btn-toolbar-inbox">
                                 &#128229; Buka Antrean Verifikasi
                             </a>
@@ -90,28 +145,41 @@
                                     <th class="text-center">Tarif (%)</th>
                                     <th class="text-center">Nilai PPh Dipotong</th>
                                     <th class="text-center">Selisih DPP</th>
-                                    <th class="text-center">No. Internal Tagihan</th>
+                                    <th class="text-center">No. Invoice</th>
                                     <th class="text-center">Diinput Oleh</th>
                                 </tr>
                                 <tr class="filter-row">
-                                    <th></th><th></th><th></th>
-                                    <th><input type="text" class="filter-input" data-col="c.nama_cabang" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" data-col="d.masa_pajak" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" data-col="d.nama_pemotong" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" data-col="d.no_bppu" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" data-col="masa_pajak_faktur" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" data-col="d.dpp" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" data-col="d.tarif" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" data-col="d.nilai_pph" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..." disabled style="background-color: var(--bg-secondary); cursor: not-allowed;"></th>
-                                    <th><input type="text" class="filter-input" data-col="d.no_invoice_internal" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" data-col="d.diinput_oleh" placeholder="🔍 Cari..."></th>
+                                    <th></th>
+                                    <th></th>
+                                    <th></th>
+                                    <th><input type="text" class="filter-input" data-col="c.nama_cabang"
+                                            placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.masa_pajak"
+                                            placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.nama_pemotong"
+                                            placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.no_bppu"
+                                            placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="masa_pajak_faktur"
+                                            placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.dpp"
+                                            placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.tarif"
+                                            placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.nilai_pph"
+                                            placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" placeholder="🔍 Cari..." disabled
+                                            style="background-color: var(--bg-secondary); cursor: not-allowed;"></th>
+                                    <th><input type="text" class="filter-input" data-col="d.no_invoice_internal"
+                                            placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.diinput_oleh"
+                                            placeholder="🔍 Cari..."></th>
                                 </tr>
                             </thead>
                             <tbody id="tabel-body"></tbody>
                         </table>
                     </div>
-                    
+
                     <div id="pg-container"></div>
                 </div>
             </div>
@@ -120,33 +188,49 @@
 
     <div id="modalViewItem" class="modal-overlay">
         <div class="modal-box" style="max-width: 750px;">
-            <h3 id="modal-title-faktur" style="border-bottom: 2px solid var(--border-color); padding-bottom: 10px; color: var(--primary-600);">Komparasi Data Tagihan</h3>
+            <h3 id="modal-title-faktur"
+                style="border-bottom: 2px solid var(--border-color); padding-bottom: 10px; color: var(--primary-600);">
+                Komparasi Data Tagihan</h3>
             <div id="container-items" class="table-responsive" style="max-height: 400px;"></div>
-            <button class="btn-simpan btn-cancel mt-15" onclick="document.getElementById('modalViewItem').style.display='none'">Tutup Jendela</button>
+            <button class="btn-simpan btn-cancel mt-15"
+                onclick="document.getElementById('modalViewItem').style.display='none'">Tutup Jendela</button>
         </div>
     </div>
 
     <div id="modalEditData" class="modal-overlay">
         <div class="modal-box" style="max-width: 500px;">
-            <h3 style="border-bottom: 2px solid var(--border-color); padding-bottom: 10px; color: var(--warning-600);">✏️ Edit Relasi Internal</h3>
-            <p style="font-size: 0.85rem; color: var(--text-tertiary); margin-bottom: 15px;">BPPU: <b id="edit-faktur-title"></b></p>
-            <div class="form-group"><label>Branch / Cabang Baru</label><select id="edit_branch" class="form-select"></select></div>
+            <h3 style="border-bottom: 2px solid var(--border-color); padding-bottom: 10px; color: var(--warning-600);">
+                ✏️ Edit Relasi Internal</h3>
+            <p style="font-size: 0.85rem; color: var(--text-tertiary); margin-bottom: 15px;">BPPU: <b
+                    id="edit-faktur-title"></b></p>
+            <div class="form-group"><label>Branch / Cabang Baru</label><select id="edit_branch"
+                    class="form-select"></select></div>
             <div class="form-group">
                 <label>Nomor Internal Tagihan (VAT OUT)</label>
                 <div class="invoice-select-wrapper" style="position:relative;">
-                    <input type="text" id="input_invoice_search" class="invoice-search" placeholder="Ketik untuk cari faktur VAT OUT..." autocomplete="off" onfocus="showInvoiceDropdown()" oninput="filterInvoiceDropdown()">
-                    <div id="invoice-dropdown" class="invoice-dropdown" style="position:absolute; width:100%; top:100%; z-index:9999;"></div>
+                    <input type="text" id="input_invoice_search" class="invoice-search"
+                        placeholder="Ketik untuk cari faktur VAT OUT..." autocomplete="off"
+                        onfocus="showInvoiceDropdown()" oninput="filterInvoiceDropdown()">
+                    <div id="invoice-dropdown" class="invoice-dropdown"
+                        style="position:absolute; width:100%; top:100%; z-index:9999;"></div>
                 </div>
                 <input type="hidden" id="edit_invoice" value="">
-                <div id="selected-invoice-display" style="display:none; margin-top:0.5rem; padding:0.5rem 0.75rem; background:var(--success-50); border:1px solid var(--success-500); border-radius:6px; font-size:0.85rem; font-weight:600; color:var(--success-700);"></div>
-                <span class="invoice-manual-toggle" id="btn-manual-toggle" onclick="toggleManualInput()" style="font-size:0.8rem; color:var(--primary-600); cursor:pointer; font-weight:600; display:block; margin-top:5px;">&#9998; Input manual (jika tidak ada di daftar)</span>
+                <div id="selected-invoice-display"
+                    style="display:none; margin-top:0.5rem; padding:0.5rem 0.75rem; background:var(--success-50); border:1px solid var(--success-500); border-radius:6px; font-size:0.85rem; font-weight:600; color:var(--success-700);">
+                </div>
+                <span class="invoice-manual-toggle" id="btn-manual-toggle" onclick="toggleManualInput()"
+                    style="font-size:0.8rem; color:var(--primary-600); cursor:pointer; font-weight:600; display:block; margin-top:5px;">&#9998;
+                    Input manual (jika tidak ada di daftar)</span>
                 <div id="manual-input-area" style="display:none; margin-top:0.5rem;">
-                    <textarea id="input_invoice_manual" rows="2" placeholder="Ketik nomor faktur/invoice manual..." style="width:100%; padding:0.75rem; border:1px solid var(--border-color); border-radius:6px; font-family:inherit; resize:vertical; background:var(--bg-primary); color:var(--text-primary);"></textarea>
+                    <textarea id="input_invoice_manual" rows="2" placeholder="Ketik nomor faktur/invoice manual..."
+                        style="width:100%; padding:0.75rem; border:1px solid var(--border-color); border-radius:6px; font-family:inherit; resize:vertical; background:var(--bg-primary); color:var(--text-primary);"></textarea>
                 </div>
             </div>
             <div style="display:flex; gap:10px; margin-top: 20px;">
-                <button class="btn-simpan" style="background-color: var(--warning-600); flex: 2;" onclick="submitEdit()">💾 Simpan Perubahan</button>
-                <button class="btn-simpan btn-cancel" style="flex: 1; margin-top:0;" onclick="document.getElementById('modalEditData').style.display='none'">Batal</button>
+                <button class="btn-simpan" style="background-color: var(--warning-600); flex: 2;"
+                    onclick="submitEdit()">💾 Simpan Perubahan</button>
+                <button class="btn-simpan btn-cancel" style="flex: 1; margin-top:0;"
+                    onclick="document.getElementById('modalEditData').style.display='none'">Batal</button>
             </div>
         </div>
     </div>
@@ -181,9 +265,9 @@
 
         socket.on('data-baru-prepaid', () => loadData(currentPage, currentLimit));
 
-        window.gantiEntitas = function(entitas) {
+        window.gantiEntitas = function (entitas) {
             aktifEntitas = entitas;
-            localStorage.setItem('lastEntitas', entitas); 
+            localStorage.setItem('lastEntitas', entitas);
             const sidebarSelect = document.getElementById('global-entity-select');
             if (sidebarSelect && sidebarSelect.value !== entitas) sidebarSelect.value = entitas;
             currentPage = 1;
@@ -193,14 +277,14 @@
         };
 
         // Pagination init
-        initPagination('pg-container', function(page, limit) { 
-            loadData(page, limit); 
+        initPagination('pg-container', function (page, limit) {
+            loadData(page, limit);
         }, 50);
 
         async function loadData(page, limit) {
             currentPage = page || 1;
             currentLimit = limit || 50;
-            
+
             let url = '/api/data-prepaid?entitas=' + aktifEntitas + '&page=' + currentPage + '&limit=' + currentLimit;
             if (Object.keys(currentSearch).length > 0) {
                 url += `&search=${encodeURIComponent(JSON.stringify(currentSearch))}`;
@@ -211,9 +295,9 @@
             const data = result.data || [];
             const total = result.total || 0;
             const offset = currentLimit === 'all' ? 0 : ((currentPage - 1) * currentLimit);
-            
+
             const tbody = document.getElementById('tabel-body');
-            tbody.innerHTML = ''; 
+            tbody.innerHTML = '';
             const formatRupiah = (n) => "Rp " + bersihkanAngka(n).toLocaleString('id-ID');
 
             // Update Statistics Cards
@@ -222,21 +306,21 @@
             document.getElementById('stat-total').textContent = total + ' BPPU';
             document.getElementById('stat-ppn').textContent = formatRupiah(totalPPh);
             document.getElementById('stat-dpp').textContent = formatRupiah(totalDPP);
-            
+
             fetch('/api/inbox-prepaid').then(r => r.json()).then(inbox => {
                 const pendingEl = document.getElementById('stat-pending');
                 if (pendingEl) pendingEl.textContent = (inbox.total || inbox.length || 0);
-            }).catch(() => {});
+            }).catch(() => { });
 
             // Month-over-Month calculation (Menggunakan tanggal_dokumen)
             var now = new Date(), curMonth = now.getMonth(), curYear = now.getFullYear();
-            var thisMonthData = data.filter(function(d) { var dt = new Date(d.tanggal_dokumen); return dt.getMonth() === curMonth && dt.getFullYear() === curYear; });
+            var thisMonthData = data.filter(function (d) { var dt = new Date(d.tanggal_dokumen); return dt.getMonth() === curMonth && dt.getFullYear() === curYear; });
             var lastMonth = curMonth === 0 ? 11 : curMonth - 1, lastYear = curMonth === 0 ? curYear - 1 : curYear;
-            var lastMonthData = data.filter(function(d) { var dt = new Date(d.tanggal_dokumen); return dt.getMonth() === lastMonth && dt.getFullYear() === lastYear; });
-            
+            var lastMonthData = data.filter(function (d) { var dt = new Date(d.tanggal_dokumen); return dt.getMonth() === lastMonth && dt.getFullYear() === lastYear; });
+
             updateMoM('mom-total', thisMonthData.length, lastMonthData.length, ' BPPU');
-            var thisMonthPPh = thisMonthData.reduce(function(s,d){return s+bersihkanAngka(d.nilai_pph)},0);
-            var lastMonthPPh = lastMonthData.reduce(function(s,d){return s+bersihkanAngka(d.nilai_pph)},0);
+            var thisMonthPPh = thisMonthData.reduce(function (s, d) { return s + bersihkanAngka(d.nilai_pph) }, 0);
+            var lastMonthPPh = lastMonthData.reduce(function (s, d) { return s + bersihkanAngka(d.nilai_pph) }, 0);
             updateMoM('mom-ppn', thisMonthPPh, lastMonthPPh, '');
 
             if (data.length === 0) {
@@ -247,11 +331,11 @@
                 const tr = document.createElement('tr');
                 let curBr = baris.kode_cabang || '';
                 let curInv = baris.no_invoice_internal || '';
-                let barisNo = offset + index + 1; 
+                let barisNo = offset + index + 1;
 
                 let btnView = `<button class="btn-tbl btn-tbl-view" title="Komparasi Faktur" onclick="viewItems('${baris.no_bppu}')">Lihat</button>`;
                 let btnEdit = `<button class="btn-tbl btn-tbl-edit" title="Edit Data" onclick="handleAction('${baris.no_bppu}', 'EDIT', '${curBr}', '${curInv}', '${(baris.nama_pemotong || '').replace(/'/g, "\\'").replace(/"/g, '&quot;')}')">Edit</button>`;
-                let btnDel  = `<button class="btn-tbl btn-tbl-del" title="Hapus Data" onclick="handleAction('${baris.no_bppu}', 'DELETE')">Hapus</button>`;
+                let btnDel = `<button class="btn-tbl btn-tbl-del" title="Hapus Data" onclick="handleAction('${baris.no_bppu}', 'DELETE')">Hapus</button>`;
                 let btnPdf = baris.link_pdf_lokal ? `<a href="/${baris.link_pdf_lokal}" target="_blank" class="btn-tbl btn-tbl-pdf">PDF</a>` : `-`;
 
                 // Hitung selisih DPP
@@ -292,14 +376,14 @@
                 `;
                 tbody.appendChild(tr);
             });
-            
+
             // Render pagination
             renderPagination('pg-container', total, currentPage, currentLimit === 'all' ? total : currentLimit);
         }
 
         // FUNGSI PENCARIAN SERVER-SIDE (DEBOUNCE)
         let searchTimeout;
-        document.addEventListener('input', function(e) {
+        document.addEventListener('input', function (e) {
             if (e.target.classList.contains('filter-input')) {
                 clearTimeout(searchTimeout);
                 searchTimeout = setTimeout(() => { jalankanFilterTabel(); }, 500);
@@ -313,7 +397,7 @@
 
             filters.forEach((input) => {
                 const val = input.value;
-                const colName = input.getAttribute('data-col'); 
+                const colName = input.getAttribute('data-col');
                 if (val && colName) {
                     isAnyFilterActive = true;
                     currentSearch[colName] = val;
@@ -321,13 +405,13 @@
             });
 
             document.getElementById('btnHapusFilter').style.display = isAnyFilterActive ? 'inline-block' : 'none';
-            loadData(1, currentLimit); 
+            loadData(1, currentLimit);
         }
 
-        function resetSemuaFilter() { 
-            document.querySelectorAll('.filter-input').forEach(input => input.value = ''); 
+        function resetSemuaFilter() {
+            document.querySelectorAll('.filter-input').forEach(input => input.value = '');
             currentSearch = {};
-            jalankanFilterTabel(); 
+            jalankanFilterTabel();
         }
 
         // MODAL VIEW (KOMPARASI PREPAID vs VAT OUT)
@@ -337,7 +421,7 @@
                 const data = await res.json();
                 document.getElementById('modal-title-faktur').innerText = "Komparasi Data Tagihan: " + noBppu;
                 const container = document.getElementById('container-items');
-                
+
                 if (!data.prepaid) {
                     container.innerHTML = "<p class='text-center' style='padding:20px;'>Data tidak ditemukan.</p>";
                     document.getElementById('modalViewItem').style.display = 'flex';
@@ -363,8 +447,8 @@
 
                 container.innerHTML = html;
                 document.getElementById('modalViewItem').style.display = 'flex';
-            } catch (err) { 
-                alert("Terjadi kesalahan."); 
+            } catch (err) {
+                alert("Terjadi kesalahan.");
                 console.error(err);
             }
         }
@@ -373,31 +457,31 @@
         async function handleAction(noBppu, actionType, curCabang = '', curInvoice = '', namaPemotong = '') {
             const userRole = currentUser.role ? currentUser.role.toLowerCase() : '';
             const isSupervisor = ['supervisor', 'administrator'].includes(userRole);
-            
+
             if (actionType === 'DELETE') {
-                if(confirm(isSupervisor ? `Konfirmasi HAPUS BPPU ${noBppu}?` : `Ajukan penghapusan BPPU ${noBppu} ke Supervisor?`)) {
+                if (confirm(isSupervisor ? `Konfirmasi HAPUS BPPU ${noBppu}?` : `Ajukan penghapusan BPPU ${noBppu} ke Supervisor?`)) {
                     socket.emit('request-action-faktur', { action: 'DELETE', mod: 'prepaid', faktur: noBppu, id_user: currentUser.id, username: currentUser.username, role: currentUser.role });
-                    if(!isSupervisor) alert("Permintaan hapus diajukan.");
+                    if (!isSupervisor) alert("Permintaan hapus diajukan.");
                 }
             } else if (actionType === 'EDIT') {
                 targetEditFaktur = noBppu;
                 document.getElementById('edit-faktur-title').innerText = noBppu;
-                
+
                 let valInv = (curInvoice === '-' || curInvoice === 'null') ? '' : curInvoice;
-                
+
                 // Initialize Select UI
-                arraySelectedInvoice = valInv ? valInv.split(',').map(s=>s.trim()).filter(Boolean) : [];
+                arraySelectedInvoice = valInv ? valInv.split(',').map(s => s.trim()).filter(Boolean) : [];
                 document.getElementById('edit_invoice').value = arraySelectedInvoice.join(', ');
                 renderSelectedInvoices();
-                
+
                 document.getElementById('input_invoice_search').value = '';
                 document.getElementById('manual-input-area').style.display = 'none';
                 document.getElementById('input_invoice_search').style.display = 'block';
                 document.getElementById('btn-manual-toggle').innerHTML = '&#9998; Input manual (jika tidak ada di daftar)';
                 isManualMode = false;
-                
+
                 await loadVatoutOptions(namaPemotong);
-                
+
                 const res = await fetch('/api/branches?entitas=' + aktifEntitas);
                 const branches = await res.json();
                 const select = document.getElementById('edit_branch');
@@ -421,7 +505,7 @@
         function submitEdit() {
             const isSupervisor = currentUser.role && ['supervisor', 'administrator'].includes(currentUser.role.toLowerCase());
             const branch = document.getElementById('edit_branch').value;
-            
+
             var manualArea = document.getElementById('manual-input-area');
             var invoice = '';
             if (manualArea.style.display !== 'none') {
@@ -433,7 +517,7 @@
             if (!branch) return alert("Branch wajib diisi!");
             socket.emit('request-action-faktur', { action: 'EDIT', mod: 'prepaid', faktur: targetEditFaktur, id_user: currentUser.id, username: currentUser.username, role: currentUser.role, newData: { branch, invoice, tanggal: '-' } });
             document.getElementById('modalEditData').style.display = 'none';
-            if(!isSupervisor) alert("Permintaan Edit diajukan ke Panel Approval.");
+            if (!isSupervisor) alert("Permintaan Edit diajukan ke Panel Approval.");
         }
 
         function updateMoM(elId, current, previous, suffix) {
@@ -460,7 +544,7 @@
             var dropdown = document.getElementById('invoice-dropdown');
             var toggleBtn = document.getElementById('btn-manual-toggle');
             var display = document.getElementById('selected-invoice-display');
-            
+
             if (isManualMode) {
                 manualArea.style.display = 'block';
                 searchInput.style.display = 'none';
@@ -483,7 +567,7 @@
                 var res = await fetch(url);
                 vatoutData = await res.json();
                 renderInvoiceDropdown('');
-            } catch(e) {
+            } catch (e) {
                 vatoutData = { matching: [], others: [] };
             }
         }
@@ -502,13 +586,13 @@
         function renderInvoiceDropdown(query) {
             var dd = document.getElementById('invoice-dropdown');
             var q = (query || '').toLowerCase();
-            var formatRp = function(n) { return 'Rp ' + Number(n || 0).toLocaleString('id-ID'); };
+            var formatRp = function (n) { return 'Rp ' + Number(n || 0).toLocaleString('id-ID'); };
             var html = '';
 
             var matchingItems = vatoutData.matching || [];
 
             // 1. FILTER: Keluarkan item yang no_invoice_internal-nya sudah dipilih
-            var available = matchingItems.filter(function(r) {
+            var available = matchingItems.filter(function (r) {
                 var invNo = (r.no_invoice_internal && r.no_invoice_internal !== '-') ? r.no_invoice_internal.trim() : '';
                 // Cek apakah salah satu dari invoice yang sudah dipilih cocok
                 if (!invNo) return true; // Biarkan tampil (tapi tidak bisa diklik)
@@ -516,8 +600,8 @@
             });
 
             // 2. SORT: Urutkan berdasarkan angka prefix sebelum '/' pertama (001, 002, 009, 013...)
-            available.sort(function(a, b) {
-                var getPrefix = function(r) {
+            available.sort(function (a, b) {
+                var getPrefix = function (r) {
                     var inv = (r.no_invoice_internal && r.no_invoice_internal !== '-') ? r.no_invoice_internal.trim() : '';
                     if (!inv || inv.indexOf('/') === -1) return 9999; // tanpa invoice internal → paling bawah
                     return parseInt(inv.split('/')[0], 10) || 9999;
@@ -528,15 +612,15 @@
             // 3. FILTER: Pencarian teks
             var filtered = available;
             if (q) {
-                filtered = available.filter(function(r) {
+                filtered = available.filter(function (r) {
                     return (r.no_invoice_internal || '').toLowerCase().includes(q) ||
-                           (r.no_faktur || '').toLowerCase().includes(q) ||
-                           (r.nama_pembeli || '').toLowerCase().includes(q);
+                        (r.no_faktur || '').toLowerCase().includes(q) ||
+                        (r.nama_pembeli || '').toLowerCase().includes(q);
                 });
             }
 
             if (filtered.length > 0) {
-                filtered.forEach(function(r) { html += buildDropdownItem(r, formatRp); });
+                filtered.forEach(function (r) { html += buildDropdownItem(r, formatRp); });
             } else if (arraySelectedInvoice.length > 0 && available.length === 0) {
                 html = '<div class="invoice-dropdown-empty" style="padding:10px; background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d;">✔ Semua faktur yang relevan sudah dipilih.</div>';
             } else {
@@ -559,7 +643,7 @@
                     '<div style="font-weight:bold; color:#94a3b8;">' + r.no_faktur + '</div>' +
                     '<div style="font-size:0.8rem; color:#f59e0b;">⚠ Belum memiliki No. Invoice Internal</div>' +
                     '<div style="font-size:0.8rem; color:#94a3b8;">' + (r.nama_pembeli || '-') + ' | ' + (r.tanggal_format || '-') + '</div>' +
-                '</div>';
+                    '</div>';
             }
 
             var onClick = 'onclick="selectInvoice(\'' + invNo.replace(/'/g, "\\''") + '\')"';
@@ -568,11 +652,11 @@
                 '<div style="font-size:0.78rem; color:var(--text-tertiary); margin-top:2px;">No. Faktur: ' + r.no_faktur + '</div>' +
                 '<div style="font-size:0.78rem; color:#666; margin-top:1px;">' + (r.nama_pembeli || '-') + ' | ' + (r.tanggal_format || '-') + '</div>' +
                 '<div style="font-size:0.78rem; color:#666;">DPP: ' + formatRp(r.dpp) + ' | PPN: ' + formatRp(r.ppn) + '</div>' +
-            '</div>';
+                '</div>';
         }
 
         function selectInvoice(noFaktur) {
-            if(arraySelectedInvoice.includes(noFaktur)) return;
+            if (arraySelectedInvoice.includes(noFaktur)) return;
             arraySelectedInvoice.push(noFaktur);
             document.getElementById('edit_invoice').value = arraySelectedInvoice.join(', ');
             document.getElementById('input_invoice_search').value = '';
@@ -582,7 +666,7 @@
 
         function renderSelectedInvoices() {
             var display = document.getElementById('selected-invoice-display');
-            if(arraySelectedInvoice.length === 0) {
+            if (arraySelectedInvoice.length === 0) {
                 display.style.display = 'none';
                 document.getElementById('edit_invoice').value = '';
                 return;
@@ -602,7 +686,7 @@
             renderSelectedInvoices();
         }
 
-        document.addEventListener('click', function(e) {
+        document.addEventListener('click', function (e) {
             if (!e.target.closest('.invoice-select-wrapper')) {
                 const dd = document.getElementById('invoice-dropdown');
                 if (dd) dd.classList.remove('show');
@@ -614,4 +698,5 @@
 
     </script>
 </body>
+
 </html>

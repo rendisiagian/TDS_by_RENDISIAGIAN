@@ -52,41 +52,38 @@
                             <h3 class="title-primary">Tambah Pengguna</h3>
                             <div class="form-group">
                                 <label>Username Login</label>
-                                <input type="text" id="new_username" autocomplete="off">
+                                <input type="text" id="new_username" placeholder="Masukkan username...">
                             </div>
                             <div class="form-group">
                                 <label>Nama Lengkap</label>
-                                <input type="text" id="new_nama" autocomplete="off">
+                                <input type="text" id="new_nama" placeholder="Masukkan nama lengkap...">
                             </div>
                             <div class="form-group">
-                                <label>Role / Hak Akses</label>
-                                <select id="new_role" class="form-select">
-                                    <option value="admin">Admin (Input & Ekstraksi)</option>
-                                    <option value="supervisor">Supervisor (Checker & Eksekutor)</option>
-                                    <option value="administrator">Administrator (Super User)</option>
-                                    <option value="dummy">Dummy (Simulator / Testing)</option>
+                                <label>Role / Peran</label>
+                                <select id="new_role">
+                                    <option value="user">User (Input Only)</option>
+                                    <option value="supervisor">Supervisor (Verify & Approval)</option>
+                                    <option value="admin">Administrator (Full Access)</option>
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label>Password Default</label>
-                                <input type="password" id="new_password">
+                                <label>Password Awal</label>
+                                <input type="password" id="new_password" placeholder="Min. 6 karakter...">
                             </div>
-                            <button class="btn-simpan btn-manage" onclick="tambahUser()">➕ Tambahkan Akun</button>
+                            <button class="btn-simpan" onclick="tambahUser()">Tambah Pengguna Baru</button>
                         </div>
 
-                        <div class="card flex-2">
-                            <div class="card-header-padding" style="padding-top:0;">
-                                <h3 class="title-success">Pengguna Terdaftar</h3>
-                            </div>
+                        <div class="card flex-2-p80">
+                            <h3 class="title-success">Daftar Pengguna Aktif</h3>
                             <div class="table-responsive">
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>ID</th>
+                                            <th class="text-center">ID</th>
                                             <th>Username</th>
                                             <th>Nama Lengkap</th>
-                                            <th>Role</th>
-                                            <th>Aksi Admin</th>
+                                            <th class="text-center">Role</th>
+                                            <th class="text-center">Aksi</th>
                                         </tr>
                                     </thead>
                                     <tbody id="tabel-users"></tbody>
@@ -98,46 +95,43 @@
             </div>
         </main>
     </div>
-
     <script>
         const socket = io();
         let currentUser = {};
 
-        // Sinkronisasi Sidebar
-        let aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
-        fetch('/sidebar.html')
-            .then(res => res.text())
-            .then(html => {
-                document.getElementById('sidebar-container').innerHTML = html;
-                const currentPath = window.location.pathname;
-                document.querySelectorAll('.sidebar-link').forEach(link => {
-                    if (link.getAttribute('href') === currentPath) link.classList.add('active');
-                });
-                const sidebarSelect = document.getElementById('global-entity-select');
-                if (sidebarSelect) sidebarSelect.value = aktifEntitas;
-            });
+        function isAdministrator(role) {
+            return ['administrator', 'superadmin'].includes(role.toLowerCase());
+        }
 
-        window.gantiEntitas = function(entitas) {
-            localStorage.setItem('lastEntitas', entitas);
-            const sidebarSelect = document.getElementById('global-entity-select');
-            if (sidebarSelect) sidebarSelect.value = entitas;
-        };
-
-        function isSuperAdmin(role) {
-            if (!role) return false;
-            return ['administrator', 'superadmin', 'super admin'].includes(role.toLowerCase());
+        function isSupervisorOrAbove(role) {
+            return ['supervisor', 'administrator', 'superadmin'].includes(role.toLowerCase());
         }
 
         async function initPage() {
             const res = await fetch('/api/me');
             currentUser = await res.json();
-            document.getElementById('user-name-display').innerText = currentUser.nama || currentUser.username;
+            document.getElementById('user-name-display').textContent = currentUser.nama;
 
-            if (isSuperAdmin(currentUser.role)) {
+            fetch('/sidebar.html')
+                .then(res => res.text())
+                .then(html => {
+                    document.getElementById('sidebar-container').innerHTML = html;
+                    const currentPath = window.location.pathname;
+                    document.querySelectorAll('.sidebar-link').forEach(link => {
+                        if (link.getAttribute('href') === currentPath) link.classList.add('active');
+                    });
+                });
+
+            // Supervisor & Admin bisa melihat Panel Approval
+            if (isSupervisorOrAbove(currentUser.role)) {
+                loadPendingRequests();
+            }
+
+            // HANYA Administrator yang bisa melihat & mengelola user
+            if (isAdministrator(currentUser.role)) {
                 document.getElementById('admin-section').classList.remove('d-none');
                 loadUsers();
             }
-            loadPendingRequests();
         }
 
         async function loadPendingRequests() {
@@ -146,7 +140,7 @@
             const tbody = document.getElementById('tabel-pending');
             tbody.innerHTML = '';
 
-            if(data.length === 0) {
+            if (data.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="5" class="text-center" style="padding: 20px; color:#64748b;">Tidak ada permintaan persetujuan saat ini.</td></tr>`;
                 return;
             }
@@ -159,7 +153,6 @@
                     <button class="btn-aksi btn-reject" title="Tolak" onclick="prosesRequest('${req.id}', 'Tolak')">❌</button>
                 `;
 
-                // LOGIKA CERDAS: Menerjemahkan Data JSON menjadi Rincian yang Mudah Dibaca
                 let detailText = '';
                 
                 if (req.jenis_request.startsWith('EDIT_')) {
@@ -168,14 +161,28 @@
                         let targetMod = req.jenis_request.replace('EDIT_', '');
                         let isBPPU = (targetMod === 'PAYABLE' || targetMod === 'PREPAID');
                         let docLabel = isBPPU ? 'No. BPPU' : 'No. Faktur';
+                        
+                        let oldVal = val.old || null;
+                        let newVal = val.new || val; 
+
+                        const compare = (key, label) => {
+                            const o = oldVal ? (oldVal[key] || '-') : '?';
+                            const n = newVal[key] || '-';
+                            if (o === n) return `<div><b>${label}:</b> ${n}</div>`;
+                            return `<div style="display:flex; justify-content:space-between; gap:10px; border-bottom:1px dashed #e2e8f0; padding:2px 0;">
+                                <span><b>${label}:</b></span>
+                                <span><s style="color:#94a3b8;">${o}</s> ➔ <b style="color:#059669;">${n}</b></span>
+                            </div>`;
+                        };
 
                         detailText = `
                             <div style="font-size:0.85rem; background:#f8fafc; padding:10px; border-radius:6px; border:1px solid #cbd5e1; line-height: 1.6;">
                                 <div style="margin-bottom: 5px;"><b style="color:#2563eb; background:#eff6ff; padding: 2px 6px; border-radius: 4px;">Modul: ${targetMod}</b></div>
-                                <b>${docLabel}:</b> <span style="font-family: monospace; font-size: 0.9rem;">${val.faktur}</span><br>
-                                <span style="color:#059669;"><b>Ubah Branch ➔</b> ${val.branch || '-'}</span><br>
-                                <span style="color:#059669;"><b>Ubah Invoice ➔</b> ${val.invoice || '-'}</span>
-                                ${!isBPPU ? `<br><span style="color:#059669;"><b>Ubah Tgl Tukar ➔</b> ${val.tanggal || '-'}</span>` : ''}
+                                <div style="margin-bottom: 8px;"><b>${docLabel}:</b> <span style="font-family: monospace; font-size: 0.9rem;">${val.faktur}</span></div>
+                                ${compare('branch', 'Branch')}
+                                ${compare('invoice', 'Invoice')}
+                                ${!isBPPU ? compare('tanggal', 'Tgl Tukar') : ''}
+                                ${targetMod === 'VATOUT' ? compare('vo', 'VO') : ''}
                             </div>
                         `;
                     } catch(e) {
@@ -193,7 +200,14 @@
                     `;
                 } 
                 else if (req.jenis_request === 'NAMA') {
-                    detailText = `Ubah Nama Lengkap menjadi: <b style="color:#059669;">${req.nilai_baru}</b>`;
+                    if (req.nilai_baru.startsWith('{')) {
+                        try {
+                            const val = JSON.parse(req.nilai_baru);
+                            detailText = `Ubah Nama: <s style="color:#94a3b8;">${val.old}</s> ➔ <b style="color:#059669;">${val.new}</b>`;
+                        } catch(e) { detailText = `Ubah Nama menjadi: <b style="color:#059669;">${req.nilai_baru}</b>`; }
+                    } else {
+                        detailText = `Ubah Nama menjadi: <b style="color:#059669;">${req.nilai_baru}</b>`;
+                    }
                 } 
                 else if (req.jenis_request === 'PASSWORD') {
                     detailText = `<span class="text-protected" style="background:#f1f5f9; padding: 4px 8px; border-radius: 4px;"><i>🔐 Mengajukan Perubahan Password</i></span>`;
@@ -219,7 +233,6 @@
             }
         }
 
-        // --- FUNGSI MANAJEMEN AKUN (SUPER ADMIN) ---
         async function loadUsers() {
             const res = await fetch('/api/users');
             const data = await res.json();
@@ -228,7 +241,7 @@
             
             data.forEach(u => {
                 const tr = document.createElement('tr');
-                let aksiBtn = isSuperAdmin(u.role) ? `<span class="text-protected" style="font-size:0.75rem; font-weight:bold;">🛡️ Protected</span>` : `<button class="btn-aksi btn-reset-pass" onclick="resetPassword('${u.id}', '${u.username}')>🔑 Reset Pass</button>`;
+                let aksiBtn = isSupervisorOrAbove(u.role) ? `<span class="text-protected" style="font-size:0.75rem; font-weight:bold;">🛡️ Protected</span>` : `<button class="btn-aksi btn-reset-pass" onclick="resetPassword('${u.id}', '${u.username}')">🔑 Reset Pass</button>`;
                 
                 let roleColor = u.role === 'supervisor' ? '#f59e0b' : (u.role === 'admin' ? '#2563eb' : '#0f172a');
 
@@ -253,7 +266,6 @@
             
             socket.emit('tambah-user', { username: user, nama: nama, role: role, password: pass });
             document.querySelectorAll('#admin-section input').forEach(i => i.value='');
-            // Alert akan muncul saat server mengkonfirmasi melalui event 'users-updated'
         }
 
         function resetPassword(id, username) {
@@ -268,16 +280,11 @@
             }
         }
 
-        // Inisialisasi awal
         initPage();
-
-        // Listeners dari Server
         socket.on('request-updated', () => loadPendingRequests());
         socket.on('users-updated', () => {
-            if (isSuperAdmin(currentUser.role)) {
+            if (isAdministrator(currentUser.role)) {
                 loadUsers();
-                // Notifikasi sukses saat pengguna baru berhasil ditambahkan dari server
-                // (Ini hanya akan tampil jika admin-section sedang aktif / user adalah superadmin)
             }
         });
     </script>

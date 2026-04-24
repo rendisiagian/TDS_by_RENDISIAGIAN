@@ -30,15 +30,27 @@
                 MODUL PAJAK <span class="chevron">▼</span>
             </span>
             <div class="sidebar-links-container">
+                <a href="/taxprojectreport-vatin" class="sidebar-link">📋 Tax Project Report</a>
                 <div class="sidebar-item-nested">
                     <span class="sidebar-link collapsible-sub" onclick="toggleSubMenu('sub-vatout')">
                         Faktur Keluaran <span class="chevron">▼</span>
                     </span>
                     <div id="sub-vatout" class="sidebar-sub-menu">
-                        <a href="/inbox-vatout" class="sidebar-link sub-link" style="color:#ea580c; font-weight:600;">📥 Antrean Verifikasi</a>
+                        <a href="/inbox-vatout" class="sidebar-link sub-link" style="color:#ea580c; font-weight:600;">📥
+                            Antrean Verifikasi</a>
                     </div>
                 </div>
-                <a href="/dashboard-vatin" class="sidebar-link">Faktur Masukan</a>
+                <div class="sidebar-item-nested">
+                    <span class="sidebar-link collapsible-sub" onclick="toggleSubMenu('sub-vatin')">
+                        Faktur Masukan <span class="chevron">▼</span>
+                    </span>
+                    <div id="sub-vatin" class="sidebar-sub-menu">
+                        <a href="/dashboard-vatin" class="sidebar-link sub-link">📊 Dashboard</a>
+                        <a href="/summary-vatin" class="sidebar-link sub-link">📊 Laporan Rekapitulasi</a>
+                        <a href="/inbox-vatin" class="sidebar-link sub-link" style="color:#ea580c; font-weight:600;">📥
+                            Antrean Verifikasi</a>
+                    </div>
+                </div>
                 <a href="/dashboard-payable" class="sidebar-link">Tax Payable</a>
                 <div class="sidebar-item-nested">
                     <span class="sidebar-link collapsible-sub" onclick="toggleSubMenu('sub-prepaid')">
@@ -53,8 +65,6 @@
         </div>
 
         <span class="sidebar-nav-label">SISTEM</span>
-        <a href="/project-management" class="sidebar-link" id="menu-project-management">📋 Project Management Report</a>
-        <a href="/summary" class="sidebar-link">Laporan Rekapitulasi</a>
         <a href="/profile" class="sidebar-link">Pengaturan Akun</a>
         <a href="/manage-users" class="sidebar-link" id="menu-manage-users">Manajemen &amp; Approval</a>
 

@@ -13,6 +13,15 @@
         .btn-tambah:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.4); }
         .btn-hapus { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: 0.2s; }
         .btn-hapus:hover { background: #ef4444; color: white; }
+        .btn-vo { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: 0.2s; }
+        .btn-vo:hover { background: #e2e8f0; color: #1e293b; }
+        
+        /* Modal VO */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+        .modal-content { background: var(--bg-primary); margin: 5% auto; padding: 30px; border-radius: 16px; width: 60%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; }
+        .close-modal { cursor: pointer; font-size: 1.5rem; color: var(--text-tertiary); }
+        .close-modal:hover { color: var(--danger-600); }
     </style>
 <script src="/sidebar.js"></script>
 </head>
@@ -90,9 +99,52 @@
                             </table>
                         </div>
                     </div>
-                </div>
             </div>
         </main>
+    </div>
+
+    <!-- Modal Kelola VO -->
+    <div id="modalVO" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="vo-title" style="margin:0;">Kelola Variation Order (VO)</h3>
+                <span class="close-modal" onclick="tutupModalVO()">&times;</span>
+            </div>
+            <div id="vo-form-section" style="margin-bottom: 30px; padding: 20px; background: var(--surface-50); border-radius: 12px; border: 1px solid var(--border-color);">
+                <h4 id="vo-form-title">➕ Tambah VO</h4>
+                <input type="hidden" id="v_id" value="">
+                <input type="hidden" id="v_kode_cabang" value="">
+                <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:15px; align-items: end;">
+                    <div class="form-group" style="margin:0;">
+                        <label>Nama Variation Order (VO)</label>
+                        <input type="text" id="v_nama" placeholder="Cth: Pekerjaan Tambahan Sipil" autocomplete="off">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label>Contract Income</label>
+                        <input type="text" id="v_contract_income" placeholder="Hanya angka" autocomplete="off">
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn-simpan btn-manage" onclick="simpanVO()" style="flex:2;">💾 Simpan</button>
+                        <button class="btn-simpan btn-cancel d-none" id="btn-v-batal" onclick="resetFormVO()" style="flex:1;">Batal</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="table-responsive">
+                <table style="width:100%;">
+                    <thead>
+                        <tr>
+                            <th>Nama Variation Order (VO)</th>
+                            <th class="text-right">Contract Income</th>
+                            <th class="text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabel-vo">
+                        <!-- Loaded by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -180,6 +232,7 @@
                 if(isAdmin) {
                     btnAksi = `
                         <div style="display:flex; justify-content:center; gap:5px;">
+                            <button class="btn-vo" onclick="bukaKelolaVO('${d.kode_cabang}')">📦 VO</button>
                             <button class="btn-tbl btn-tbl-edit" onclick="siapkanEdit('${d.kode_cabang}', '${(d.nama_cabang || '').replace(/'/g, "\\'")}', '${d.entitas}', '${d.contract_income || 0}')">Edit</button>
                             ${d.kode_cabang !== 'PUSAT' ? `<button class="btn-hapus" onclick="hapusCabang('${d.kode_cabang}')">Hapus</button>` : `<span style="font-size:0.8rem; color:#64748b; padding:5px;">Protected</span>`}
                         </div>
@@ -273,6 +326,106 @@
         socket.on('error-cabang', (msg) => {
             alert("GAGAL: " + msg);
         });
+
+        // ===================================
+        // LOGIKA VO (Variation Order)
+        // ===================================
+        let activeVOKodeCabang = '';
+        let voData = [];
+
+        function bukaKelolaVO(kode) {
+            activeVOKodeCabang = kode;
+            document.getElementById('v_kode_cabang').value = kode;
+            document.getElementById('vo-title').innerText = `Kelola VO - Project ${kode}`;
+            document.getElementById('modalVO').style.display = 'block';
+            loadVOs(kode);
+        }
+
+        function tutupModalVO() {
+            document.getElementById('modalVO').style.display = 'none';
+            resetFormVO();
+        }
+
+        async function loadVOs(kode) {
+            try {
+                const res = await fetch(`/api/vo/${kode}`);
+                voData = await res.json();
+                renderTabelVO();
+            } catch(e) {
+                console.error("Gagal load VO", e);
+            }
+        }
+
+        function renderTabelVO() {
+            const tbody = document.getElementById('tabel-vo');
+            tbody.innerHTML = '';
+            
+            if(voData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center" style="padding:20px; color:var(--text-tertiary);">Belum ada Variation Order.</td></tr>';
+                return;
+            }
+
+            voData.forEach(v => {
+                const tr = document.createElement('tr');
+                const formatRp = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(v.contract_income || 0);
+                
+                tr.innerHTML = `
+                    <td>${v.nama_vo}</td>
+                    <td class="text-right">${formatRp}</td>
+                    <td class="text-center">
+                        <div style="display:flex; justify-content:center; gap:5px;">
+                            <button class="btn-tbl btn-tbl-edit" onclick="siapkanEditVO(${v.id}, '${v.nama_vo.replace(/'/g, "\\'")}', ${v.contract_income})">Edit</button>
+                            <button class="btn-hapus" onclick="hapusVO(${v.id})">Hapus</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function siapkanEditVO(id, nama, income) {
+            document.getElementById('vo-form-title').innerText = '📝 Edit VO';
+            document.getElementById('v_id').value = id;
+            document.getElementById('v_nama').value = nama;
+            document.getElementById('v_contract_income').value = income;
+            document.getElementById('btn-v-batal').classList.remove('d-none');
+        }
+
+        function resetFormVO() {
+            document.getElementById('vo-form-title').innerText = '➕ Tambah VO';
+            document.getElementById('v_id').value = '';
+            document.getElementById('v_nama').value = '';
+            document.getElementById('v_contract_income').value = '';
+            document.getElementById('btn-v-batal').classList.add('d-none');
+        }
+
+        function simpanVO() {
+            const id = document.getElementById('v_id').value;
+            const nama = document.getElementById('v_nama').value.trim();
+            const income = document.getElementById('v_contract_income').value.trim();
+            const kode = document.getElementById('v_kode_cabang').value;
+
+            if(!nama) return alert("Nama VO wajib diisi!");
+
+            if(id) {
+                socket.emit('edit-vo', { id, nama_vo: nama, contract_income: income, user: currentUser.username });
+            } else {
+                socket.emit('tambah-vo', { kode_cabang: kode, nama_vo: nama, contract_income: income, user: currentUser.username });
+            }
+            resetFormVO();
+        }
+
+        function hapusVO(id) {
+            if(confirm("Hapus Variation Order ini?")) {
+                socket.emit('hapus-vo', { id, user: currentUser.username });
+            }
+        }
+
+        socket.on('data-baru-vo', () => {
+            if(activeVOKodeCabang) loadVOs(activeVOKodeCabang);
+        });
+
+        socket.on('error-vo', (msg) => alert("GAGAL VO: " + msg));
 
         initPage();
     </script>
