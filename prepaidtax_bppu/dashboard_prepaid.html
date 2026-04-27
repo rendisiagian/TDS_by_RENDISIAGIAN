@@ -145,8 +145,8 @@
                                     <th class="text-center">Tarif (%)</th>
                                     <th class="text-center">Nilai PPh Dipotong</th>
                                     <th class="text-center">Selisih DPP</th>
-                                    <th class="text-center">No. Invoice</th>
                                     <th class="text-center">Diinput Oleh</th>
+                                    <th class="text-center">No. Invoice</th>
                                 </tr>
                                 <tr class="filter-row">
                                     <th></th>
@@ -170,9 +170,9 @@
                                             placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" placeholder="🔍 Cari..." disabled
                                             style="background-color: var(--bg-secondary); cursor: not-allowed;"></th>
-                                    <th><input type="text" class="filter-input" data-col="d.no_invoice_internal"
-                                            placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.diinput_oleh"
+                                            placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.no_invoice_internal"
                                             placeholder="🔍 Cari..."></th>
                                 </tr>
                             </thead>
@@ -371,8 +371,8 @@
                     <td class="text-center">${baris.tarif}%</td>
                     <td class="text-right" style="font-weight:600; color:var(--primary-600);">${formatRupiah(baris.nilai_pph)}</td>
                     <td class="text-center" data-selisih="${selisihValue}">${selisihText}</td>
-                    <td class="text-center">${baris.no_invoice_internal || '-'}</td>
                     <td class="text-center text-diinput">${baris.diinput_oleh || '-'}</td>
+                    <td class="text-center">${baris.no_invoice_internal || '-'}</td>
                 `;
                 tbody.appendChild(tr);
             });
