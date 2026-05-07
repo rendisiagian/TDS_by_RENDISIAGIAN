@@ -300,34 +300,27 @@
             tbody.innerHTML = '';
             const formatRupiah = (n) => "Rp " + bersihkanAngka(n).toLocaleString('id-ID');
 
-            // Update Statistics Cards
-            let totalDPP = 0, totalPPh = 0;
-            data.forEach(d => { totalDPP += bersihkanAngka(d.dpp); totalPPh += bersihkanAngka(d.nilai_pph); });
+            // BUG-H2/H3 FIX: Gunakan stats dari server (total seluruh data, bukan hanya halaman ini)
+            const stats = result.stats || {};
             document.getElementById('stat-total').textContent = total + ' BPPU';
-            document.getElementById('stat-ppn').textContent = formatRupiah(totalPPh);
-            document.getElementById('stat-dpp').textContent = formatRupiah(totalDPP);
+            document.getElementById('stat-ppn').textContent = formatRupiah(stats.total_tax || 0);
+            document.getElementById('stat-dpp').textContent = formatRupiah(stats.total_dpp || 0);
 
             fetch('/api/inbox-prepaid').then(r => r.json()).then(inbox => {
                 const pendingEl = document.getElementById('stat-pending');
                 if (pendingEl) pendingEl.textContent = (inbox.total || inbox.length || 0);
             }).catch(() => { });
 
-            // Month-over-Month calculation (Menggunakan tanggal_dokumen)
-            var now = new Date(), curMonth = now.getMonth(), curYear = now.getFullYear();
-            var thisMonthData = data.filter(function (d) { var dt = new Date(d.tanggal_dokumen); return dt.getMonth() === curMonth && dt.getFullYear() === curYear; });
-            var lastMonth = curMonth === 0 ? 11 : curMonth - 1, lastYear = curMonth === 0 ? curYear - 1 : curYear;
-            var lastMonthData = data.filter(function (d) { var dt = new Date(d.tanggal_dokumen); return dt.getMonth() === lastMonth && dt.getFullYear() === lastYear; });
-
-            updateMoM('mom-total', thisMonthData.length, lastMonthData.length, ' BPPU');
-            var thisMonthPPh = thisMonthData.reduce(function (s, d) { return s + bersihkanAngka(d.nilai_pph) }, 0);
-            var lastMonthPPh = lastMonthData.reduce(function (s, d) { return s + bersihkanAngka(d.nilai_pph) }, 0);
-            updateMoM('mom-ppn', thisMonthPPh, lastMonthPPh, '');
+            // Month-over-Month dari server (akurat untuk seluruh dataset)
+            updateMoM('mom-total', stats.cur_jml || 0, stats.prev_jml || 0, ' BPPU');
+            updateMoM('mom-ppn', stats.cur_tax || 0, stats.prev_tax || 0, '');
 
             if (data.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="14" class="text-center" style="padding:20px; color:var(--text-tertiary);">Data tidak ditemukan.</td></tr>`;
             }
 
-            data.forEach(async (baris, index) => {
+            // BUG-H4 FIX: Gunakan for...of agar baris tabel dirender secara berurutan
+            for (const [index, baris] of data.entries()) {
                 const tr = document.createElement('tr');
                 let curBr = baris.kode_cabang || '';
                 let curInv = baris.no_invoice_internal || '';
@@ -339,11 +332,11 @@
                 let btnPdf = baris.link_pdf_lokal ? `<a href="/${baris.link_pdf_lokal}" target="_blank" class="btn-tbl btn-tbl-pdf">PDF</a>` : `-`;
 
                 // Hitung selisih DPP
-                let selisihText = '<span style="color:var(--text-tertiary);">Menghitung...</span>';
+                let selisihText = '<span style="color:var(--text-tertiary);">-</span>';
                 let selisihValue = 0;
                 try {
-                    const res = await fetch(`/api/prepaid-comparison/${baris.no_bppu}`);
-                    const comparisonData = await res.json();
+                    const resCmp = await fetch(`/api/prepaid-comparison/${baris.no_bppu}`);
+                    const comparisonData = await resCmp.json();
                     if (comparisonData.prepaid && comparisonData.vatout) {
                         const dppBP = comparisonData.prepaid.dpp || 0;
                         const dppVO = comparisonData.vatout.dpp || 0;
@@ -375,7 +368,7 @@
                     <td class="text-center">${baris.no_invoice_internal || '-'}</td>
                 `;
                 tbody.appendChild(tr);
-            });
+            }
 
             // Render pagination
             renderPagination('pg-container', total, currentPage, currentLimit === 'all' ? total : currentLimit);

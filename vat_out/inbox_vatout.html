@@ -220,12 +220,22 @@
             if (typeof window.refreshSidebarYears === 'function') window.refreshSidebarYears();
         };
 
-        initPagination('pg-container', function (page, limit) { loadInbox(page, limit); }, 50);
+        let currentPage = 1, currentLimit = 50, currentSearch = null;
+        initPagination('pg-container', function (page, limit) { 
+            loadInbox(page, limit); 
+        }, 50);
 
-        async function loadInbox(page, limit) {
-            page = page || 1;
-            limit = limit || 50;
-            const res = await fetch('/api/inbox-vatout?page=' + page + '&limit=' + limit + '&entitas=' + aktifEntitas);
+        async function loadInbox(page, limit, searchObj) {
+            currentPage = page || currentPage || 1;
+            currentLimit = limit || currentLimit || 50;
+            if (searchObj !== undefined) currentSearch = searchObj;
+
+            let url = `/api/inbox-vatout?entitas=${aktifEntitas}&page=${currentPage}&limit=${currentLimit}`;
+            if (currentSearch) {
+                url += `&search=${encodeURIComponent(JSON.stringify(currentSearch))}`;
+            }
+
+            const res = await fetch(url);
             const result = await res.json();
             const data = result.data || result;
             const total = result.total || data.length;
@@ -252,9 +262,12 @@
                         ? `<span style="display:inline-block;font-size:0.75rem;font-weight:700;padding:2px 8px;border-radius:12px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;">${tahun}</span>`
                         : `<span style="display:inline-block;font-size:0.75rem;font-weight:700;padding:2px 8px;border-radius:12px;background:#fff7ed;color:#ea580c;border:1px solid #fed7aa;">${tahun}</span>`;
 
+                // LOGIKA BADGE FAKTUR PENGGANTI
+                let badgePengganti = parsed.isPengganti ? `<br><span style="display:inline-block; margin-top:4px; padding:2px 6px; background:#fef3c7; color:#d97706; border:1px solid #f59e0b; border-radius:4px; font-size:0.7rem; font-weight:bold;">🔄 Faktur Pengganti</span>` : '';
+
                 tr.innerHTML = `
                     <td class="text-center">${offset + index + 1}</td>
-                    <td class="text-center font-bold" style="color:#ea580c;">${parsed.noFaktur || '-'}</td>
+                    <td class="text-center font-bold" style="color:#ea580c;">${parsed.noFaktur || '-'}${badgePengganti}</td>
                     <td>${parsed.namaPembeli || '-'}</td>
                     <td class="text-right">${formatRupiah(parsed.dpp || 0)}</td>
                     <td class="text-right">${formatRupiah(parsed.ppn || 0)}</td>
@@ -268,8 +281,7 @@
                 tbody.appendChild(tr);
             });
 
-            jalankanFilterInbox();
-            renderPagination("pg-container", total, page, limit === "all" ? total : limit);
+            renderPagination("pg-container", total, currentPage, currentLimit === "all" ? total : currentLimit);
         }
 
         function hapusInbox(id) {
@@ -343,6 +355,22 @@
             document.getElementById('rev_ref').value = parsed.referensi || '-';
             document.getElementById('rev_kota_ttd').value = `${parsed.kotaPenerbit || '-'} | ${parsed.penandatangan || '-'}`;
 
+            // LOGIKA AUTO-FILL JIKA FAKTUR PENGGANTI
+            let autoInvoice = '';
+            let autoBranch = '';
+            let autoVO = '';
+            if (parsed.isPengganti && parsed.noFakturNormal) {
+                try {
+                    const resLama = await fetch('/api/detail-vatout/' + parsed.noFakturNormal);
+                    const dataLama = await resLama.json();
+                    if (dataLama && dataLama.no_invoice_internal) {
+                        autoInvoice = dataLama.no_invoice_internal;
+                        autoBranch = dataLama.kode_cabang;
+                        autoVO = dataLama.kode_vo || '';
+                    }
+                } catch(e) { console.error("Gagal menarik data faktur lama"); }
+            }
+
             const tbodyItems = document.getElementById('tabel-items-modal');
             tbodyItems.innerHTML = '';
             if (parsed.items && parsed.items.length > 0) {
@@ -395,6 +423,28 @@
             }
             document.getElementById('badge-branch-status').style.display = 'none';
             document.getElementById('badge-branch-notfound').style.display = 'none';
+
+            // Isi otomatis form input jika datanya ditemukan dari Faktur Normal
+            if (autoInvoice) {
+                document.getElementById('input_invoice_baru').value = autoInvoice;
+                // Trigger deteksi branch otomatis jika cabang tidak di-lock (misal untuk BBS)
+                if (rowData.entitas !== 'JO') {
+                     autoDetectBranch(autoInvoice);
+                }
+            }
+
+            // Override jika autoBranch/VO terdeteksi dari database
+            if (autoBranch && rowData.entitas !== 'JO') {
+                select.value = autoBranch;
+                await autoLoadVOs(autoBranch);
+                if (autoVO) {
+                    setTimeout(() => {
+                        let voSelect = document.getElementById('input_vo_baru');
+                        if(voSelect) voSelect.value = autoVO;
+                    }, 200); // Beri sedikit jeda agar DOM select VO selesai dirender
+                }
+            }
+
             document.getElementById('modalReviewPDF').style.display = 'flex';
         }
 
@@ -443,6 +493,9 @@
         }
 
         function simpanFinalVatout() {
+            const btn = document.querySelector('#modalReviewPDF .btn-simpan');
+            if (btn.disabled) return;
+
             tempDataFinal.invoiceInput = document.getElementById('input_invoice_baru').value;
             tempDataFinal.tglTukarInput = "-";
             tempDataFinal.branchInput = document.getElementById('input_branch_baru').value;
@@ -450,32 +503,56 @@
             tempDataFinal.username = currentUserName;
             if (!tempDataFinal.branchInput) return alert("Branch wajib diisi!");
             if (!tempDataFinal.invoiceInput) return alert("Nomor Invoice wajib diisi agar bisa ditarik oleh modul Prepaid!");
+
+            // Bug Fix: Disable button to prevent double-click ENOENT errors
+            btn.disabled = true;
+            btn.innerHTML = '⌛ Memproses...';
+            btn.style.opacity = '0.7';
+            btn.style.cursor = 'not-allowed';
+
             socket.emit('simpan-final-vatout', tempDataFinal);
-            document.getElementById('modalReviewPDF').style.display = 'none';
+            
+            setTimeout(() => {
+                document.getElementById('modalReviewPDF').style.display = 'none';
+                btn.disabled = false;
+                btn.innerHTML = '💾 Verifikasi & Simpan';
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+            }, 500);
         }
 
+        let filterTimeout;
         function jalankanFilterInbox() {
-            const filters = document.querySelectorAll('.filter-input-inbox');
-            const rows = document.querySelectorAll('#tabel-inbox tr');
-            let isAnyFilterActive = false;
-            rows.forEach(row => {
-                let isMatch = true;
-                filters.forEach((input, index) => {
-                    const filterValue = input.value.toLowerCase();
-                    if (filterValue) {
-                        isAnyFilterActive = true;
-                        const cellText = row.cells[index + 1] ? row.cells[index + 1].innerText.toLowerCase() : "";
-                        if (!cellText.includes(filterValue)) isMatch = false;
+            clearTimeout(filterTimeout);
+            filterTimeout = setTimeout(() => {
+                const inputs = document.querySelectorAll('.filter-input-inbox');
+                const searchObj = {};
+                let hasFilter = false;
+
+                // Mapping index: 0:noFaktur, 1:namaPembeli, 2:dpp, 3:ppn, 4:Tahun(tanggalFaktur)
+                const keys = ['noFaktur', 'namaPembeli', 'dpp', 'ppn', 'tanggalFaktur'];
+                
+                inputs.forEach((input, index) => {
+                    const val = input.value.trim();
+                    if (val) {
+                        hasFilter = true;
+                        if (index === 4) { // Tahun
+                            searchObj['tanggalFaktur'] = val + '-';
+                        } else {
+                            searchObj[keys[index]] = val;
+                        }
                     }
                 });
-                row.style.display = isMatch ? '' : 'none';
-            });
-            document.getElementById('btnHapusFilter').style.display = isAnyFilterActive ? 'inline-block' : 'none';
+
+                document.getElementById('btnHapusFilter').style.display = hasFilter ? 'inline-block' : 'none';
+                loadInbox(1, currentLimit, hasFilter ? searchObj : null);
+            }, 500);
         }
 
         function resetSemuaFilter() {
             document.querySelectorAll('.filter-input-inbox').forEach(input => input.value = '');
-            jalankanFilterInbox();
+            document.getElementById('btnHapusFilter').style.display = 'none';
+            loadInbox(1, currentLimit, null);
         }
 
         document.addEventListener('input', function (e) {

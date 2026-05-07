@@ -5,6 +5,19 @@
  */
 (function () {
     /**
+     * Sinkronisasi dropdown entitas dengan localStorage
+     * Dipanggil otomatis setelah sidebar dimuat ke DOM
+     */
+    function syncEntityDropdown() {
+        const select = document.getElementById('global-entity-select');
+        if (!select) return;
+        const saved = localStorage.getItem('lastEntitas');
+        if (saved && select.value !== saved) {
+            select.value = saved;
+        }
+    }
+
+    /**
      * Ambil tahun yang tersedia dari server, lalu inject link ke sub-menu
      */
     function populateVatoutYears() {
@@ -42,6 +55,12 @@
                     container.insertBefore(a, inboxLink || null);
                 });
 
+                // Highlight Laporan Rekapitulasi if active
+                const summaryLink = container.querySelector('a[href="/summary-vatout"]');
+                if (summaryLink && window.location.pathname === '/summary-vatout') {
+                    summaryLink.classList.add('active');
+                }
+
                 // Jika ada link yang aktif, buka parent sub-menu dan grup sidebar
                 const activeYearLink = container.querySelector('.sidebar-link.active');
                 if (activeYearLink) {
@@ -69,11 +88,15 @@
     // Ekspos agar bisa dipanggil manual saat entitas berubah
     window.refreshSidebarYears = populateVatoutYears;
 
-    // MutationObserver: panggil populateVatoutYears segera setelah
-    // #sub-vatout muncul di DOM (sidebar dimuat secara async via fetch)
+    // MutationObserver: panggil inisialisasi segera setelah
+    // sidebar-container terisi (sidebar dimuat secara async via fetch)
     const observer = new MutationObserver(function (mutations) {
-        if (document.getElementById('sub-vatout')) {
+        const select = document.getElementById('global-entity-select');
+        if (select) {
             observer.disconnect();
+            // 1. Sinkronisasi dropdown entitas dari localStorage
+            syncEntityDropdown();
+            // 2. Populate sub-menu tahun VAT OUT
             populateVatoutYears();
         }
     });
@@ -87,3 +110,4 @@
         });
     }
 })();
+

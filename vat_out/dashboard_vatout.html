@@ -10,6 +10,8 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@latest/dist/xlsx.full.min.js"></script>
     <script src="/pagination.js"></script>
     <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         .table-responsive {
@@ -70,7 +72,7 @@
                                 data-testid="btn-export">Export</button>
                             <button class="btn-toolbar btn-toolbar-print" onclick="window.print()"
                                 data-testid="btn-print">&#128424; Print</button>
-                            <a id="inbox-link" href="/inbox-vatout" class="btn-toolbar btn-toolbar-inbox">
+                             <a id="inbox-link" href="/inbox-vatout" class="btn-toolbar btn-toolbar-inbox">
                                 &#128229; Buka Antrean Verifikasi
                             </a>
                         </div>
@@ -104,8 +106,8 @@
                                             placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.no_faktur"
                                             placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" data-col="d.tanggal_faktur"
-                                            placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input filter-date-range" data-col="d.tanggal_faktur"
+                                            placeholder="Range Tgl..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.dpp"
                                             placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.ppn"
@@ -158,7 +160,6 @@
             </div>
         </div>
     </div>
-
     <script>
         const socket = io();
         let aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
@@ -170,31 +171,21 @@
         let currentLimit = 50;
         let currentSearch = {};
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const aktifYear = urlParams.get('year') || '2025';
-
+        // BUG-C2 FIX: Isi currentUser agar aksi Edit/Hapus tidak kirim data kosong
         fetch('/api/me').then(res => res.json()).then(u => {
             currentUser = u;
             const el = document.getElementById('header-user-name');
             if (el) el.textContent = u.nama || u.username || '';
         });
 
+        // BUG-H1 FIX: Hapus duplikat — hanya satu listener di bawah (line berikutnya)
+        socket.on('data-baru-vatout', () => loadData(currentPage, currentLimit));
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const aktifYear = urlParams.get('year') || new Date().getFullYear().toString();
+
         fetch('/sidebar.html').then(res => res.text()).then(html => {
             document.getElementById('sidebar-container').innerHTML = html;
-
-            // Highlight sub-menu tahun yang aktif
-            const checkSubMenu = setInterval(() => {
-                const subMenu = document.getElementById('sub-vatout');
-                if (subMenu) {
-                    subMenu.style.display = 'flex';
-                    subMenu.closest('.sidebar-item-nested').classList.add('open');
-                    const yearLink = subMenu.querySelector(`a[href*="year=${aktifYear}"]`);
-                    if (yearLink) yearLink.classList.add('active');
-                    clearInterval(checkSubMenu);
-                }
-            }, 100);
-            setTimeout(() => clearInterval(checkSubMenu), 2000);
-
             const sidebarSelect = document.getElementById('global-entity-select');
             if (sidebarSelect) sidebarSelect.value = aktifEntitas;
         });
@@ -204,7 +195,7 @@
         const inboxLink = document.getElementById('inbox-link');
         if (inboxLink) inboxLink.href = `/inbox-vatout?year=${aktifYear}`;
 
-        socket.on('data-baru-vatout', () => loadData(currentPage, currentLimit));
+        // (BUG-H1 FIX: Duplikat listener sudah dihapus — hanya ada satu di atas)
 
         // Dipanggil dari Sidebar Dropdown
         window.gantiEntitas = function (entitas) {
@@ -242,27 +233,20 @@
             tbody.innerHTML = '';
             const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
 
-            // Update Statistics Cards
-            let totalDPP = 0, totalPPN = 0;
-            data.forEach(d => { totalDPP += Number(d.dpp || 0); totalPPN += Number(d.ppn || 0); });
+            // BUG-H2/H3 FIX: Gunakan stats dari server (total seluruh data, bukan hanya halaman ini)
+            const stats = result.stats || {};
             document.getElementById('stat-total').textContent = total + ' Faktur';
-            document.getElementById('stat-ppn').textContent = formatRupiah(totalPPN);
-            document.getElementById('stat-dpp').textContent = formatRupiah(totalDPP);
+            document.getElementById('stat-ppn').textContent = formatRupiah(stats.total_tax || 0);
+            document.getElementById('stat-dpp').textContent = formatRupiah(stats.total_dpp || 0);
 
             fetch('/api/inbox-vatout').then(r => r.json()).then(inbox => {
                 const pendingEl = document.getElementById('stat-pending');
                 if (pendingEl) pendingEl.textContent = (inbox.total || inbox.length || 0);
             }).catch(() => { });
 
-            // Month-over-Month calculation
-            var now = new Date(), curMonth = now.getMonth(), curYear = now.getFullYear();
-            var thisMonthData = data.filter(function (d) { var dt = new Date(d.tanggal_faktur); return dt.getMonth() === curMonth && dt.getFullYear() === curYear; });
-            var lastMonth = curMonth === 0 ? 11 : curMonth - 1, lastYear = curMonth === 0 ? curYear - 1 : curYear;
-            var lastMonthData = data.filter(function (d) { var dt = new Date(d.tanggal_faktur); return dt.getMonth() === lastMonth && dt.getFullYear() === lastYear; });
-            updateMoM('mom-total', thisMonthData.length, lastMonthData.length, ' faktur');
-            var thisMonthPPN = thisMonthData.reduce(function (s, d) { return s + Number(d.ppn || 0) }, 0);
-            var lastMonthPPN = lastMonthData.reduce(function (s, d) { return s + Number(d.ppn || 0) }, 0);
-            updateMoM('mom-ppn', thisMonthPPN, lastMonthPPN, '');
+            // Month-over-Month dari server (akurat untuk seluruh dataset)
+            updateMoM('mom-total', stats.cur_jml || 0, stats.prev_jml || 0, ' faktur');
+            updateMoM('mom-ppn', stats.cur_tax || 0, stats.prev_tax || 0, '');
 
             if (data.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="11" class="text-center" style="padding:20px; color:#64748b;">Data tidak ditemukan.</td></tr>`;
@@ -320,7 +304,16 @@
                 const colName = input.getAttribute('data-col');
                 if (val && colName) {
                     isAnyFilterActive = true;
-                    currentSearch[colName] = val;
+                    if (val.includes(' to ')) {
+                        let parts = val.split(' to ');
+                        currentSearch[colName + '_start'] = parts[0];
+                        currentSearch[colName + '_end'] = parts[1];
+                    } else if (input.classList.contains('filter-date-range') && val) {
+                        currentSearch[colName + '_start'] = val;
+                        currentSearch[colName + '_end'] = val;
+                    } else {
+                        currentSearch[colName] = val;
+                    }
                 }
             });
 
@@ -450,6 +443,15 @@
 
         // Jalankan Pertama Kali
         loadData(1, 50);
+
+        // Inisialisasi Flatpickr
+        flatpickr(".filter-date-range", {
+            mode: "range",
+            dateFormat: "Y-m-d",
+            onChange: function(selectedDates, dateStr, instance) {
+                jalankanFilterTabel();
+            }
+        });
 
     </script>
 </body>

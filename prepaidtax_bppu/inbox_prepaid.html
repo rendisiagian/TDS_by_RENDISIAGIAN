@@ -143,6 +143,7 @@
         let dataInboxLokal = [];
         let loadedBranches = [];
         let arraySelectedInvoice = [];
+        let currentSearch = null, currentLimit = 50;
 
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
@@ -159,14 +160,24 @@
             localStorage.setItem('lastEntitas', entitas);
             const sidebarSelect = document.getElementById('global-entity-select');
             if (sidebarSelect && sidebarSelect.value !== entitas) sidebarSelect.value = entitas;
-            loadInbox(); 
+            loadInbox(1); 
         };
 
-        initPagination('pg-container', function(page, limit) { loadInbox(page, limit); }, 50);
+        initPagination('pg-container', function(page, limit) { 
+            loadInbox(page, limit); 
+        }, 50);
 
-        async function loadInbox(page, limit) {
-            page = page || 1; limit = limit || 50;
-            const res = await fetch(`/api/inbox-prepaid?entitas=${aktifEntitas}&page=${page}&limit=${limit}`);
+        async function loadInbox(page, limit, searchObj) {
+            currentPage = page || currentPage || 1;
+            currentLimit = limit || currentLimit || 50;
+            if (searchObj !== undefined) currentSearch = searchObj;
+            
+            let url = `/api/inbox-prepaid?entitas=${aktifEntitas}&page=${currentPage}&limit=${currentLimit}`;
+            if (currentSearch) {
+                url += `&search=${encodeURIComponent(JSON.stringify(currentSearch))}`;
+            }
+
+            const res = await fetch(url);
             const result = await res.json();
             const data = result.data || [];
             dataInboxLokal = data;
@@ -185,7 +196,7 @@
                 try { parsed = JSON.parse(row.data_ekstraksi); } catch(e) {}
 
                 tr.innerHTML = `
-                    <td class="text-center">${index + 1}</td>
+                    <td class="text-center">${(page - 1) * limit + index + 1}</td>
                     <td class="text-center" style="font-weight:bold; color:#4f46e5;">${parsed.noBppu || '-'}</td>
                     <td class="text-center" style="font-size:0.8rem;">${parsed.nomorDokumen || '-'}</td>
                     <td class="text-center" style="font-size:0.8rem;">${parsed.tanggalDokumen || '-'}</td>
@@ -201,7 +212,7 @@
                 `;
                 tbody.appendChild(tr);
             });
-            renderPagination('pg-container', result.total || 0, page, limit);
+            renderPagination('pg-container', result.total || 0, currentPage, currentLimit);
         }
 
         function hapusInbox(id) {
@@ -264,9 +275,9 @@
 
             let parsed = JSON.parse(rowData.data_ekstraksi);
             tempDataFinal = parsed;
-            tempDataFinal.id_link = rowData.id; // Harus id_link agar dibaca app.js
+            tempDataFinal.id_link = rowData.id;
             tempDataFinal.file_name = rowData.file_name;
-            tempDataFinal.link_pdf_lokal = rowData.link_pdf_lokal; // Ambil dari kolom link_pdf_lokal
+            tempDataFinal.link_pdf_lokal = rowData.link_pdf_lokal; 
             tempDataFinal.entitas = rowData.entitas;
             tempDataFinal.username = currentUserName;
             
@@ -318,6 +329,9 @@
         }
 
         function simpanFinalPrepaid() {
+            const btn = document.querySelector('#modalReviewPDF .btn-simpan');
+            if (btn.disabled) return;
+
             var branch = document.getElementById('input_branch_baru').value;
             if(!branch) return alert("Pilih Branch terlebih dahulu!");
             
@@ -333,8 +347,21 @@
             tempDataFinal.branchInput = branch;
             tempDataFinal.username = currentUserName;
 
+            // Bug Fix: Disable button to prevent double-click ENOENT errors
+            btn.disabled = true;
+            btn.innerHTML = '⌛ Memproses...';
+            btn.style.opacity = '0.7';
+            btn.style.cursor = 'not-allowed';
+
             socket.emit('simpan-final-prepaid', tempDataFinal);
-            document.getElementById('modalReviewPDF').style.display = 'none';
+            
+            setTimeout(() => {
+                document.getElementById('modalReviewPDF').style.display = 'none';
+                btn.disabled = false;
+                btn.innerHTML = '💾 Verifikasi & Simpan';
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+            }, 500);
         }
 
         socket.on('simpan-final-sukses', (res) => { alert(res.message); loadInbox(); });
@@ -535,31 +562,34 @@
 
         socket.on('update-tabel-prepaid', () => loadInbox());
         
+        let filterTimeout;
         function jalankanFilterInbox() {
-            const filters = document.querySelectorAll('.filter-input-inbox');
-            const rows = document.querySelectorAll('#tabel-inbox tr');
-            let isAnyFilterActive = false;
+            clearTimeout(filterTimeout);
+            filterTimeout = setTimeout(() => {
+                const inputs = document.querySelectorAll('.filter-input-inbox');
+                const searchObj = {};
+                let hasFilter = false;
 
-            rows.forEach(row => {
-                let isMatch = true;
-                filters.forEach((input, index) => {
-                    const filterVal = input.value.toLowerCase();
-                    if (filterVal) {
-                        isAnyFilterActive = true;
-                        // Kolom data dimulai dari index 1 (BPPU), 2 (Client), dst.
-                        const cellVal = row.cells[index + 1] ? row.cells[index + 1].textContent.toLowerCase() : '';
-                        if (!cellVal.includes(filterVal)) isMatch = false;
+                // Mapping input index ke key JSON di data_ekstraksi
+                const keys = ['noBppu', 'nomorDokumen', 'tanggalDokumen', 'namaPemotong', 'masaPajak', 'dpp', 'pph'];
+                
+                inputs.forEach((input, index) => {
+                    const val = input.value.trim();
+                    if (val) {
+                        searchObj[keys[index]] = val;
+                        hasFilter = true;
                     }
                 });
-                row.style.display = isMatch ? '' : 'none';
-            });
-            
-            document.getElementById('btnHapusFilter').style.display = isAnyFilterActive ? 'inline-block' : 'none';
+
+                document.getElementById('btnHapusFilter').style.display = hasFilter ? 'inline-block' : 'none';
+                loadInbox(1, currentLimit, hasFilter ? searchObj : null);
+            }, 500); // Debounce 500ms agar tidak terlalu berat ke server
         }
 
         function resetSemuaFilter() {
             document.querySelectorAll('.filter-input-inbox').forEach(i => i.value = '');
-            jalankanFilterInbox();
+            document.getElementById('btnHapusFilter').style.display = 'none';
+            loadInbox(1, currentLimit, null);
         }
 
         document.addEventListener('input', function(e) {

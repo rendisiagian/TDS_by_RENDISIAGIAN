@@ -178,28 +178,20 @@
             tbody.innerHTML = ''; 
             const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
 
-            // Update Statistics Cards
-            let totalDPP = 0, totalPPh = 0;
-            data.forEach(d => { totalDPP += Number(d.dpp || 0); totalPPh += Number(d.nilai_pph || 0); });
+            // BUG-H2/H3 FIX: Gunakan stats dari server (total seluruh data, bukan hanya halaman ini)
+            const stats = result.stats || {};
             document.getElementById('stat-total').textContent = total + ' Dokumen';
-            document.getElementById('stat-ppn').textContent = formatRupiah(totalPPh);
-            document.getElementById('stat-dpp').textContent = formatRupiah(totalDPP);
+            document.getElementById('stat-ppn').textContent = formatRupiah(stats.total_tax || 0);
+            document.getElementById('stat-dpp').textContent = formatRupiah(stats.total_dpp || 0);
             
             fetch('/api/inbox-payable').then(r => r.json()).then(inbox => {
                 const pendingEl = document.getElementById('stat-pending');
                 if (pendingEl) pendingEl.textContent = (inbox.total || inbox.length || 0);
             }).catch(() => {});
 
-            // Month-over-Month calculation (Menggunakan tanggal_dokumen)
-            var now = new Date(), curMonth = now.getMonth(), curYear = now.getFullYear();
-            var thisMonthData = data.filter(function(d) { var dt = new Date(d.tanggal_dokumen); return dt.getMonth() === curMonth && dt.getFullYear() === curYear; });
-            var lastMonth = curMonth === 0 ? 11 : curMonth - 1, lastYear = curMonth === 0 ? curYear - 1 : curYear;
-            var lastMonthData = data.filter(function(d) { var dt = new Date(d.tanggal_dokumen); return dt.getMonth() === lastMonth && dt.getFullYear() === lastYear; });
-            
-            updateMoM('mom-total', thisMonthData.length, lastMonthData.length, ' BPPU');
-            var thisMonthPPh = thisMonthData.reduce(function(s,d){return s+Number(d.nilai_pph||0)},0);
-            var lastMonthPPh = lastMonthData.reduce(function(s,d){return s+Number(d.nilai_pph||0)},0);
-            updateMoM('mom-ppn', thisMonthPPh, lastMonthPPh, '');
+            // Month-over-Month dari server (akurat untuk seluruh dataset)
+            updateMoM('mom-total', stats.cur_jml || 0, stats.prev_jml || 0, ' BPPU');
+            updateMoM('mom-ppn', stats.cur_tax || 0, stats.prev_tax || 0, '');
 
             if (data.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="12" class="text-center" style="padding:20px; color:#64748b;">Data tidak ditemukan.</td></tr>`;

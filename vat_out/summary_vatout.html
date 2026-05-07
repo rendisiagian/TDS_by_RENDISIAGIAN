@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Summary VAT OUT - Analisis Tren Pajak</title>
+    <script src="/theme.js"></script>
+    <script src="/export.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@latest/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="/sidebar.js"></script>
+</head>
+<body>
+    <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
+    <div class="app-wrapper">
+        <div id="sidebar-container"></div>
+        
+        <main class="main-content">
+            <header class="header">
+                <h2>Tren & Analisis Faktur Keluaran</h2>
+                <div class="user-profile"><span id="header-user-name"></span>
+                    <div class="toolbar-actions">
+                        <button class="btn-toolbar btn-toolbar-export" onclick="showExportMenu(event, 'tabel-summary', 'summary_vatout_' + aktifEntitas)" data-testid="btn-export-summary">Export</button>
+                        <button class="btn-toolbar btn-toolbar-print" onclick="window.print()" data-testid="btn-print-summary">&#128424; Print</button>
+                    </div>
+                    <a href="/logout" class="btn-logout">Logout</a>
+                </div>
+            </header>
+
+            <div class="container">
+                <!-- Charts -->
+                <div class="chart-grid" data-testid="chart-grid">
+                    <div class="chart-container" style="flex: 2;">
+                        <h3 class="title-primary" style="margin-bottom: 1rem; font-size: 1rem; border-left-color: #ea580c;">Tren PPN Keluaran per Periode</h3>
+                        <canvas id="chartPPN"></canvas>
+                    </div>
+                    <div class="chart-container" style="flex: 1.2;">
+                        <h3 class="title-success" style="margin-bottom: 1rem; font-size: 1rem; border-left-color: #3b82f6;">Distribusi PPN per Cabang</h3>
+                        <div style="max-width: 300px; margin: 0 auto;">
+                            <canvas id="chartBranch"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <div class="card">
+                    <div class="card-header-padding">
+                        <h3 class="title-primary" style="border-left-color: #ea580c; margin: 0; padding-bottom: 15px;">Rekapitulasi Bulanan</h3>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table id="tabel-summary">
+                            <thead>
+                                <tr>
+                                    <th class="text-center">Bulan / Periode</th>
+                                    <th class="text-center">Jumlah Dokumen</th>
+                                    <th class="text-right">Total DPP</th>
+                                    <th class="text-right">Total PPN</th>
+                                </tr>
+                            </thead>
+                            <tbody id="body-compare"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
+        let chartPPN = null, chartBranch = null;
+
+        fetch('/sidebar.html')
+            .then(res => res.text())
+            .then(html => {
+                document.getElementById('sidebar-container').innerHTML = html;
+                const sidebarSelect = document.getElementById('global-entity-select');
+                if (sidebarSelect) sidebarSelect.value = aktifEntitas;
+            });
+
+        fetch('/api/me').then(res => res.json()).then(u => {
+            const el = document.getElementById('header-user-name');
+            if (el) el.textContent = u.nama || u.username || '';
+        });
+
+        window.gantiEntitas = function(entitas) {
+            aktifEntitas = entitas;
+            localStorage.setItem('lastEntitas', entitas);
+            const sidebarSelect = document.getElementById('global-entity-select');
+            if (sidebarSelect && sidebarSelect.value !== entitas) sidebarSelect.value = entitas;
+            loadSummary();
+        };
+
+        function getChartColors() {
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            return {
+                text: isDark ? '#cbd5e1' : '#334155',
+                grid: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                ppnLine: '#ea580c',
+                pieColors: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#71717a']
+            };
+        }
+
+        async function loadSummary() {
+            try {
+                const response = await fetch('/api/summary-vatout?entitas=' + aktifEntitas);
+                let result = await response.json();
+                let trendData = result.trend || [];
+                let branchData = result.branch || [];
+                
+                // Sort trend by period (MM-YYYY) ascending
+                trendData.sort((a, b) => {
+                    const [monthA, yearA] = a.periode.split('-').map(Number);
+                    const [monthB, yearB] = b.periode.split('-').map(Number);
+                    if (yearA !== yearB) return yearA - yearB;
+                    return monthA - monthB;
+                });
+                
+                const tbody = document.getElementById('body-compare');
+                tbody.innerHTML = '';
+                const formatRupiah = (angka) => "Rp " + Number(angka).toLocaleString('id-ID');
+
+                if (trendData.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="padding: 20px; color: var(--text-tertiary);">Belum ada data rekapitulasi untuk entitas ini.</td></tr>';
+                    if (chartPPN) { chartPPN.destroy(); chartPPN = null; }
+                    if (chartBranch) { chartBranch.destroy(); chartBranch = null; }
+                    return;
+                }
+
+                // Populate table (Show latest first)
+                [...trendData].reverse().forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = 
+                        '<td class="text-bold text-center">' + row.periode + '</td>' +
+                        '<td class="text-center">' + row.jml_faktur + ' Dokumen</td>' +
+                        '<td class="text-right">' + formatRupiah(row.dpp_faktur) + '</td>' +
+                        '<td class="text-right text-bold" style="color: #ea580c;">' + formatRupiah(row.ppn_faktur) + '</td>';
+                    tbody.appendChild(tr);
+                });
+
+                const colors = getChartColors();
+
+                // 1. TREND LINE CHART (PPN)
+                if (chartPPN) chartPPN.destroy();
+                chartPPN = new Chart(document.getElementById('chartPPN'), {
+                    type: 'line',
+                    data: {
+                        labels: trendData.map(r => r.periode),
+                        datasets: [{
+                            label: 'Total PPN Keluaran',
+                            data: trendData.map(r => r.ppn_faktur),
+                            borderColor: colors.ppnLine,
+                            backgroundColor: colors.ppnLine + '20',
+                            tension: 0.3,
+                            fill: true,
+                            pointRadius: 4,
+                            pointBackgroundColor: colors.ppnLine
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { 
+                            legend: { labels: { color: colors.text } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) { return 'PPN: ' + formatRupiah(context.raw); }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { ticks: { color: colors.text }, grid: { color: colors.grid } },
+                            y: { ticks: { color: colors.text, callback: v => 'Rp ' + (v/1000000).toFixed(0) + 'jt' }, grid: { color: colors.grid } }
+                        }
+                    }
+                });
+
+                // 2. BRANCH PIE CHART
+                if (chartBranch) chartBranch.destroy();
+                chartBranch = new Chart(document.getElementById('chartBranch'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: branchData.map(b => b.nama_cabang || b.kode_cabang || 'Lainnya'),
+                        datasets: [{
+                            data: branchData.map(b => b.total_ppn),
+                            backgroundColor: colors.pieColors,
+                            borderWidth: 2,
+                            borderColor: document.documentElement.getAttribute('data-theme') === 'dark' ? '#1e293b' : '#fff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: colors.text, boxWidth: 12, font: { size: 10 } } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) { return context.label + ': ' + formatRupiah(context.raw); }
+                                }
+                            }
+                        },
+                        cutout: '60%'
+                    }
+                });
+
+            } catch (err) {
+                console.error("Gagal memuat summary", err);
+            }
+        }
+
+        loadSummary();
+    </script>
+</body>
+</html>

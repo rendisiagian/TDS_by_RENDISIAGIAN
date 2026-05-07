@@ -9,10 +9,54 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@latest/dist/xlsx.full.min.js"></script>
     <script src="/pagination.js"></script>
     <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <style>
         /* Mengurangi max-height agar scrollbar aktif di dalam tabel (bukan di body utama) karena ada blok stats-grid */
-        .table-responsive { max-height: calc(100vh - 320px); }
+        .table-responsive {
+            max-height: calc(100vh - 320px);
+        }
+        .filter-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+        .filter-wrapper .filter-input {
+            padding-right: 28px !important; 
+        }
+        .filter-wrapper .filter-input.null-active {
+            background-color: #f8fafc !important;
+            color: #ef4444 !important;
+            font-weight: bold;
+            cursor: default;
+        }
+        .btn-filter-null {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1rem;
+            padding: 0;
+            color: #94a3b8;
+            transition: 0.2s;
+            position: absolute;
+            right: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            z-index: 5;
+        }
+        .btn-filter-null:hover { color: #2563eb; transform: scale(1.1); }
+        .btn-filter-null.active { color: #ef4444; }
+
+        .btn-toolbar-upload {
+            background: linear-gradient(135deg, var(--primary-600), var(--primary-700)) !important;
+            color: white !important;
+            border-color: var(--primary-700) !important;
+        }
     </style>
 <script src="/sidebar.js"></script>
 </head>
@@ -47,9 +91,9 @@
                         <span class="stat-value" id="stat-dpp">Rp 0</span>
                     </div>
                     <div class="stat-card accent-orange" data-testid="stat-pending">
-                        <span class="stat-label">Menunggu Verifikasi</span>
+                        <span class="stat-label">Perlu Verifikasi</span>
                         <span class="stat-value" id="stat-pending">0</span>
-                        <span class="stat-sub">dokumen dalam antrean</span>
+                        <span class="stat-sub">butuh Cabang & Invoice</span>
                     </div>
                 </div>
 
@@ -61,9 +105,9 @@
                             <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">&#128465; Hapus Filter</button>
                             <button class="btn-toolbar btn-toolbar-export" onclick="showExportMenu(event, 'tabel-data', 'data_vatin_' + aktifEntitas)" data-testid="btn-export">Export</button>
                             <button class="btn-toolbar btn-toolbar-print" onclick="window.print()" data-testid="btn-print">&#128424; Print</button>
-                            <a href="/inbox-vatin" class="btn-toolbar btn-toolbar-inbox">
-                                &#128229; Buka Antrean Verifikasi
-                            </a>
+                            <button class="btn-toolbar btn-toolbar-upload" onclick="document.getElementById('filePdfUpload').click()">
+                                📁 Unggah PDF
+                            </button>
                         </div>
                     </div>
 
@@ -88,10 +132,15 @@
                                     <th></th><th></th><th></th>
                                     <th><input type="text" class="filter-input" data-col="c.nama_cabang" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.no_invoice_internal" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" data-col="d.tgl_tukar_faktur" placeholder="🔍 Cari..."></th>
+                                    <th>
+                                        <div class="filter-wrapper">
+                                            <input type="text" class="filter-input filter-date-range" data-col="d.tgl_tukar_faktur" placeholder="Range Tgl...">
+                                            <button class="btn-filter-null" onclick="toggleNullFilter(this)" title="Filter Data Kosong">∅</button>
+                                        </div>
+                                    </th>
                                     <th><input type="text" class="filter-input" data-col="d.nama_penjual" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.no_faktur" placeholder="🔍 Cari..."></th>
-                                    <th><input type="text" class="filter-input" data-col="d.tanggal_faktur" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input filter-date-range" data-col="d.tanggal_faktur" placeholder="Range Tgl..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.dpp" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.ppn" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.diinput_oleh" placeholder="🔍 Cari..."></th>
@@ -120,13 +169,13 @@
             <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 15px;">Faktur: <b id="edit-faktur-title"></b></p>
             <div class="form-group"><label>Branch / Cabang Baru</label><select id="edit_branch" class="form-select"></select></div>
             <div class="form-group"><label>No. Invoice</label><input type="text" id="edit_invoice" autocomplete="off" placeholder="Ketik No Invoice..."></div>
-            <div class="form-group"><label>Tanggal Baru</label><input type="date" id="edit_tanggal"></div>
+            <div class="form-group"><label>Tanggal Tukar Faktur</label><input type="date" id="edit_tanggal"></div>
             <div style="display:flex; gap:10px; margin-top: 20px;">
                 <button class="btn-simpan" style="background-color: #f59e0b; flex: 2;" onclick="submitEdit()">💾 Simpan Perubahan</button>
                 <button class="btn-simpan btn-cancel" style="flex: 1; margin-top:0;" onclick="document.getElementById('modalEditData').style.display='none'">Batal</button>
             </div>
         </div>
-    </div>
+    <input type="file" id="filePdfUpload" accept="application/pdf" multiple style="display:none;">
 
     <script>
         const socket = io();
@@ -154,6 +203,21 @@
 
         socket.on('data-baru-vatin', () => loadData(currentPage, currentLimit));
 
+        socket.on('upload-batch-selesai', (res) => {
+            if (res.modul === 'VAT IN' && uploadStats.isActive) {
+                uploadStats.sukses += res.sukses;
+                uploadStats.duplikat += res.duplikat;
+                uploadStats.gagal += res.gagal;
+                uploadStats.chunksDone++;
+
+                if (uploadStats.chunksDone === uploadStats.chunksTotal) {
+                    uploadStats.isActive = false;
+                    alert(`✅ PROSES UPLOAD SELESAI!\n\nTotal: ${uploadStats.totalFiles} Dokumen\nBerhasil Masuk: ${uploadStats.sukses}\nDuplikat: ${uploadStats.duplikat}\nGagal: ${uploadStats.gagal}`);
+                    loadData(1, currentLimit);
+                }
+            }
+        });
+
         // Dipanggil dari Sidebar Dropdown
         window.gantiEntitas = function(entitas) {
             aktifEntitas = entitas;
@@ -167,6 +231,9 @@
         };
 
         // Pagination init
+        let uploadStats = { isActive: false, totalFiles: 0, chunksTotal: 0, chunksDone: 0, sukses: 0, duplikat: 0, gagal: 0 };
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
         initPagination('pg-container', function(page, limit) { 
             loadData(page, limit); 
         }, 50);
@@ -190,26 +257,18 @@
             tbody.innerHTML = ''; 
             const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
 
-            // Update Statistics Cards
-            let totalDPP = 0, totalPPN = 0;
-            data.forEach(d => { totalDPP += Number(d.dpp || 0); totalPPN += Number(d.ppn || 0); });
+            // BUG-H2/H3 FIX: Gunakan stats dari server (total seluruh data, bukan hanya halaman ini)
+            const stats = result.stats || {};
             document.getElementById('stat-total').textContent = total + ' Faktur';
-            document.getElementById('stat-ppn').textContent = formatRupiah(totalPPN);
-            document.getElementById('stat-dpp').textContent = formatRupiah(totalDPP);
+            document.getElementById('stat-ppn').textContent = formatRupiah(stats.total_tax || 0);
+            document.getElementById('stat-dpp').textContent = formatRupiah(stats.total_dpp || 0);
             
-            fetch('/api/inbox-vatin').then(r => r.json()).then(inbox => {
-                document.getElementById('stat-pending').textContent = (inbox.total || inbox.length || 0);
-            }).catch(() => {});
+            const pendingEl = document.getElementById('stat-pending');
+            if (pendingEl) pendingEl.textContent = result.needs_verify || 0;
 
-            // Month-over-Month calculation
-            var now = new Date(), curMonth = now.getMonth(), curYear = now.getFullYear();
-            var thisMonthData = data.filter(function(d) { var dt = new Date(d.tanggal_faktur); return dt.getMonth() === curMonth && dt.getFullYear() === curYear; });
-            var lastMonth = curMonth === 0 ? 11 : curMonth - 1, lastYear = curMonth === 0 ? curYear - 1 : curYear;
-            var lastMonthData = data.filter(function(d) { var dt = new Date(d.tanggal_faktur); return dt.getMonth() === lastMonth && dt.getFullYear() === lastYear; });
-            updateMoM('mom-total', thisMonthData.length, lastMonthData.length, ' faktur');
-            var thisMonthPPN = thisMonthData.reduce(function(s,d){return s+Number(d.ppn||0)},0);
-            var lastMonthPPN = lastMonthData.reduce(function(s,d){return s+Number(d.ppn||0)},0);
-            updateMoM('mom-ppn', thisMonthPPN, lastMonthPPN, '');
+            // Month-over-Month dari server (akurat untuk seluruh dataset)
+            updateMoM('mom-total', stats.cur_jml || 0, stats.prev_jml || 0, ' faktur');
+            updateMoM('mom-ppn', stats.cur_tax || 0, stats.prev_tax || 0, '');
 
             if (data.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="12" class="text-center" style="padding:20px; color:#64748b;">Data tidak ditemukan.</td></tr>`;
@@ -267,7 +326,23 @@
                 const colName = input.getAttribute('data-col'); // Mengambil data-col
                 if (val && colName) {
                     isAnyFilterActive = true;
-                    currentSearch[colName] = val;
+                    if (val === '(Kosong)') {
+                        if (input.classList.contains('filter-date-range')) {
+                            currentSearch[colName + '_start'] = '__IS_NULL__';
+                            currentSearch[colName + '_end'] = '__IS_NULL__';
+                        } else {
+                            currentSearch[colName] = '__IS_NULL__';
+                        }
+                    } else if (val.includes(' to ')) {
+                        let parts = val.split(' to ');
+                        currentSearch[colName + '_start'] = parts[0];
+                        currentSearch[colName + '_end'] = parts[1];
+                    } else if (input.classList.contains('filter-date-range') && val) {
+                        currentSearch[colName + '_start'] = val;
+                        currentSearch[colName + '_end'] = val;
+                    } else {
+                        currentSearch[colName] = val;
+                    }
                 }
             });
 
@@ -275,10 +350,34 @@
             loadData(1, currentLimit); // Reset ke halaman 1 saat difilter
         }
 
-        function resetSemuaFilter() { 
-            document.querySelectorAll('.filter-input').forEach(input => input.value = ''); 
+        function resetSemuaFilter() {
+            document.querySelectorAll('.filter-input').forEach(input => {
+                input.value = '';
+                input.readOnly = false;
+                input.classList.remove('null-active');
+            });
+            document.querySelectorAll('.btn-filter-null').forEach(btn => btn.classList.remove('active'));
             currentSearch = {};
-            jalankanFilterTabel(); 
+            jalankanFilterTabel();
+        }
+
+        function toggleNullFilter(btn) {
+            const input = btn.previousElementSibling;
+            const fp = input._flatpickr;
+            
+            if (input.value === '(Kosong)') {
+                input.value = '';
+                input.readOnly = false;
+                input.classList.remove('null-active');
+                btn.classList.remove('active');
+            } else {
+                if (fp) fp.clear(); // Clear date selection
+                input.value = '(Kosong)';
+                input.readOnly = true;
+                input.classList.add('null-active');
+                btn.classList.add('active');
+            }
+            jalankanFilterTabel();
         }
 
         // FUNGSI LAMA TIDAK ADA YANG DIUBAH
@@ -361,6 +460,50 @@
 
         // Jalankan Pertama Kali
         loadData(1, 50);
+
+        // Inisialisasi Flatpickr
+        flatpickr(".filter-date-range", {
+            mode: "range",
+            dateFormat: "Y-m-d",
+            onChange: function(selectedDates, dateStr, instance) {
+                jalankanFilterTabel();
+            }
+        });
+
+        document.getElementById('filePdfUpload').addEventListener('change', async function (e) {
+            const files = e.target.files;
+            if (files.length === 0) return;
+            alert(`Memproses ekstraksi ${files.length} file PDF.\n\nData akan langsung masuk ke Dashboard dengan status "Perlu Verifikasi". Mohon tunggu notifikasi selesai!`);
+
+            const chunkSize = 5;
+            uploadStats = { isActive: true, totalFiles: files.length, chunksTotal: Math.ceil(files.length / chunkSize), chunksDone: 0, sukses: 0, duplikat: 0, gagal: 0 };
+
+            for (let i = 0; i < files.length; i += chunkSize) {
+                let payloadFiles = [];
+                let chunk = Array.from(files).slice(i, i + chunkSize);
+
+                for (let file of chunk) {
+                    try {
+                        const arrayBuffer = await file.arrayBuffer();
+                        const loadingTask = pdfjsLib.getDocument(new Uint8Array(arrayBuffer));
+                        const pdf = await loadingTask.promise;
+
+                        let fullText = "";
+                        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                            const page = await pdf.getPage(pageNum);
+                            const textContent = await page.getTextContent();
+                            fullText += textContent.items.map(item => item.str).join(" ") + " ";
+                        }
+                        loadingTask.destroy();
+                        payloadFiles.push({ teksPDF: fullText, fileBuffer: arrayBuffer });
+                    } catch (err) {
+                        payloadFiles.push({ teksPDF: "ERROR", fileBuffer: await file.arrayBuffer() });
+                    }
+                }
+                socket.emit('upload-pdf-vatin-batch', { entitas: aktifEntitas, username: currentUser.nama || currentUser.username || 'Admin', files: payloadFiles });
+            }
+            this.value = '';
+        });
 
     </script>
 </body>

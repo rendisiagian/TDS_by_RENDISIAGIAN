@@ -142,12 +142,22 @@
             loadInbox(); 
         };
 
-        initPagination('pg-container', function(page, limit) { loadInbox(page, limit); }, 50);
+        let currentPage = 1, currentLimit = 50, currentSearch = null;
+        initPagination('pg-container', function(page, limit) { 
+            loadInbox(page, limit); 
+        }, 50);
 
-        async function loadInbox(page, limit) {
-            page = page || 1;
-            limit = limit || 50;
-            const res = await fetch('/api/inbox-payable?page=' + page + '&limit=' + limit);
+        async function loadInbox(page, limit, searchObj) {
+            currentPage = page || currentPage || 1;
+            currentLimit = limit || currentLimit || 50;
+            if (searchObj !== undefined) currentSearch = searchObj;
+
+            let url = `/api/inbox-payable?entitas=${aktifEntitas}&page=${currentPage}&limit=${currentLimit}`;
+            if (currentSearch) {
+                url += `&search=${encodeURIComponent(JSON.stringify(currentSearch))}`;
+            }
+
+            const res = await fetch(url);
             const result = await res.json();
             const data = result.data || result;
             const total = result.total || data.length;
@@ -164,9 +174,10 @@
                 const tr = document.createElement('tr');
                 let parsed = {};
                 try { parsed = JSON.parse(row.data_ekstraksi); } catch(e) {}
+                const offset = (currentPage - 1) * currentLimit;
 
                 tr.innerHTML = `
-                    <td class="text-center">${index + 1}</td>
+                    <td class="text-center">${offset + index + 1}</td>
                     <td class="text-center font-bold" style="color:#7c3aed;">${parsed.noBppu || '-'}</td>
                     <td>${parsed.namaDipotong || '-'}</td>
                     <td class="text-center">${parsed.masaPajak || '-'}</td>
@@ -181,8 +192,7 @@
                 tbody.appendChild(tr);
             });
 
-            jalankanFilterInbox();
-            renderPagination("pg-container", total, page, limit === "all" ? total : limit);
+            renderPagination("pg-container", total, currentPage, currentLimit === "all" ? total : currentLimit);
         }
 
         function hapusInbox(id) {
@@ -307,6 +317,9 @@
         }
 
         function simpanFinalPayable() {
+            const btn = document.querySelector('#modalReviewPDF .btn-simpan');
+            if (btn.disabled) return;
+
             tempDataFinal.branchInput = document.getElementById('input_branch_baru').value;
             tempDataFinal.username = currentUserName;
 
@@ -324,39 +337,53 @@
             if (!tempDataFinal.branchInput) return alert("Branch wajib diisi!");
             if (!tempDataFinal.invoiceInput) return alert("Harap pilih minimal satu Faktur atau ketik No Invoice/Faktur di kolom manual!");
 
+            // Bug Fix: Disable button to prevent double-click ENOENT errors
+            btn.disabled = true;
+            btn.innerHTML = '⌛ Memproses...';
+            btn.style.opacity = '0.7';
+            btn.style.cursor = 'not-allowed';
+
             socket.emit('simpan-final-payable', tempDataFinal);
-            document.getElementById('modalReviewPDF').style.display = 'none';
+            
+            setTimeout(() => {
+                document.getElementById('modalReviewPDF').style.display = 'none';
+                btn.disabled = false;
+                btn.innerHTML = '💾 Verifikasi & Simpan';
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+            }, 500);
         }
 
         socket.on('update-tabel-payable', () => loadInbox());
         
+        let filterTimeout;
         function jalankanFilterInbox() {
-            const filters = document.querySelectorAll('.filter-input-inbox');
-            const rows = document.querySelectorAll('#tabel-inbox tr');
-            let isAnyFilterActive = false;
+            clearTimeout(filterTimeout);
+            filterTimeout = setTimeout(() => {
+                const filters = document.querySelectorAll('.filter-input-inbox');
+                const searchObj = {};
+                let hasFilter = false;
 
-            rows.forEach(row => {
-                let isMatch = true;
+                // Mapping index: 0:noBppu, 1:namaDipotong, 2:masaPajak, 3:dpp, 4:pph
+                const keys = ['noBppu', 'namaDipotong', 'masaPajak', 'dpp', 'pph'];
+
                 filters.forEach((input, index) => {
-                    const filterValue = input.value.toLowerCase();
-                    if (filterValue) {
-                        isAnyFilterActive = true;
-                        const cellIndex = index + 1;
-                        const cellText = row.cells[cellIndex] ? row.cells[cellIndex].innerText.toLowerCase() : "";
-                        if (!cellText.includes(filterValue)) {
-                            isMatch = false;
-                        }
+                    const val = input.value.trim();
+                    if (val) {
+                        hasFilter = true;
+                        searchObj[keys[index]] = val;
                     }
                 });
-                row.style.display = isMatch ? '' : 'none';
-            });
-            
-            document.getElementById('btnHapusFilter').style.display = isAnyFilterActive ? 'inline-block' : 'none';
+                
+                document.getElementById('btnHapusFilter').style.display = hasFilter ? 'inline-block' : 'none';
+                loadInbox(1, currentLimit, hasFilter ? searchObj : null);
+            }, 500);
         }
 
         function resetSemuaFilter() {
             document.querySelectorAll('.filter-input-inbox').forEach(input => input.value = '');
-            jalankanFilterInbox();
+            document.getElementById('btnHapusFilter').style.display = 'none';
+            loadInbox(1, currentLimit, null);
         }
 
         document.addEventListener('input', function(e) {

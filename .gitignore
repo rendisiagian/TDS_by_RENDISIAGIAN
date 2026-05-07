@@ -14,3 +14,9 @@ Backup DB/
 *.db-journal
 *.db-shm
 *.db-wal
+
+# Tax Document Archives (Private Data)
+vat_in/arsip_vatin/
+vat_out/arsip_vatout/
+prepaidtax_bppu/arsip_prepaid/
+taxpayable_bppu/arsip_payable/

@@ -300,11 +300,6 @@ db.serialize(() => {
     // CATATAN: Kolom ref_bppu, is_advance, ref_advance sudah didefinisikan di CREATE TABLE di atas.
     // Baris ALTER TABLE lama dihapus untuk mencegah error duplikat setiap server start. (BUG-02)
 
-    // TABEL BARU: PROJECT MANAGEMENT (menggunakan master_cabang yang sudah ada)
-    // Kolom tambahan ditambahkan via ensureColumn di atas
-
-
-
     db.get(`SELECT count(*) as count FROM users`, (err, row) => {
         if (row && row.count === 0) {
             // SECURITY: Naikkan salt rounds ke 12 untuk keamanan lebih baik (BUG-08)
@@ -317,7 +312,8 @@ db.serialize(() => {
 
     db.run(`INSERT OR IGNORE INTO master_cabang (kode_cabang, nama_cabang, entitas) VALUES ('PUSAT', 'Kantor Pusat BBS', 'BBS'), ('20305G', 'BBS JO', 'JO'), ('250310', 'BMP JO', 'JO')`);
 
-
+    // MIGRASI OTOMATIS: Ubah 'Verifikasi Ulang' menjadi 'Perlu Verifikasi' agar sinkron dengan UI baru
+    db.run("UPDATE data_vatin SET kode_cabang = 'Perlu Verifikasi' WHERE kode_cabang = 'Verifikasi Ulang'");
 
     modules.forEach(mod => {
         db.run(`CREATE TABLE IF NOT EXISTS inbox_${mod.id} (id INTEGER PRIMARY KEY AUTOINCREMENT, entitas TEXT, link_pdf_lokal TEXT, status TEXT DEFAULT 'Menunggu Lengkapi', diinput_oleh TEXT, data_ekstraksi TEXT, waktu DATETIME DEFAULT CURRENT_TIMESTAMP)`);
@@ -331,6 +327,17 @@ db.serialize(() => {
             db.run(`CREATE TABLE IF NOT EXISTS data_${mod.id} (no_bppu TEXT PRIMARY KEY, masa_pajak TEXT, entitas TEXT, kode_cabang TEXT, npwp_pemotong TEXT, nama_pemotong TEXT, npwp_dipotong TEXT, nama_dipotong TEXT, dpp REAL, tarif REAL, nilai_pph REAL, tanggal_dokumen DATE, nomor_dokumen TEXT, no_invoice_internal TEXT, diinput_oleh TEXT, link_pdf_lokal TEXT, waktu_input DATETIME DEFAULT CURRENT_TIMESTAMP)`);
         }
     });
+
+    // ------------------------------------------
+    // BUG-C1 FIX: Tabel projects wajib dibuat agar CRUD di taxprojectreport tidak crash
+    // ------------------------------------------
+    db.run(`CREATE TABLE IF NOT EXISTS projects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kode TEXT UNIQUE, nama TEXT, deskripsi TEXT, status TEXT,
+        progress INTEGER DEFAULT 0, tanggal_mulai DATE, tanggal_selesai DATE,
+        pm TEXT, anggaran REAL DEFAULT 0, diinput_oleh TEXT,
+        waktu_input DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
 
     // ------------------------------------------
     // PERFORMANCE: Tambahkan Database Indexing
@@ -377,7 +384,7 @@ app.get('/manage-users', cekAuth, (req, res) => res.sendFile(path.join(__dirname
 app.get('/master-cabang', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'master_cabang.html')));
 app.get('/master-kontak', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'master_kontak.html')));
 app.get('/audit-logs', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'audit_logs.html')));
-app.get('/taxprojectreport-vatin', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'vat_in', 'taxprojectreport.html')));
+app.get('/tax-project-report', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'taxprojectreport.html')));
 app.get('/', (req, res) => req.session.user ? res.redirect('/dashboard-utama') : res.redirect('/login'));
 app.get('/dashboard-utama', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'dashboard_utama.html')));
 app.get('/client-ledger', cekAuth, (req, res) => res.sendFile(path.join(__dirname, 'accounting', 'client_ledger.html')));
@@ -462,6 +469,15 @@ app.get('/api/items/:mod/:faktur', cekAuth, (req, res) => {
     db.all(`SELECT * FROM item_${req.params.mod} WHERE no_faktur = ?`, [req.params.faktur], (err, rows) => res.json(rows || []));
 });
 
+// API: Cek detail faktur VAT IN / VAT OUT (Digunakan untuk Smart Auto-Fill Faktur Pengganti)
+app.get('/api/detail-vatin/:faktur', cekAuth, (req, res) => {
+    db.get(`SELECT * FROM data_vatin WHERE no_faktur = ?`, [req.params.faktur], (err, row) => res.json(row || null));
+});
+
+app.get('/api/detail-vatout/:faktur', cekAuth, (req, res) => {
+    db.get(`SELECT * FROM data_vatout WHERE no_faktur = ?`, [req.params.faktur], (err, row) => res.json(row || null));
+});
+
 // API: Compare Prepaid Tax vs VAT OUT (Membaca no_faktur atau no_invoice_internal)
 app.get('/api/prepaid-comparison/:noBppu', cekAuth, (req, res) => {
     db.get(`SELECT * FROM data_prepaid WHERE no_bppu = ?`, [req.params.noBppu], (err, prepaid) => {
@@ -532,10 +548,21 @@ app.get('/api/data-client-ledger', cekAuth, (req, res) => {
         try {
             let searchParams = JSON.parse(decodeURIComponent(req.query.search));
             for (let col in searchParams) {
-                // Prevent SQL Injection by ensuring col only contains word characters and dots
-                if (/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/.test(col) && searchParams[col] && searchParams[col].trim() !== '') {
+                let val = searchParams[col];
+                if (typeof val === 'string') val = val.trim();
+                if (!val) continue;
+
+                if (col.endsWith('_start') && /^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+_start$/.test(col)) {
+                    let actualCol = col.replace('_start', '');
+                    baseSql += ` AND ${actualCol} >= ?`;
+                    params.push(val);
+                } else if (col.endsWith('_end') && /^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+_end$/.test(col)) {
+                    let actualCol = col.replace('_end', '');
+                    baseSql += ` AND ${actualCol} <= ?`;
+                    params.push(val);
+                } else if (/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/.test(col)) {
                     baseSql += ` AND ${col} LIKE ?`;
-                    params.push(`%${searchParams[col].trim()}%`);
+                    params.push(`%${val}%`);
                 }
             }
         } catch (e) { }
@@ -586,7 +613,11 @@ app.get('/api/data-client-ledger', cekAuth, (req, res) => {
 modules.forEach(mod => {
     app.get(`/dashboard-${mod.id}`, cekAuth, (req, res) => res.sendFile(path.join(__dirname, mod.path, `dashboard_${mod.id}.html`)));
     app.get(`/summary-${mod.id}`, cekAuth, (req, res) => res.sendFile(path.join(__dirname, mod.path, `summary_${mod.id}.html`)));
-    app.get(`/inbox-${mod.id}`, cekAuth, (req, res) => res.sendFile(path.join(__dirname, mod.path, `inbox_${mod.id}.html`)));
+    
+    // Inbox vatin sudah dihapus (Direct-to-Dashboard)
+    if (mod.id !== 'vatin') {
+        app.get(`/inbox-${mod.id}`, cekAuth, (req, res) => res.sendFile(path.join(__dirname, mod.path, `inbox_${mod.id}.html`)));
+    }
 
     // --- SERVER-SIDE DATATABLES ENGINE ---
     app.get(`/api/data-${mod.id}`, cekAuth, (req, res) => {
@@ -612,10 +643,39 @@ modules.forEach(mod => {
             try {
                 let searchParams = JSON.parse(decodeURIComponent(req.query.search));
                 for (let col in searchParams) {
-                    // Prevent SQL Injection by validating col name format
-                    if (/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/.test(col) && searchParams[col] && searchParams[col].trim() !== '') {
-                        baseSql += ` AND ${col} LIKE ?`;
-                        params.push(`%${searchParams[col].trim()}%`);
+                    let val = searchParams[col];
+                    if (typeof val === 'string') val = val.trim();
+                    if (!val) continue;
+
+                    // Support for Date Range (_start and _end)
+                    if (col.endsWith('_start') && /^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+_start$/.test(col)) {
+                        let actualCol = col.replace('_start', '');
+                        if (val === '__IS_NULL__') {
+                            baseSql += ` AND (${actualCol} IS NULL OR ${actualCol} = '' OR ${actualCol} = '-')`;
+                        } else {
+                            baseSql += ` AND ${actualCol} >= ?`;
+                            params.push(val);
+                        }
+                    } else if (col.endsWith('_end') && /^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+_end$/.test(col)) {
+                        let actualCol = col.replace('_end', '');
+                        if (val === '__IS_NULL__') {
+                            // Already handled by _start, but skip adding >= ?
+                        } else {
+                            baseSql += ` AND ${actualCol} <= ?`;
+                            params.push(val);
+                        }
+                    } else if (/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/.test(col)) {
+                        // Prevent SQL Injection by validating col name format
+                        if (val === '__IS_NULL__') {
+                            baseSql += ` AND (${col} IS NULL OR ${col} = '' OR ${col} = '-')`;
+                        } else if (col === 'c.nama_cabang') {
+                            // Support searching both branch name and raw branch code (e.g. for "Verifikasi Ulang")
+                            baseSql += ` AND (c.nama_cabang LIKE ? OR d.kode_cabang LIKE ?)`;
+                            params.push(`%${val}%`, `%${val}%`);
+                        } else {
+                            baseSql += ` AND ${col} LIKE ?`;
+                            params.push(`%${val}%`);
+                        }
                     }
                 }
             } catch (e) {
@@ -637,24 +697,64 @@ modules.forEach(mod => {
         db.get(`SELECT count(*) as total ${baseSql}`, params, (err, countRow) => {
             const total = countRow ? countRow.total : 0;
 
-            let selectSql = mod.id.startsWith('vat')
-                ? `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_faktur) AS tanggal_format, strftime('%d-%m-%Y', d.tgl_tukar_faktur) AS tgl_tukar_format ${baseSql} ORDER BY CAST(SUBSTR(d.no_invoice_internal, 1, MAX(1, INSTR(d.no_invoice_internal, '/') - 1)) AS INTEGER) ASC, d.waktu_input DESC`
-                : mod.id === 'prepaid'
-                ? `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_dokumen) AS tgl_dokumen_format, strftime('%m-%Y', v.tanggal_faktur) AS masa_pajak_faktur ${baseSql} ORDER BY d.waktu_input DESC`
-                : `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_dokumen) AS tgl_dokumen_format ${baseSql} ORDER BY d.waktu_input DESC`;
+            // Tambahan: Hitung data yang statusnya 'Perlu Verifikasi' (Direct Upload)
+            let verifySql = `SELECT COUNT(*) as count ${baseSql} AND d.kode_cabang = 'Perlu Verifikasi'`;
+            db.get(verifySql, params, (errV, vRow) => {
+                const needsVerify = vRow ? vRow.count : 0;
 
-            if (limit) {
-                selectSql += ` LIMIT ? OFFSET ?`;
-                params.push(limit, (page - 1) * limit);
-            }
+                // BUG-H2/H3 FIX: Server-side stats + MoM agar tidak dihitung dari data parsial halaman
+                const colTax = mod.id.startsWith('vat') ? 'd.ppn' : 'd.nilai_pph';
+                const colTgl = mod.id.startsWith('vat') ? 'd.tanggal_faktur' : 'd.tanggal_dokumen';
+                const now = new Date();
+                const curM = now.getMonth() + 1, curY = now.getFullYear();
+                const prevM = curM === 1 ? 12 : curM - 1;
+                const prevY = curM === 1 ? curY - 1 : curY;
+                const curYM = `${curY}-${String(curM).padStart(2, '0')}`;
+                const prevYM = `${prevY}-${String(prevM).padStart(2, '0')}`;
 
-            db.all(selectSql, params, (err2, rows) => {
-                res.json({ data: rows || [], total, page, limit: limit || total });
+                const statsSql = `SELECT
+                    COALESCE(SUM(d.dpp), 0) as total_dpp,
+                    COALESCE(SUM(${colTax}), 0) as total_tax,
+                    COALESCE(SUM(CASE WHEN strftime('%Y-%m', ${colTgl}) = ? THEN 1 ELSE 0 END), 0) as cur_jml,
+                    COALESCE(SUM(CASE WHEN strftime('%Y-%m', ${colTgl}) = ? THEN ${colTax} ELSE 0 END), 0) as cur_tax,
+                    COALESCE(SUM(CASE WHEN strftime('%Y-%m', ${colTgl}) = ? THEN 1 ELSE 0 END), 0) as prev_jml,
+                    COALESCE(SUM(CASE WHEN strftime('%Y-%m', ${colTgl}) = ? THEN ${colTax} ELSE 0 END), 0) as prev_tax
+                    ${baseSql}`;
+                const statsParams = [curYM, curYM, prevYM, prevYM, ...params];
+
+                db.get(statsSql, statsParams, (errS, statsRow) => {
+                    let selectSql = mod.id.startsWith('vat')
+                        ? `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_faktur) AS tanggal_format, strftime('%d-%m-%Y', d.tgl_tukar_faktur) AS tgl_tukar_format ${baseSql} ORDER BY CAST(SUBSTR(d.no_invoice_internal, 1, MAX(1, INSTR(d.no_invoice_internal, '/') - 1)) AS INTEGER) ASC, d.waktu_input DESC`
+                        : mod.id === 'prepaid'
+                        ? `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_dokumen) AS tgl_dokumen_format, strftime('%m-%Y', v.tanggal_faktur) AS masa_pajak_faktur ${baseSql} ORDER BY d.waktu_input DESC`
+                        : `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_dokumen) AS tgl_dokumen_format ${baseSql} ORDER BY d.waktu_input DESC`;
+
+                    if (limit) {
+                        selectSql += ` LIMIT ? OFFSET ?`;
+                        params.push(limit, (page - 1) * limit);
+                    }
+
+                    db.all(selectSql, params, (err2, rows) => {
+                        res.json({
+                            data: rows || [], total, page, limit: limit || total,
+                            needs_verify: needsVerify,
+                            stats: {
+                                total_dpp: statsRow ? statsRow.total_dpp : 0,
+                                total_tax: statsRow ? statsRow.total_tax : 0,
+                                cur_jml: statsRow ? statsRow.cur_jml : 0,
+                                cur_tax: statsRow ? statsRow.cur_tax : 0,
+                                prev_jml: statsRow ? statsRow.prev_jml : 0,
+                                prev_tax: statsRow ? statsRow.prev_tax : 0
+                            }
+                        });
+                    });
+                });
             });
         });
     });
 
-    app.get(`/api/inbox-${mod.id}`, cekAuth, (req, res) => {
+    if (mod.id !== 'vatin') {
+        app.get(`/api/inbox-${mod.id}`, cekAuth, (req, res) => {
         const page = parseInt(req.query.page) || 1;
         const limit = req.query.limit === 'all' ? null : (parseInt(req.query.limit) || 50);
         const search = (req.query.search || '').trim();
@@ -668,10 +768,30 @@ modules.forEach(mod => {
             params.push(entitas);
         }
 
-        if (search) {
-            baseSql += ` AND (data_ekstraksi LIKE ? OR diinput_oleh LIKE ?)`;
-            const s = '%' + search + '%';
-            params.push(s, s);
+        if (req.query.search) {
+            try {
+                const searchParams = JSON.parse(decodeURIComponent(req.query.search));
+                for (let key in searchParams) {
+                    const val = searchParams[key];
+                    if (!val) continue;
+
+                    if (key === 'diinput_oleh') {
+                        baseSql += ` AND diinput_oleh LIKE ?`;
+                        params.push(`%${val}%`);
+                    } else {
+                        // Asumsikan key lain ada di dalam kolom JSON data_ekstraksi
+                        baseSql += ` AND json_extract(data_ekstraksi, '$.${key}') LIKE ?`;
+                        params.push(`%${val}%`);
+                    }
+                }
+            } catch (e) {
+                const search = (req.query.search || '').trim();
+                if (search) {
+                    baseSql += ` AND (data_ekstraksi LIKE ? OR diinput_oleh LIKE ?)`;
+                    const s = '%' + search + '%';
+                    params.push(s, s);
+                }
+            }
         }
 
         db.get(`SELECT count(*) as total ${baseSql}`, params, (err, countRow) => {
@@ -686,8 +806,9 @@ modules.forEach(mod => {
             db.all(selectSql, params, (err2, rows) => {
                 res.json({ data: rows || [], total, page, limit: limit || total });
             });
+            });
         });
-    });
+    }
 });
 
 // ==============================================================
@@ -772,7 +893,7 @@ app.get('/api/dashboard-summary', cekAuth, (req, res) => {
         vatout_total: `SELECT COUNT(*) as jml, COALESCE(SUM(dpp),0) as total_dpp, COALESCE(SUM(ppn),0) as total_ppn FROM data_vatout WHERE entitas = ?`,
         vatout_inbox: `SELECT COUNT(*) as jml FROM inbox_vatout WHERE entitas = ?`,
         vatin_total: `SELECT COUNT(*) as jml, COALESCE(SUM(dpp),0) as total_dpp, COALESCE(SUM(ppn),0) as total_ppn FROM data_vatin WHERE entitas = ?`,
-        vatin_inbox: `SELECT COUNT(*) as jml FROM inbox_vatin WHERE entitas = ?`,
+        vatin_inbox: `SELECT COUNT(*) as jml FROM data_vatin WHERE entitas = ? AND kode_cabang = 'Perlu Verifikasi'`,
         payable_total: `SELECT COUNT(*) as jml, COALESCE(SUM(dpp),0) as total_dpp, COALESCE(SUM(nilai_pph),0) as total_pph FROM data_payable WHERE entitas = ?`,
         payable_inbox: `SELECT COUNT(*) as jml FROM inbox_payable WHERE entitas = ?`,
         prepaid_total: `SELECT COUNT(*) as jml, COALESCE(SUM(dpp),0) as total_dpp, COALESCE(SUM(nilai_pph),0) as total_pph FROM data_prepaid WHERE entitas = ?`,
@@ -843,6 +964,31 @@ app.get('/api/summary', cekAuth, (req, res) => {
         });
     });
 });
+
+app.get('/api/summary-vatout', cekAuth, (req, res) => {
+    const ent = req.query.entitas || 'BBS';
+
+    const sqlTrend = `SELECT strftime('%m-%Y', tanggal_faktur) as periode, count(*) as jml, sum(ppn) as total_ppn, sum(dpp) as total_dpp FROM data_vatout WHERE entitas = ? GROUP BY periode`;
+    const sqlBranch = `SELECT d.kode_cabang, c.nama_cabang, count(*) as jml, sum(d.ppn) as total_ppn FROM data_vatout d LEFT JOIN master_cabang c ON d.kode_cabang = c.kode_cabang WHERE d.entitas = ? GROUP BY d.kode_cabang`;
+
+    db.all(sqlTrend, [ent], (err1, trendRows) => {
+        db.all(sqlBranch, [ent], (err2, branchRows) => {
+            const result = (trendRows || []).map(r => ({
+                periode: r.periode,
+                jml_faktur: r.jml,
+                ppn_faktur: r.total_ppn,
+                dpp_faktur: r.total_dpp
+            }));
+
+            res.json({
+                trend: result,
+                branch: branchRows || []
+            });
+        });
+    });
+});
+
+
 
 app.get('/api/available-vatout', cekAuth, (req, res) => {
     const entitas = req.query.entitas || 'BBS';
@@ -982,8 +1128,7 @@ app.get('/api/search-advance-ledger', cekAuth, (req, res) => {
                 return {
                     id: adv.id,
                     inv_no: adv.inv_no,
-                    nama_client: adv.nama_client,
-                    waktu_input: adv.waktu_input,
+                    nama_client: adv.waktu_input,
                     total_advance: Number(adv.net_certificate || 0),
                     terpakai: totalDeductions,
                     sisa_saldo: balance
@@ -1103,7 +1248,13 @@ io.on('connection', (socket) => {
                 let mNo = teks.match(/Kode dan Nomor Seri Faktur Pajak:\s*([\d]+)/i);
                 if (!mNo) { gagal++; continue; }
 
-                let isDup = await checkDuplicateAsync('data_vatin', 'inbox_vatin', 'no_faktur', mNo[1]);
+                let noFakturAktual = mNo[1];
+                
+                // LOGIKA FAKTUR PENGGANTI (Deteksi Digit ke-4)
+                let isPengganti = noFakturAktual.length >= 4 && noFakturAktual.charAt(3) === '1';
+                let noFakturNormal = isPengganti ? noFakturAktual.substring(0, 3) + '0' + noFakturAktual.substring(4) : noFakturAktual;
+
+                let isDup = await checkDuplicateAsync('data_vatin', 'inbox_vatin', 'no_faktur', noFakturAktual);
                 if (isDup) { duplikat++; continue; }
 
                 // VAT IN selalu MODERN (format 2025+)
@@ -1134,10 +1285,13 @@ io.on('connection', (socket) => {
                 let mTTD = teks.match(/Ditandatangani secara elektronik\s*\n(.*?)\s*\n/i);
 
                 let namaVendorSafe = sanitizeFilename(mVen?.[1]);
-                let namaFileLokal = `arsip_vatin/${mNo[1]}_${namaVendorSafe}.pdf`;
+                // Format file final langsung
+                let namaFileLokal = `arsip_vatin/Perlu Verifikasi_${noFakturAktual}_${namaVendorSafe}.pdf`;
 
                 let data = {
-                    noFaktur: mNo[1],
+                    noFaktur: noFakturAktual,
+                    isPengganti: isPengganti,
+                    noFakturNormal: noFakturNormal,
                     namaVendor: mVen?.[1].trim(), alamatVendor: mAlmVen ? mAlmVen[1].replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : "-", npwpVendor: mNpwpVen?.[1].trim(),
                     namaPembeli: mPem?.[1].trim(), alamatPembeli: mAlmPem ? mAlmPem[1].replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : "-", npwpPembeli: mNpwpPem?.[1].trim(),
                     tanggalFaktur: mTgl ? formatTanggal(mTgl[2]) : "-", kotaPenerbit: mTgl ? mTgl[1].trim() : "-", format_tipe: formatTipe,
@@ -1151,17 +1305,38 @@ io.on('connection', (socket) => {
                     await updateMasterData('master_vendor', data.npwpVendor, data.namaVendor, data.alamatVendor, data.format_tipe, data.tanggalFaktur);
                 }
 
+                // SIMPAN FILE FISIK
                 await fsPromises.writeFile(path.join(__dirname, 'vat_in', namaFileLokal), Buffer.from(file.fileBuffer));
-                await dbRun(`INSERT INTO inbox_vatin (entitas, link_pdf_lokal, diinput_oleh, data_ekstraksi) VALUES (?, ?, ?, ?)`, [entitas, namaFileLokal, username, JSON.stringify(data)]);
+
+                // INSERT LANGSUNG KE DATA_VATIN (Dashboard)
+                await dbRun(`INSERT INTO data_vatin (
+                    no_faktur, entitas, kode_cabang, npwp_penjual, nama_penjual, alamat_penjual, npwp_pembeli, nama_pembeli, alamat_pembeli, 
+                    tanggal_faktur, harga_jual, diskon, uang_muka, referensi, kota_penerbit, penandatangan, dpp, ppn, 
+                    no_invoice_internal, tgl_tukar_faktur, diinput_oleh, link_pdf_lokal, format_tipe
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
+                [
+                    data.noFaktur, data.entitas, "Perlu Verifikasi", data.npwpVendor, data.namaVendor, data.alamatVendor, 
+                    data.npwpPembeli, data.namaPembeli, data.alamatPembeli, data.tanggalFaktur, data.hargaJual, 
+                    data.diskon, data.uangMuka, data.referensi, data.kotaPenerbit, data.penandatangan, data.dpp, data.ppn, 
+                    data.referensi, null, username, data.link_pdf_lokal, data.format_tipe
+                ]);
+
+                // INSERT ITEMS
+                if (data.items && data.items.length > 0) {
+                    let stmt = db.prepare(`INSERT INTO item_vatin (no_faktur, nama_barang, harga_satuan, qty, satuan, diskon, total_harga) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+                    data.items.forEach(it => stmt.run([data.noFaktur, it.nama_barang, it.harga_satuan, it.qty, it.satuan, it.diskon, it.total_harga]));
+                    stmt.finalize();
+                }
+
                 sukses++;
 
-            } catch (e) { gagal++; }
+            } catch (e) { console.error("Direct Upload Error:", e); gagal++; }
         }
 
         socket.emit('upload-batch-selesai', { modul: 'VAT IN', total: files.length, sukses, duplikat, gagal });
         io.emit('update-tabel-vatin');
+        io.emit('data-baru-vatin');
     });
-
     socket.on('simpan-final-vatin', (d) => {
         if (isDummy(socket)) {
             socket.emit('simpan-final-sukses', { message: 'Mode Dummy: Verifikasi disimulasi.' });
@@ -1170,23 +1345,46 @@ io.on('connection', (socket) => {
         let namaVendorSafe = sanitizeFilename(d.namaVendor);
         let namaFileFinal = `arsip_vatin/${d.branchInput}_${d.noFaktur}_${namaVendorSafe}.pdf`;
 
-        try {
-            fs.renameSync(path.join(__dirname, 'vat_in', d.link_pdf_lokal), path.join(__dirname, 'vat_in', namaFileFinal));
+        const sourcePath = path.join(__dirname, 'vat_in', d.link_pdf_lokal);
+        const destPath = path.join(__dirname, 'vat_in', namaFileFinal);
+
+        if (fs.existsSync(sourcePath)) {
+            try {
+                fs.renameSync(sourcePath, destPath);
+                d.link_pdf_lokal = namaFileFinal;
+            } catch (err) { console.error("Gagal rename PDF Vatin:", err); }
+        } else if (fs.existsSync(destPath)) {
+            // File sudah di-rename (klik ganda), tetap gunakan path yang baru
             d.link_pdf_lokal = namaFileFinal;
-        } catch (err) { console.error("Gagal rename PDF Vatin:", err); }
+        }
 
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
+
+            // LOGIKA PENGGANTI: Hapus Faktur Normal dari database jika yang disimpan adalah Penggantinya
+            if (d.isPengganti && d.noFakturNormal) {
+                db.run(`DELETE FROM data_vatin WHERE no_faktur = ?`, [d.noFakturNormal]);
+                db.run(`DELETE FROM item_vatin WHERE no_faktur = ?`, [d.noFakturNormal]);
+            }
+
             db.run(`INSERT INTO data_vatin (no_faktur, entitas, kode_cabang, npwp_penjual, nama_penjual, alamat_penjual, npwp_pembeli, nama_pembeli, alamat_pembeli, tanggal_faktur, harga_jual, diskon, uang_muka, referensi, kota_penerbit, penandatangan, dpp, ppn, no_invoice_internal, tgl_tukar_faktur, diinput_oleh, link_pdf_lokal, format_tipe) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [d.noFaktur, d.entitas, d.branchInput, d.npwpVendor, d.namaVendor, d.alamatVendor, d.npwpPembeli, d.namaPembeli, d.alamatPembeli, d.tanggalFaktur, d.hargaJual, d.diskon, d.uangMuka, d.referensi, d.kotaPenerbit, d.penandatangan, d.dpp, d.ppn, d.invoiceInput, d.tglTukarInput, d.username, d.link_pdf_lokal, d.format_tipe], function (err) {
-                    if (err) { db.run("ROLLBACK"); return; }
+                    if (err) { 
+                        console.error("❌ DB Insert Error (data_vatin):", err.message); 
+                        db.run("ROLLBACK"); 
+                        return; 
+                    }
 
                     let stmt = db.prepare(`INSERT INTO item_vatin (no_faktur, nama_barang, harga_satuan, qty, satuan, diskon, total_harga) VALUES (?, ?, ?, ?, ?, ?, ?)`);
                     if (d.items && d.items.length > 0) d.items.forEach(it => stmt.run([d.noFaktur, it.nama_barang, it.harga_satuan, it.qty, it.satuan, it.diskon, it.total_harga]));
                     stmt.finalize();
 
                     db.run(`DELETE FROM inbox_vatin WHERE id = ?`, [d.id_link], (err) => {
-                        if (err) { db.run("ROLLBACK"); return; }
+                        if (err) { 
+                            console.error("❌ DB Delete Error (inbox_vatin):", err.message); 
+                            db.run("ROLLBACK"); 
+                            return; 
+                        }
                         db.run("COMMIT"); io.emit('update-tabel-vatin'); io.emit('data-baru-vatin');
                     });
                 });
@@ -1335,23 +1533,38 @@ io.on('connection', (socket) => {
         let namaClientSafe = sanitizeFilename(d.namaPembeli);
         let namaFileFinal = `arsip_vatout/${d.branchInput}_${d.noFaktur}_${namaClientSafe}.pdf`;
 
-        try {
-            fs.renameSync(path.join(__dirname, 'vat_out', d.link_pdf_lokal), path.join(__dirname, 'vat_out', namaFileFinal));
+        const sourcePath = path.join(__dirname, 'vat_out', d.link_pdf_lokal);
+        const destPath = path.join(__dirname, 'vat_out', namaFileFinal);
+
+        if (fs.existsSync(sourcePath)) {
+            try {
+                fs.renameSync(sourcePath, destPath);
+                d.link_pdf_lokal = namaFileFinal;
+            } catch (err) { console.error("Gagal rename PDF Vatout:", err); }
+        } else if (fs.existsSync(destPath)) {
             d.link_pdf_lokal = namaFileFinal;
-        } catch (err) { }
+        }
 
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
             db.run(`INSERT INTO data_vatout (no_faktur, entitas, kode_cabang, kode_vo, npwp_penjual, nama_penjual, alamat_penjual, npwp_pembeli, nama_pembeli, alamat_pembeli, tanggal_faktur, harga_jual, diskon, uang_muka, referensi, kota_penerbit, penandatangan, dpp, ppn, no_invoice_internal, tgl_tukar_faktur, diinput_oleh, link_pdf_lokal, format_tipe) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [d.noFaktur, d.entitas, d.branchInput, d.voInput || null, d.npwpVendor, d.namaVendor, d.alamatVendor, d.npwpPembeli, d.namaPembeli, d.alamatPembeli, d.tanggalFaktur, d.hargaJual, d.diskon, d.uangMuka, d.referensi, d.kotaPenerbit, d.penandatangan, d.dpp, d.ppn, d.invoiceInput, d.tglTukarInput, d.username, d.link_pdf_lokal, d.format_tipe], function (err) {
-                    if (err) { db.run("ROLLBACK"); return; }
+                    if (err) { 
+                        console.error("❌ DB Insert Error (data_vatout):", err.message); 
+                        db.run("ROLLBACK"); 
+                        return; 
+                    }
 
                     let stmt = db.prepare(`INSERT INTO item_vatout (no_faktur, nama_barang, harga_satuan, qty, satuan, diskon, total_harga) VALUES (?, ?, ?, ?, ?, ?, ?)`);
                     if (d.items && d.items.length > 0) d.items.forEach(it => stmt.run([d.noFaktur, it.nama_barang, it.harga_satuan, it.qty, it.satuan, it.diskon, it.total_harga]));
                     stmt.finalize();
 
                     db.run(`DELETE FROM inbox_vatout WHERE id = ?`, [d.id_link], (err) => {
-                        if (err) { db.run("ROLLBACK"); return; }
+                        if (err) { 
+                            console.error("❌ DB Delete Error (inbox_vatout):", err.message); 
+                            db.run("ROLLBACK"); 
+                            return; 
+                        }
                         db.run("COMMIT"); io.emit('update-tabel-vatout'); io.emit('data-baru-vatout');
                     });
                 });
@@ -1422,9 +1635,17 @@ io.on('connection', (socket) => {
             db.run("BEGIN TRANSACTION");
             db.run(`INSERT INTO data_payable (no_bppu, masa_pajak, entitas, kode_cabang, nama_dipotong, dpp, nilai_pph, tarif, tanggal_dokumen, nomor_dokumen, no_invoice_internal, diinput_oleh, link_pdf_lokal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [d.noBppu, d.masaPajak, d.entitas, d.branchInput, d.namaDipotong, d.dpp, d.pph, d.tarif, d.tanggalDokumen, d.nomorDokumen, d.invoiceInput, d.username, d.link_pdf_lokal], (err) => {
-                    if (err) { db.run("ROLLBACK"); return; }
+                    if (err) { 
+                        console.error("❌ DB Insert Error (data_payable):", err.message); 
+                        db.run("ROLLBACK"); 
+                        return; 
+                    }
                     db.run(`DELETE FROM inbox_payable WHERE id = ?`, [d.id_link], (err) => {
-                        if (err) { db.run("ROLLBACK"); return; }
+                        if (err) { 
+                            console.error("❌ DB Delete Error (inbox_payable):", err.message); 
+                            db.run("ROLLBACK"); 
+                            return; 
+                        }
                         db.run("COMMIT"); io.emit('update-tabel-payable'); io.emit('data-baru-payable');
                     });
                 });
@@ -1432,6 +1653,8 @@ io.on('connection', (socket) => {
     });
 
     socket.on('hapus-inbox-payable', (id) => {
+        // BUG-C3 FIX: Dummy user tidak boleh menghapus file PDF asli
+        if (isDummy(socket)) return io.emit('update-tabel-payable');
         db.get(`SELECT link_pdf_lokal FROM inbox_payable WHERE id = ?`, [id], (err, row) => {
             if (row) { try { fs.unlinkSync(path.join(__dirname, 'taxpayable_bppu', row.link_pdf_lokal)); } catch (e) { } }
             db.run(`DELETE FROM inbox_payable WHERE id = ?`, [id], () => io.emit('update-tabel-payable'));
@@ -1493,9 +1716,17 @@ io.on('connection', (socket) => {
             db.run("BEGIN TRANSACTION");
             db.run(`INSERT INTO data_prepaid (no_bppu, masa_pajak, entitas, kode_cabang, nama_pemotong, dpp, nilai_pph, tarif, tanggal_dokumen, nomor_dokumen, no_invoice_internal, diinput_oleh, link_pdf_lokal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [d.noBppu, d.masaPajak, d.entitas, d.branchInput, d.namaPemotong, d.dpp, d.pph, d.tarif, d.tanggalDokumen, d.nomorDokumen, d.invoiceInput, d.username, d.link_pdf_lokal], (err) => {
-                    if (err) { db.run("ROLLBACK"); return; }
+                    if (err) { 
+                        console.error("❌ DB Insert Error (data_prepaid):", err.message); 
+                        db.run("ROLLBACK"); 
+                        return; 
+                    }
                     db.run(`DELETE FROM inbox_prepaid WHERE id = ?`, [d.id_link], (err) => {
-                        if (err) { db.run("ROLLBACK"); return; }
+                        if (err) { 
+                            console.error("❌ DB Delete Error (inbox_prepaid):", err.message); 
+                            db.run("ROLLBACK"); 
+                            return; 
+                        }
                         db.run("COMMIT"); io.emit('update-tabel-prepaid'); io.emit('data-baru-prepaid');
                     });
                 });
@@ -1503,6 +1734,8 @@ io.on('connection', (socket) => {
     });
 
     socket.on('hapus-inbox-prepaid', (id) => {
+        // BUG-C3 FIX: Dummy user tidak boleh menghapus file PDF asli
+        if (isDummy(socket)) return io.emit('update-tabel-prepaid');
         db.get(`SELECT link_pdf_lokal FROM inbox_prepaid WHERE id = ?`, [id], (err, row) => {
             if (row) { try { fs.unlinkSync(path.join(__dirname, 'prepaidtax_bppu', row.link_pdf_lokal)); } catch (e) { } }
             db.run(`DELETE FROM inbox_prepaid WHERE id = ?`, [id], () => io.emit('update-tabel-prepaid'));

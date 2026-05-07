@@ -117,7 +117,15 @@
         async function loadSummary() {
             try {
                 const response = await fetch('/api/summary?entitas=' + aktifEntitas);
-                const data = await response.json();
+                let data = await response.json();
+                
+                // Sort data by period (MM-YYYY) ascending
+                data.sort((a, b) => {
+                    const [monthA, yearA] = a.periode.split('-').map(Number);
+                    const [monthB, yearB] = b.periode.split('-').map(Number);
+                    if (yearA !== yearB) return yearA - yearB;
+                    return monthA - monthB;
+                });
                 const tbody = document.getElementById('body-compare');
                 tbody.innerHTML = '';
                 const formatRupiah = (angka) => "Rp " + Number(angka).toLocaleString('id-ID');
@@ -145,11 +153,11 @@
                 });
 
                 // Build charts
-                var labels = data.map(function(r) { return r.periode; }).reverse();
-                var ppnTukar = data.map(function(r) { return r.ppn_tukar; }).reverse();
-                var ppnFaktur = data.map(function(r) { return r.ppn_faktur; }).reverse();
-                var docTukar = data.map(function(r) { return r.jml_tukar; }).reverse();
-                var docFaktur = data.map(function(r) { return r.jml_faktur; }).reverse();
+                var labels = data.map(function(r) { return r.periode; });
+                var ppnTukar = data.map(function(r) { return r.ppn_tukar; });
+                var ppnFaktur = data.map(function(r) { return r.ppn_faktur; });
+                var docTukar = data.map(function(r) { return r.jml_tukar; });
+                var docFaktur = data.map(function(r) { return r.jml_faktur; });
                 var colors = getChartColors();
 
                 // PPN Chart

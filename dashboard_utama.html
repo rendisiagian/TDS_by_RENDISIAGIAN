@@ -925,12 +925,12 @@
         }
 
         // --- Pending Badge helper ---
-        function setPendingBadge(elId, count, linkHref) {
+        function setPendingBadge(elId, count, label = 'Menunggu Verifikasi') {
             const el = document.getElementById(elId);
             if (!el) return;
             if (count > 0) {
                 el.className = 'module-pending-badge pending-active';
-                el.textContent = `⚠ ${count} Menunggu Verifikasi`;
+                el.textContent = `⚠ ${count} ${label}`;
             } else {
                 el.className = 'module-pending-badge pending-zero';
                 el.textContent = '✔ Antrean Bersih';
@@ -958,7 +958,7 @@
                 document.getElementById('vi-ppn').textContent = fShort(vatin.ppn);
                 document.getElementById('vi-jml').textContent = vatin.jml + ' Faktur';
                 document.getElementById('vi-dpp').textContent = fShort(vatin.dpp);
-                setPendingBadge('vi-pending-badge', vatin.pending);
+                setPendingBadge('vi-pending-badge', vatin.pending, 'Perlu Verifikasi');
 
                 // ---- TAX PAYABLE ----
                 document.getElementById('pay-pph').textContent = fShort(payable.pph);
