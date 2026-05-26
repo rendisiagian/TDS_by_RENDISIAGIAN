@@ -21,7 +21,8 @@
                 <h2>Laporan Rekapitulasi Pajak</h2>
                 <div class="user-profile"><span id="header-user-name"></span>
                     <div class="toolbar-actions">
-                        <button class="btn-toolbar btn-toolbar-export" onclick="showExportMenu(event, 'tabel-summary', 'summary_' + aktifEntitas)" data-testid="btn-export-summary">Export</button>
+                        <!-- BUG-4 FIX: Tombol disabled saat loading, baru aktif setelah data siap -->
+                        <button id="btn-export-summary" class="btn-toolbar btn-toolbar-export" onclick="showExportMenu(event, 'tabel-summary', 'summary_' + aktifEntitas)" data-testid="btn-export-summary" disabled style="opacity:0.5;cursor:not-allowed;">Export</button>
                         <button class="btn-toolbar btn-toolbar-print" onclick="window.print()" data-testid="btn-print-summary">&#128424; Print</button>
                     </div>
                     <a href="/logout" class="btn-logout">Logout</a>
@@ -116,11 +117,28 @@
 
         async function loadSummary() {
             try {
+                // BUG-4 FIX: Disable tombol export selama loading
+                const btnExport = document.getElementById('btn-export-summary');
+                if (btnExport) { btnExport.disabled = true; btnExport.style.opacity = '0.5'; btnExport.style.cursor = 'not-allowed'; }
+
                 const response = await fetch('/api/summary?entitas=' + aktifEntitas);
+
+                // BUG-5 FIX: Cek HTTP status sebelum akses data
+                if (!response.ok) {
+                    throw new Error('Server error: HTTP ' + response.status);
+                }
+
                 let data = await response.json();
-                
-                // Sort data by period (MM-YYYY) ascending
+
+                // BUG-5 FIX: Guard — pastikan data berupa array sebelum sort
+                if (!Array.isArray(data)) {
+                    console.error('API /api/summary tidak mengembalikan array:', data);
+                    data = [];
+                }
+
+                // BUG-9 FIX: Sort periode aman meski ada nilai null/undefined
                 data.sort((a, b) => {
+                    if (!a.periode || !b.periode) return 0;
                     const [monthA, yearA] = a.periode.split('-').map(Number);
                     const [monthB, yearB] = b.periode.split('-').map(Number);
                     if (yearA !== yearB) return yearA - yearB;
@@ -134,6 +152,8 @@
                     tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="padding: 20px; color: var(--text-tertiary);">Belum ada data rekapitulasi untuk entitas ini.</td></tr>';
                     if (chartPPN) { chartPPN.destroy(); chartPPN = null; }
                     if (chartDokumen) { chartDokumen.destroy(); chartDokumen = null; }
+                    // BUG-4 FIX: Tetap enable export meski data kosong (user mungkin mau export file kosong)
+                    if (btnExport) { btnExport.disabled = false; btnExport.style.opacity = '1'; btnExport.style.cursor = 'pointer'; }
                     return;
                 }
 
@@ -204,6 +224,13 @@
 
             } catch (err) {
                 console.error("Gagal memuat summary", err);
+                // BUG-5 FIX: Tampilkan pesan error di tabel agar user tahu ada masalah
+                const tbody = document.getElementById('body-compare');
+                if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="padding: 20px; color: #ef4444;">⚠️ Gagal memuat data: ${err.message}</td></tr>`;
+            } finally {
+                // BUG-4 FIX: Re-enable tombol export setelah loading selesai (sukses maupun gagal)
+                const btnExport = document.getElementById('btn-export-summary');
+                if (btnExport) { btnExport.disabled = false; btnExport.style.opacity = '1'; btnExport.style.cursor = 'pointer'; }
             }
         }
 

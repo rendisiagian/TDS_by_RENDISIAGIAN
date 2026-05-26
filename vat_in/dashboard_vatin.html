@@ -122,7 +122,9 @@
                                     <th class="text-center">No. Invoice</th>
                                     <th class="text-center">Tgl Tukar</th>
                                     <th class="text-center">Nama Vendor</th>
+                                    <th class="text-center">Status Faktur</th>
                                     <th class="text-center">No. Faktur</th>
+                                    <th class="text-center">Masa Pajak</th>
                                     <th class="text-center">Tanggal Faktur</th>
                                     <th class="text-center">DPP</th>
                                     <th class="text-center">PPN</th>
@@ -139,7 +141,9 @@
                                         </div>
                                     </th>
                                     <th><input type="text" class="filter-input" data-col="d.nama_penjual" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.status_faktur" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.no_faktur" placeholder="🔍 Cari..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.masa_pajak" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input filter-date-range" data-col="d.tanggal_faktur" placeholder="Range Tgl..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.dpp" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.ppn" placeholder="🔍 Cari..."></th>
@@ -167,6 +171,10 @@
         <div class="modal-box" style="max-width: 500px;">
             <h3 style="border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; color: #f59e0b;">✏️ Edit Relasi Internal</h3>
             <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 15px;">Faktur: <b id="edit-faktur-title"></b></p>
+            <!-- BUG-3 FIX: Notifikasi jika data dari upload PDF dan belum diverifikasi -->
+            <div id="edit-verif-notif" style="display:none; background:#fef9c3; border:1px solid #fde047; border-radius:6px; padding:8px 12px; margin-bottom:10px; font-size:0.82rem; color:#854d0e;">
+                ⚠️ Data ini berasal dari upload PDF dan <b>belum memiliki Branch</b>. Pilih Branch yang sesuai untuk menyelesaikan verifikasi.
+            </div>
             <div class="form-group"><label>Branch / Cabang Baru</label><select id="edit_branch" class="form-select"></select></div>
             <div class="form-group"><label>No. Invoice</label><input type="text" id="edit_invoice" autocomplete="off" placeholder="Ketik No Invoice..."></div>
             <div class="form-group"><label>Tanggal Tukar Faktur</label><input type="date" id="edit_tanggal"></div>
@@ -175,6 +183,7 @@
                 <button class="btn-simpan btn-cancel" style="flex: 1; margin-top:0;" onclick="document.getElementById('modalEditData').style.display='none'">Batal</button>
             </div>
         </div>
+    </div>
     <input type="file" id="filePdfUpload" accept="application/pdf" multiple style="display:none;">
 
     <script>
@@ -271,35 +280,72 @@
             updateMoM('mom-ppn', stats.cur_tax || 0, stats.prev_tax || 0, '');
 
             if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="12" class="text-center" style="padding:20px; color:#64748b;">Data tidak ditemukan.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="14" class="text-center" style="padding:20px; color:#64748b;">Data tidak ditemukan.</td></tr>`;
             }
 
             data.forEach((baris, index) => {
                 const tr = document.createElement('tr');
-                let curBr = baris.kode_cabang || '';
-                let curInv = baris.no_invoice_internal || '';
-                let curTgl = baris.tgl_tukar_faktur || '';
+                // BUG-2 FIX: Escape karakter ' agar tidak break atribut onclick
+                // Gunakan data-* attribute untuk menyimpan nilai, bukan inline onclick string
                 let barisNo = offset + index + 1; // Penomoran Akurat
 
-                let btnView = `<button class="btn-tbl btn-tbl-view" title="Lihat" onclick="viewItems('${baris.no_faktur}')">Lihat</button>`;
-                let btnEdit = `<button class="btn-tbl btn-tbl-edit" title="Edit" onclick="handleAction('${baris.no_faktur}', 'EDIT', '${curBr}', '${curInv}', '${curTgl}')">Edit</button>`;
-                let btnDel  = `<button class="btn-tbl btn-tbl-del" title="Hapus" onclick="handleAction('${baris.no_faktur}', 'DELETE')">Hapus</button>`;
-                let btnPdf = baris.link_pdf_lokal ? `<a href="/${baris.link_pdf_lokal}" target="_blank" class="btn-tbl btn-tbl-pdf">PDF</a>` : `-`;
+                // BUG-2 FIX: Tombol aksi dibuat via DOM API, bukan innerHTML string interpolasi
+                const btnView = document.createElement('button');
+                btnView.className = 'btn-tbl btn-tbl-view';
+                btnView.title = 'Lihat';
+                btnView.textContent = 'Lihat';
+                btnView.addEventListener('click', () => viewItems(baris.no_faktur));
+
+                const btnEdit = document.createElement('button');
+                btnEdit.className = 'btn-tbl btn-tbl-edit';
+                btnEdit.title = 'Edit';
+                btnEdit.textContent = 'Edit';
+                btnEdit.addEventListener('click', () => handleAction(
+                    baris.no_faktur, 'EDIT',
+                    baris.kode_cabang || '',
+                    baris.no_invoice_internal || '',
+                    baris.tgl_tukar_faktur || ''
+                ));
+
+                const btnDel = document.createElement('button');
+                btnDel.className = 'btn-tbl btn-tbl-del';
+                btnDel.title = 'Hapus';
+                btnDel.textContent = 'Hapus';
+                btnDel.addEventListener('click', () => handleAction(baris.no_faktur, 'DELETE'));
+
+                let btnPdfHtml = baris.link_pdf_lokal
+                    ? `<a href="/${baris.link_pdf_lokal}" target="_blank" class="btn-tbl btn-tbl-pdf">PDF</a>`
+                    : `-`;
+
+                // Display status faktur dengan styling
+                let statusDisplay = baris.status_faktur || 'Normal';
+                let statusColor = statusDisplay === 'Normal' ? '#22c55e' : '#f59e0b';
+                let statusStyle = `style="color: ${statusColor}; font-weight: bold;"`;
 
                 tr.innerHTML = `
                     <td class="text-center">${barisNo}</td>
-                    <td class="text-center" style="white-space:nowrap;">${btnView} ${btnEdit} ${btnDel}</td>
-                    <td class="text-center">${btnPdf}</td>
+                    <td class="text-center" style="white-space:nowrap;"></td>
+                    <td class="text-center">${btnPdfHtml}</td>
                     <td class="text-center">${baris.nama_cabang || baris.kode_cabang || '-'}</td>
                     <td class="text-center">${baris.no_invoice_internal || '-'}</td>
                     <td class="text-center">${baris.tgl_tukar_format || '-'}</td>
                     <td class="text-bold">${baris.nama_penjual || '-'}</td>
+                    <td class="text-center" ${statusStyle}>${statusDisplay}</td>
                     <td class="text-center" style="color:#2563eb; font-weight:bold;">${baris.no_faktur || '-'}</td>
+                    <td class="text-center">${baris.masa_pajak || '-'}</td>
                     <td class="text-center">${baris.tanggal_format || '-'}</td>
                     <td class="text-right">${formatRupiah(baris.dpp)}</td>
                     <td class="text-right">${formatRupiah(baris.ppn)}</td>
                     <td class="text-center">${baris.diinput_oleh || '-'}</td>
                 `;
+                // BUG-2 FIX: Sisipkan tombol ke dalam <td> aksi via DOM (aman dari XSS)
+                const tdAksi = tr.querySelector('td:nth-child(2)');
+                tdAksi.appendChild(btnView);
+                tdAksi.appendChild(document.createTextNode(' '));
+                tdAksi.appendChild(btnEdit);
+                tdAksi.appendChild(document.createTextNode(' '));
+                tdAksi.appendChild(btnDel);
+
                 tbody.appendChild(tr);
             });
             
@@ -426,16 +472,29 @@
                 const select = document.getElementById('edit_branch');
                 select.disabled = false; select.style.backgroundColor = '#fff';
                 select.innerHTML = '<option value="">-- Pilih Branch --</option>';
+
+                // BUG-3 FIX: Tampilkan keterangan jika data belum diverifikasi
+                const notifVerif = document.getElementById('edit-verif-notif');
+                if (curCabang === 'Perlu Verifikasi' || curCabang === '') {
+                    if (notifVerif) notifVerif.style.display = 'block';
+                } else {
+                    if (notifVerif) notifVerif.style.display = 'none';
+                }
+
                 branches.forEach(b => {
-                    let isSelected = (b.kode_cabang === curCabang) ? 'selected' : '';
-                    select.innerHTML += `<option value="${b.kode_cabang}" ${isSelected}>${b.kode_cabang} - ${b.nama_cabang}</option>`;
+                    const opt = document.createElement('option');
+                    opt.value = b.kode_cabang;
+                    opt.textContent = `${b.kode_cabang} - ${b.nama_cabang}`;
+                    if (b.kode_cabang === curCabang) opt.selected = true;
+                    select.appendChild(opt);
                 });
                 document.getElementById('modalEditData').style.display = 'flex';
             }
         }
 
         function submitEdit() {
-            const isSupervisor = ['supervisor', 'administrator'].includes(currentUser.role.toLowerCase());
+            // BUG-1 FIX: Guard untuk mencegah crash jika currentUser belum dimuat (race condition)
+            const isSupervisor = ['supervisor', 'administrator'].includes((currentUser.role || '').toLowerCase());
             const branch = document.getElementById('edit_branch').value;
             const invoice = document.getElementById('edit_invoice').value;
             const tanggal = document.getElementById('edit_tanggal').value;
