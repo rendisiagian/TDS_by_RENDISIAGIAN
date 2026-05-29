@@ -87,13 +87,34 @@
                 <tr>
                   <th class="text-center">No.</th>
                   <th>No. Faktur Normal</th>
-                  <th>Normal Status</th>
+                  <th>Masa Pajak Normal</th>
                   <th>Pengganti Terakhir</th>
                   <th class="text-right">PPN Normal</th>
                   <th class="text-right">PPN Pengganti</th>
                 </tr>
               </thead>
               <tbody id="body-replaced"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 1rem;">
+          <div class="card-header-padding">
+            <h3 class="title-primary" style="border-left-color:#8b5cf6; margin:0;">Masa Pajak Berbeda antara Normal dan Pengganti</h3>
+            <div class="warn-badge" style="margin-top:0.5rem; background: rgba(139, 92, 246, 0.15); color: #7c3aed; border-color: rgba(139, 92, 246, 0.35);">Jumlah: <span id="cnt-diffmasa"></span></div>
+          </div>
+          <div class="table-responsive">
+            <table class="table" style="width:100%;">
+              <thead>
+                <tr>
+                  <th class="text-center">No.</th>
+                  <th>No. Faktur Normal</th>
+                  <th>Masa Pajak Normal</th>
+                  <th>No. Faktur Pengganti</th>
+                  <th>Masa Pajak Pengganti</th>
+                </tr>
+              </thead>
+              <tbody id="body-diffmasa"></tbody>
             </table>
           </div>
         </div>
@@ -121,11 +142,13 @@
         // BUG-6 FIX: Guard — pastikan payload berstruktur benar
         const orphan = Array.isArray(payload.orphan_replacements) ? payload.orphan_replacements : [];
         const replaced = Array.isArray(payload.replaced_normals) ? payload.replaced_normals : [];
+        const diffMasa = Array.isArray(payload.diff_masa) ? payload.diff_masa : [];
 
         document.getElementById('cnt-orphan').textContent = orphan.length;
         document.getElementById('cnt-replaced').textContent = replaced.length;
+        document.getElementById('cnt-diffmasa').textContent = diffMasa.length;
 
-        document.getElementById('audit-summary').innerHTML = `Ditemukan <b>${orphan.length + replaced.length}</b> anomali untuk entitas <b>${aktifEntitas}</b>.`;
+        document.getElementById('audit-summary').innerHTML = `Ditemukan <b>${orphan.length + replaced.length + diffMasa.length}</b> anomali untuk entitas <b>${aktifEntitas}</b>.`;
 
         const formatRupiah = (n) => "Rp " + Number(n || 0).toLocaleString('id-ID');
 
@@ -156,12 +179,30 @@
             tr.innerHTML = `
               <td class="text-center">${i+1}</td>
               <td style="font-weight:700;">${r.normal_no_faktur}</td>
-              <td>${r.normal_status_faktur}</td>
+              <td>${r.normal_masa_pajak || '-'}</td>
               <td style="color:#f59e0b; font-weight:700;">${r.latest_pengganti_no_faktur}</td>
               <td class="text-right">${formatRupiah(r.normal_ppn)}</td>
               <td class="text-right">${formatRupiah(r.latest_pengganti_ppn)}</td>
             `;
             bodyReplaced.appendChild(tr);
+          });
+        }
+
+        const bodyDiffMasa = document.getElementById('body-diffmasa');
+        bodyDiffMasa.innerHTML = '';
+        if (diffMasa.length === 0) {
+          bodyDiffMasa.innerHTML = '<tr><td colspan="5" class="text-center text-muted" style="padding:20px;">Tidak ada data anomali.</td></tr>';
+        } else {
+          diffMasa.forEach((r, i) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td class="text-center">${i+1}</td>
+              <td style="font-weight:700;">${r.normal_no_faktur}</td>
+              <td style="color:#10b981; font-weight:700;">${r.normal_masa_pajak || '-'}</td>
+              <td style="color:#f59e0b; font-weight:700;">${r.pengganti_no_faktur}</td>
+              <td style="color:#ef4444; font-weight:700;">${r.pengganti_masa_pajak || '-'}</td>
+            `;
+            bodyDiffMasa.appendChild(tr);
           });
         }
       } catch (e) {
@@ -170,8 +211,10 @@
         const errorMsg = `<tr><td colspan="4" class="text-center" style="padding:20px; color:#ef4444;">&#9888; Gagal memuat data: ${e.message}</td></tr>`;
         const bodyOrphan = document.getElementById('body-orphan');
         const bodyReplaced = document.getElementById('body-replaced');
+        const bodyDiffMasa = document.getElementById('body-diffmasa');
         if (bodyOrphan) bodyOrphan.innerHTML = errorMsg;
         if (bodyReplaced) bodyReplaced.innerHTML = errorMsg.replace('colspan="4"', 'colspan="6"');
+        if (bodyDiffMasa) bodyDiffMasa.innerHTML = errorMsg.replace('colspan="4"', 'colspan="5"');
         const summaryEl = document.getElementById('audit-summary');
         if (summaryEl) summaryEl.innerHTML = `<span style="color:#ef4444;">&#9888; Gagal memuat audit: ${e.message}</span>`;
       }

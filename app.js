@@ -162,10 +162,11 @@ function extractMasaPajak(tanggalFaktur) {
 function deduplicateVatinData(rows) {
     if (!rows || rows.length === 0) return [];
     
-    // Group by no_faktur_normal (or no_faktur if no_faktur_normal is NULL)
+    // Group by serial number (mengabaikan 4 digit pertama: kode transaksi & status)
     const groups = {};
     rows.forEach(row => {
-        const groupKey = row.no_faktur_normal || row.no_faktur;
+        const f = row.no_faktur || '';
+        const groupKey = f.length >= 5 ? f.substring(4) : f;
         if (!groups[groupKey]) {
             groups[groupKey] = [];
         }
@@ -192,7 +193,16 @@ function deduplicateVatinData(rows) {
             if (a.waktu_input && b.waktu_input) return b.waktu_input.localeCompare(a.waktu_input);
             return (b.no_faktur || '').localeCompare(a.no_faktur || '');
         });
-        selected.push(sorted[0]);
+        
+        let chosen = sorted[0];
+        
+        // BUG-FIX: Sinkronisasi masa pajak faktur pengganti dengan masa pajak faktur normal
+        const normalRow = groupRows.find(r => r.status_faktur === 'Normal');
+        if (normalRow && normalRow.masa_pajak && chosen.status_faktur !== 'Normal') {
+            chosen.masa_pajak = normalRow.masa_pajak;
+        }
+        
+        selected.push(chosen);
     }
 
     return selected;
@@ -1275,7 +1285,7 @@ app.get('/api/summary', cekAuth, (req, res) => {
     const ent = req.query.entitas || 'BBS';
 
     // BUG FIX: data_vatin tidak punya kolom 'id', gunakan waktu_input agar sesuai dengan kebutuhan deduplicateVatinData
-    const sqlAll = `SELECT no_faktur, no_faktur_normal, status_faktur, tgl_tukar_faktur, tanggal_faktur, ppn, waktu_input FROM data_vatin WHERE entitas = ?`;
+    const sqlAll = `SELECT no_faktur, no_faktur_normal, status_faktur, tgl_tukar_faktur, tanggal_faktur, ppn, waktu_input, masa_pajak FROM data_vatin WHERE entitas = ?`;
     
     db.all(sqlAll, [ent], (err, allRows) => {
         if (err) {
@@ -1301,14 +1311,17 @@ app.get('/api/summary', cekAuth, (req, res) => {
                 ttfMap[periodeTTF].total_ppn += (row.ppn || 0);
             }
 
-            // Berdasarkan tanggal_faktur
-            if (row.tanggal_faktur) {
-                const periodeFaktur = row.tanggal_faktur.substring(5, 7) + '-' + row.tanggal_faktur.substring(0, 4);
-                if (!fakturMap[periodeFaktur]) {
-                    fakturMap[periodeFaktur] = { jml: 0, total_ppn: 0 };
+            // Berdasarkan tanggal_faktur, diganti menggunakan masa_pajak agar mengikuti aturan faktur pengganti
+            if (row.masa_pajak) {
+                const parts = row.masa_pajak.split('-');
+                if (parts.length === 2) {
+                    const periodeFaktur = parts[1] + '-' + parts[0];
+                    if (!fakturMap[periodeFaktur]) {
+                        fakturMap[periodeFaktur] = { jml: 0, total_ppn: 0 };
+                    }
+                    fakturMap[periodeFaktur].jml += 1;
+                    fakturMap[periodeFaktur].total_ppn += (row.ppn || 0);
                 }
-                fakturMap[periodeFaktur].jml += 1;
-                fakturMap[periodeFaktur].total_ppn += (row.ppn || 0);
             }
         });
 
@@ -1347,7 +1360,7 @@ app.get('/api/audit-vatin', cekAuth, (req, res) => {
               SELECT 1
               FROM data_vatin n
               WHERE n.entitas = r.entitas
-                AND n.no_faktur = r.no_faktur_normal
+                AND SUBSTR(n.no_faktur, 5) = SUBSTR(r.no_faktur, 5)
                 AND n.status_faktur = 'Normal'
           )
         ORDER BY r.waktu_input DESC
@@ -1363,24 +1376,24 @@ app.get('/api/audit-vatin', cekAuth, (req, res) => {
     const replacedSql2 = `
         SELECT
             n.no_faktur AS normal_no_faktur,
-            n.status_faktur AS normal_status_faktur,
+            n.masa_pajak AS normal_masa_pajak,
             n.ppn AS normal_ppn,
             p.no_faktur AS latest_pengganti_no_faktur,
             p.status_faktur AS latest_pengganti_status_faktur,
             p.ppn AS latest_pengganti_ppn
         FROM data_vatin n
         INNER JOIN data_vatin p
-            ON p.no_faktur_normal = n.no_faktur
+            ON SUBSTR(p.no_faktur, 5) = SUBSTR(n.no_faktur, 5)
            AND p.entitas = n.entitas
            AND p.status_faktur LIKE 'Pengganti%'
         INNER JOIN (
-            SELECT no_faktur_normal, MAX(waktu_input) AS max_waktu
+            SELECT SUBSTR(no_faktur, 5) AS serial_faktur, MAX(waktu_input) AS max_waktu
             FROM data_vatin
             WHERE entitas = ?
               AND status_faktur LIKE 'Pengganti%'
-            GROUP BY no_faktur_normal
+            GROUP BY SUBSTR(no_faktur, 5)
         ) mx
-          ON mx.no_faktur_normal = p.no_faktur_normal
+          ON mx.serial_faktur = SUBSTR(p.no_faktur, 5)
          AND mx.max_waktu = p.waktu_input
         WHERE n.entitas = ?
           AND n.status_faktur = 'Normal'
@@ -1389,13 +1402,35 @@ app.get('/api/audit-vatin', cekAuth, (req, res) => {
         LIMIT 5000
     `;
 
+    const diffMasaSql = `
+        SELECT
+            n.no_faktur AS normal_no_faktur,
+            n.masa_pajak AS normal_masa_pajak,
+            p.no_faktur AS pengganti_no_faktur,
+            strftime('%Y-%m', p.tanggal_faktur) AS pengganti_masa_pajak
+        FROM data_vatin n
+        INNER JOIN data_vatin p
+            ON SUBSTR(p.no_faktur, 5) = SUBSTR(n.no_faktur, 5)
+           AND p.entitas = n.entitas
+           AND p.status_faktur LIKE 'Pengganti%'
+        WHERE n.entitas = ?
+          AND n.status_faktur = 'Normal'
+          AND (n.masa_pajak != strftime('%Y-%m', p.tanggal_faktur) OR p.tanggal_faktur IS NULL OR n.masa_pajak IS NULL)
+        ORDER BY p.waktu_input DESC
+        LIMIT 5000
+    `;
+
     db.all(orphanSql, [entitas], (err1, orphanRows) => {
-        if (err1) return res.status(500).json({ error: err1.message, orphan_replacements: [], replaced_normals: [] });
+        if (err1) return res.status(500).json({ error: err1.message, orphan_replacements: [], replaced_normals: [], diff_masa: [] });
         db.all(replacedSql2, [entitas, entitas], (err2, replacedRows) => {
-            if (err2) return res.status(500).json({ error: err2.message, orphan_replacements: orphanRows || [], replaced_normals: [] });
-            res.json({
-                orphan_replacements: orphanRows || [],
-                replaced_normals: replacedRows || []
+            if (err2) return res.status(500).json({ error: err2.message, orphan_replacements: orphanRows || [], replaced_normals: [], diff_masa: [] });
+            db.all(diffMasaSql, [entitas], (err3, diffMasaRows) => {
+                if (err3) return res.status(500).json({ error: err3.message, orphan_replacements: orphanRows || [], replaced_normals: replacedRows || [], diff_masa: [] });
+                res.json({
+                    orphan_replacements: orphanRows || [],
+                    replaced_normals: replacedRows || [],
+                    diff_masa: diffMasaRows || []
+                });
             });
         });
     });
@@ -1771,6 +1806,29 @@ io.on('connection', (socket) => {
                 }
 
                 sukses++;
+
+                // BUG FIX: Sinkronisasi masa_pajak faktur pengganti (Permanen di Database)
+                const familySerial = noFakturAktual.length >= 5 ? noFakturAktual.substring(4) : noFakturAktual;
+                await dbRun(`
+                    UPDATE data_vatin
+                    SET masa_pajak = (
+                        SELECT n.masa_pajak 
+                        FROM data_vatin n 
+                        WHERE n.entitas = data_vatin.entitas 
+                          AND n.status_faktur = 'Normal' 
+                          AND SUBSTR(n.no_faktur, 5) = ?
+                    )
+                    WHERE entitas = ? 
+                      AND SUBSTR(no_faktur, 5) = ? 
+                      AND status_faktur != 'Normal'
+                      AND EXISTS (
+                          SELECT 1 
+                          FROM data_vatin n 
+                          WHERE n.entitas = data_vatin.entitas 
+                            AND n.status_faktur = 'Normal' 
+                            AND SUBSTR(n.no_faktur, 5) = ?
+                      )
+                `, [familySerial, entitas, familySerial, familySerial]);
 
             } catch (e) { console.error("Direct Upload Error:", e); gagal++; }
         }
