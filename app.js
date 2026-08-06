@@ -169,7 +169,7 @@ function extractMasaPajak(tanggalFaktur) {
  * Untuk setiap group (normal + pengganti-nya), pilih yang punya status tertinggi
  * Ranking: Pengganti N > ... > Pengganti 2 > Pengganti 1 > Normal
  */
-function deduplicateVatinData(rows) {
+function deduplicateFakturData(rows) {
     if (!rows || rows.length === 0) return [];
     
     // Group by serial number (mengabaikan 4 digit pertama: kode transaksi & status)
@@ -653,6 +653,88 @@ app.post('/api/migrate-vatin-status', cekRoleAPI(['administrator', 'supervisor',
     }
 });
 
+// API: MIGRASI DATA VATOUT - Update status_faktur, masa_pajak, no_faktur_normal untuk existing data
+app.post('/api/migrate-vatout-status', cekRoleAPI(['administrator', 'supervisor', 'superadmin']), async (req, res) => {
+    try {
+        // Query semua data yang belum memiliki status_faktur atau masa_pajak
+        db.all(`SELECT no_faktur, tanggal_faktur FROM data_vatout WHERE status_faktur IS NULL OR status_faktur = '' OR masa_pajak IS NULL OR status_faktur = 'Normal'`, async (err, rows) => {
+            if (err) {
+                return res.status(500).json({ error: 'Database error', details: err.message });
+            }
+            
+            if (!rows || rows.length === 0) {
+                return res.json({ 
+                    success: true, 
+                    message: 'Tidak ada data yang perlu di-update',
+                    updated: 0,
+                    total: 0
+                });
+            }
+
+            let updatedCount = 0;
+            let failedCount = 0;
+            const totalCount = rows.length;
+
+            // Update setiap baris
+            for (let row of rows) {
+                try {
+                    const noFaktur = row.no_faktur;
+                    const tanggalFaktur = row.tanggal_faktur;
+                    
+                    // Extract status_faktur dari digit 3-4
+                    const statusDigit = noFaktur && noFaktur.length >= 4 ? noFaktur.substring(2, 4) : '00';
+                    const statusFaktur = statusDigit === '00' ? 'Normal' : `Pengganti ${parseInt(statusDigit)}`;
+                    
+                    // Extract masa_pajak dari tanggal (YYYY-MM)
+                    const masaPajak = tanggalFaktur && tanggalFaktur.includes('-') 
+                        ? tanggalFaktur.split('-').slice(0, 2).join('-')
+                        : null;
+                    
+                    // Get no_faktur_normal untuk faktur pengganti
+                    let noFakturNormal = null;
+                    if (statusDigit !== '00') {
+                        noFakturNormal = noFaktur.substring(0, 2) + '00' + noFaktur.substring(4);
+                    }
+                    
+                    // Update baris
+                    await new Promise((resolve, reject) => {
+                        db.run(
+                            `UPDATE data_vatout SET status_faktur = ?, masa_pajak = ?, no_faktur_normal = ? WHERE no_faktur = ?`,
+                            [statusFaktur, masaPajak, noFakturNormal, noFaktur],
+                            function(err) {
+                                if (err) {
+                                    failedCount++;
+                                    reject(err);
+                                } else {
+                                    updatedCount++;
+                                    resolve();
+                                }
+                            }
+                        );
+                    });
+                } catch (itemErr) {
+                    failedCount++;
+                    console.error(`Migration error for ${row.no_faktur}:`, itemErr);
+                }
+            }
+
+            // Return hasil
+            res.json({
+                success: true,
+                message: `Migrasi selesai`,
+                total: totalCount,
+                updated: updatedCount,
+                failed: failedCount
+            });
+        });
+    } catch (error) {
+        res.status(500).json({ 
+            error: 'Migration failed', 
+            details: error.message 
+        });
+    }
+});
+
 // API: VERIFY MIGRASI VATIN - Check hasil update status_faktur, masa_pajak, no_faktur_normal
 app.get('/api/verify-vatin-migration', cekRoleAPI(['administrator', 'supervisor', 'superadmin']), async (req, res) => {
     try {
@@ -1025,7 +1107,7 @@ modules.forEach(mod => {
                     let deduplicateSelectSql = `SELECT d.*, c.nama_cabang, d.status_faktur, d.masa_pajak, d.no_faktur_normal ${baseSql}`;
                     db.all(deduplicateSelectSql, params, (errDedup, allRows) => {
                         // Deduplikasi
-                        const deduplicatedRows = deduplicateVatinData(allRows || []);
+                        const deduplicatedRows = deduplicateFakturData(allRows || []);
 
                         // Hitung stats dari deduplicated data
                         let total_dpp = 0, total_tax = 0, cur_jml = 0, cur_tax = 0, prev_jml = 0, prev_tax = 0;
@@ -1320,7 +1402,7 @@ app.get('/api/summary', cekAuth, (req, res) => {
         }
 
         // Deduplikasi data vatin
-        const deduplicatedRows = deduplicateVatinData(allRows || []);
+        const deduplicatedRows = deduplicateFakturData(allRows || []);
 
         // Kelompokkan by periode dan hitung stats
         const ttfMap = {};
@@ -1456,23 +1538,62 @@ app.get('/api/audit-vatin', cekAuth, (req, res) => {
 app.get('/api/summary-vatout', cekAuth, (req, res) => {
     const ent = req.query.entitas || 'BBS';
 
+    const sqlAll = `SELECT d.*, c.nama_cabang FROM data_vatout d LEFT JOIN master_cabang c ON d.kode_cabang = c.kode_cabang WHERE d.entitas = ?`;
+    
+    db.all(sqlAll, [ent], (err, allRows) => {
+        if (err) {
+            console.error('Error /api/summary-vatout:', err);
+            return res.status(500).json({ error: err.message });
+        }
 
-    const sqlTrend = `SELECT strftime('%m-%Y', tanggal_faktur) as periode, count(*) as jml, sum(ppn) as total_ppn, sum(dpp) as total_dpp FROM data_vatout WHERE entitas = ? GROUP BY periode`;
-    const sqlBranch = `SELECT d.kode_cabang, c.nama_cabang, count(*) as jml, sum(d.ppn) as total_ppn FROM data_vatout d LEFT JOIN master_cabang c ON d.kode_cabang = c.kode_cabang WHERE d.entitas = ? GROUP BY d.kode_cabang`;
+        const deduplicatedRows = deduplicateFakturData(allRows || []);
 
-    db.all(sqlTrend, [ent], (err1, trendRows) => {
-        db.all(sqlBranch, [ent], (err2, branchRows) => {
-            const result = (trendRows || []).map(r => ({
-                periode: r.periode,
-                jml_faktur: r.jml,
-                ppn_faktur: r.total_ppn,
-                dpp_faktur: r.total_dpp
-            }));
+        const trendMap = {};
+        const branchMap = {};
 
-            res.json({
-                trend: result,
-                branch: branchRows || []
-            });
+        deduplicatedRows.forEach(row => {
+            // Trend by masa_pajak or tanggal_faktur
+            let periode = null;
+            if (row.masa_pajak) {
+                const parts = row.masa_pajak.split('-');
+                if (parts.length === 2) periode = parts[1] + '-' + parts[0];
+            } else if (row.tanggal_faktur && row.tanggal_faktur.includes('-')) {
+                const parts = row.tanggal_faktur.split('-');
+                if (parts.length >= 2) periode = parts[1] + '-' + parts[0];
+            }
+
+            if (periode) {
+                if (!trendMap[periode]) trendMap[periode] = { jml: 0, total_ppn: 0, total_dpp: 0 };
+                trendMap[periode].jml += 1;
+                trendMap[periode].total_ppn += (row.ppn || 0);
+                trendMap[periode].total_dpp += (row.dpp || 0);
+            }
+
+            // Branch aggregation
+            const kodeCb = row.kode_cabang || '-';
+            const namaCb = row.nama_cabang || '-';
+            if (!branchMap[kodeCb]) branchMap[kodeCb] = { nama_cabang: namaCb, jml: 0, total_ppn: 0 };
+            branchMap[kodeCb].jml += 1;
+            branchMap[kodeCb].total_ppn += (row.ppn || 0);
+        });
+
+        const trendResult = Object.keys(trendMap).sort().reverse().map(p => ({
+            periode: p,
+            jml_faktur: trendMap[p].jml,
+            ppn_faktur: trendMap[p].total_ppn,
+            dpp_faktur: trendMap[p].total_dpp
+        }));
+
+        const branchResult = Object.keys(branchMap).map(k => ({
+            kode_cabang: k,
+            nama_cabang: branchMap[k].nama_cabang,
+            jml: branchMap[k].jml,
+            total_ppn: branchMap[k].total_ppn
+        }));
+
+        res.json({
+            trend: trendResult,
+            branch: branchResult
         });
     });
 });
@@ -1975,10 +2096,20 @@ io.on('connection', (socket) => {
         // Tentukan link_pdf_lokal yang akan disimpan di DB
         const linkPdfFinal = (fileExistsAtSource || fileExistsAtDest) ? namaFileFinal : d.link_pdf_lokal;
 
+        // Ekstraksi Status Faktur & Masa Pajak untuk VAT OUT
+        const statusDigit = d.noFaktur && d.noFaktur.length >= 4 ? d.noFaktur.substring(2, 4) : '00';
+        const statusFaktur = statusDigit === '00' ? 'Normal' : `Pengganti ${parseInt(statusDigit)}`;
+        const masaPajak = d.tanggalFaktur && d.tanggalFaktur.includes('-') 
+            ? d.tanggalFaktur.split('-').slice(0, 2).join('-') : null;
+        let noFakturNormal = null;
+        if (statusDigit !== '00') {
+            noFakturNormal = d.noFaktur.substring(0, 2) + '00' + d.noFaktur.substring(4);
+        }
+
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
-            db.run(`INSERT INTO data_vatout (no_faktur, entitas, kode_cabang, kode_vo, npwp_penjual, nama_penjual, alamat_penjual, npwp_pembeli, nama_pembeli, alamat_pembeli, tanggal_faktur, harga_jual, diskon, uang_muka, referensi, kota_penerbit, penandatangan, dpp, ppn, no_invoice_internal, tgl_tukar_faktur, diinput_oleh, link_pdf_lokal, format_tipe) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [d.noFaktur, d.entitas, d.branchInput, d.voInput || null, d.npwpVendor, d.namaVendor, d.alamatVendor, d.npwpPembeli, d.namaPembeli, d.alamatPembeli, d.tanggalFaktur, d.hargaJual, d.diskon, d.uangMuka, d.referensi, d.kotaPenerbit, d.penandatangan, d.dpp, d.ppn, d.invoiceInput, d.tglTukarInput, d.username, linkPdfFinal, d.format_tipe], function (err) {
+            db.run(`INSERT INTO data_vatout (no_faktur, entitas, kode_cabang, kode_vo, npwp_penjual, nama_penjual, alamat_penjual, npwp_pembeli, nama_pembeli, alamat_pembeli, tanggal_faktur, harga_jual, diskon, uang_muka, referensi, kota_penerbit, penandatangan, dpp, ppn, no_invoice_internal, tgl_tukar_faktur, diinput_oleh, link_pdf_lokal, format_tipe, status_faktur, masa_pajak, no_faktur_normal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [d.noFaktur, d.entitas, d.branchInput, d.voInput || null, d.npwpVendor, d.namaVendor, d.alamatVendor, d.npwpPembeli, d.namaPembeli, d.alamatPembeli, d.tanggalFaktur, d.hargaJual, d.diskon, d.uangMuka, d.referensi, d.kotaPenerbit, d.penandatangan, d.dpp, d.ppn, d.invoiceInput, d.tglTukarInput, d.username, linkPdfFinal, d.format_tipe, statusFaktur, masaPajak, noFakturNormal], function (err) {
                     if (err) { 
                         console.error("❌ DB Insert Error (data_vatout):", err.message); 
                         db.run("ROLLBACK"); 
