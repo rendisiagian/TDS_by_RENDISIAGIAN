@@ -6,6 +6,7 @@
     <title>Summary VAT OUT - Analisis Tren Pajak</title>
     <script src="/theme.js"></script>
     <script src="/toast.js"></script>
+    <script src="/utils.js"></script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <script src="/export.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@latest/dist/xlsx.full.min.js"></script>
@@ -121,7 +122,7 @@
                 
                 const tbody = document.getElementById('body-compare');
                 tbody.innerHTML = '';
-                const formatRupiah = (angka) => "Rp " + Number(angka).toLocaleString('id-ID');
+
 
                 if (trendData.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="padding: 20px; color: var(--text-tertiary);">Belum ada data rekapitulasi untuk entitas ini.</td></tr>';

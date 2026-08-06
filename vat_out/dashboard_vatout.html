@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/utils.js"></script>
     <style>
         .table-responsive {
             max-height: calc(100vh - 320px);
@@ -232,7 +233,7 @@
 
             const tbody = document.getElementById('tabel-body');
             tbody.innerHTML = '';
-            const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
+
 
             // BUG-H2/H3 FIX: Gunakan stats dari server (total seluruh data, bukan hanya halaman ini)
             const stats = result.stats || {};

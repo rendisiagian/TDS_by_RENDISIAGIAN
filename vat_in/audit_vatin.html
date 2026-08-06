@@ -10,6 +10,8 @@
   <script src="/export.js"></script>
   <link rel="stylesheet" href="/style.css">
   <script src="/sidebar.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/utils.js"></script>
   <style>
     .warn-badge {
       display: inline-flex;
@@ -151,7 +153,7 @@
 
         document.getElementById('audit-summary').innerHTML = `Ditemukan <b>${orphan.length + replaced.length + diffMasa.length}</b> anomali untuk entitas <b>${aktifEntitas}</b>.`;
 
-        const formatRupiah = (n) => "Rp " + Number(n || 0).toLocaleString('id-ID');
+
 
         const bodyOrphan = document.getElementById('body-orphan');
         bodyOrphan.innerHTML = '';

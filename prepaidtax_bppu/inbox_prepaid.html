@@ -10,6 +10,7 @@
     <script src="/pagination.js"></script>
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/utils.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <script src="/export.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@latest/dist/xlsx.full.min.js"></script>
@@ -144,7 +145,7 @@
         let dataInboxLokal = [];
         let loadedBranches = [];
         let arraySelectedInvoice = [];
-        let currentSearch = null, currentLimit = 25;
+        let currentPage = 1, currentSearch = null, currentLimit = 25;
 
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
@@ -185,7 +186,7 @@
             
             const tbody = document.getElementById('tabel-inbox');
             tbody.innerHTML = '';
-            const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
+
 
             if (data.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="10" class="text-center" style="padding:20px;">Belum ada dokumen dalam antrean.</td></tr>';
@@ -197,7 +198,7 @@
                 try { parsed = JSON.parse(row.data_ekstraksi); } catch(e) {}
 
                 tr.innerHTML = `
-                    <td class="text-center">${(page - 1) * limit + index + 1}</td>
+                    <td class="text-center">${(currentPage - 1) * currentLimit + index + 1}</td>
                     <td class="text-center" style="font-weight:bold; color:#4f46e5;">${parsed.noBppu || '-'}</td>
                     <td class="text-center" style="font-size:0.8rem;">${parsed.nomorDokumen || '-'}</td>
                     <td class="text-center" style="font-size:0.8rem;">${parsed.tanggalDokumen || '-'}</td>

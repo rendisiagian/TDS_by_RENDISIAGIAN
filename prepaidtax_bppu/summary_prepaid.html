@@ -12,6 +12,7 @@
     <script src="/pagination.js"></script>
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/utils.js"></script>
     <style>
         .modal-item-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
         .modal-item-table th, .modal-item-table td { border: 1px solid var(--border-color); padding: 10px; text-align: left; }
@@ -76,11 +77,6 @@
         let aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
         let currentUser = {};
 
-        function bersihkanAngka(t) {
-            if (t === null || t === undefined || t === '') return 0;
-            return parseFloat(t.toString().replace(/\./g, '').replace(',', '.')) || 0;
-        }
-
         fetch('/api/me').then(res => res.json()).then(u => currentUser = u);
 
         fetch('/sidebar.html').then(res => res.text()).then(html => {
@@ -109,7 +105,7 @@
             
             const tbody = document.getElementById('tabel-body');
             tbody.innerHTML = '';
-            const formatRupiah = (n) => "Rp " + bersihkanAngka(n).toLocaleString('id-ID');
+
 
             if (data.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding:20px; color:var(--text-tertiary);">Data tidak ditemukan.</td></tr>`;

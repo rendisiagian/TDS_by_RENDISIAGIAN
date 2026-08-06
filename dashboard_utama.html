@@ -901,11 +901,20 @@
             if (sidebarSelect) sidebarSelect.value = aktifEntitas;
         });
 
-        // --- API Me ---
-        fetch('/api/me').then(r => r.json()).then(u => {
+        let isSupervisor = false;
+
+        fetch('/api/me').then(res => res.json()).then(u => {
             currentUser = u;
             document.getElementById('header-user-name').textContent = u.nama || u.username;
             document.getElementById('hero-name').textContent = u.nama || u.username;
+            isSupervisor = ['supervisor', 'administrator', 'superadmin'].includes((u.role || '').toLowerCase());
+            
+            // AUDIT FIX (M-03): Peringatan untuk segera ganti password default
+            if (u.isDefaultPassword) {
+                setTimeout(() => {
+                    showToast('SECURITY WARNING: Anda masih menggunakan password default! Harap segera ganti di menu Profil demi keamanan.', 'error');
+                }, 1000);
+            }
         });
 
         // --- Entity change from sidebar ---

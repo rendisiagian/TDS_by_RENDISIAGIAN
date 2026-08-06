@@ -12,6 +12,7 @@
     <script src="/sidebar.js"></script>
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/utils.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 </head>
 
@@ -244,9 +245,9 @@
 
             const tbody = document.getElementById('tabel-inbox');
             tbody.innerHTML = '';
-            const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
+
             const filteredData = data.filter(row => row.entitas === aktifEntitas);
-            const offset = (page - 1) * limit;
+            const offset = (currentPage - 1) * currentLimit;
 
             filteredData.forEach((row, index) => {
                 const tr = document.createElement('tr');
@@ -336,7 +337,7 @@
         });
 
         async function bukaJalurManual(idStr) {
-            const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
+
             const rowData = dataInboxLokal.find(r => r.id == idStr);
             if (!rowData) return showToast('Data tidak ditemukan!', 'error');
 

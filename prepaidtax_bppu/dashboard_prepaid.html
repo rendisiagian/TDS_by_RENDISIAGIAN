@@ -13,6 +13,7 @@
     <script src="/pagination.js"></script>
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/utils.js"></script>
     <style>
         .modal-item-table {
             width: 100%;
@@ -247,11 +248,6 @@
         let currentLimit = 25;
         let currentSearch = {};
 
-        function bersihkanAngka(t) {
-            if (t === null || t === undefined || t === '') return 0;
-            return parseFloat(t.toString().replace(/\./g, '').replace(',', '.')) || 0;
-        }
-
         fetch('/api/me').then(res => res.json()).then(u => currentUser = u);
 
         fetch('/sidebar.html').then(res => res.text()).then(html => {
@@ -299,7 +295,7 @@
 
             const tbody = document.getElementById('tabel-body');
             tbody.innerHTML = '';
-            const formatRupiah = (n) => "Rp " + bersihkanAngka(n).toLocaleString('id-ID');
+
 
             // BUG-H2/H3 FIX: Gunakan stats dari server (total seluruh data, bukan hanya halaman ini)
             const stats = result.stats || {};

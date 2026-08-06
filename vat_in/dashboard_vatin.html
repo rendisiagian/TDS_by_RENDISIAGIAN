@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/utils.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <style>
         /* Mengurangi max-height agar scrollbar aktif di dalam tabel (bukan di body utama) karena ada blok stats-grid */
@@ -265,7 +266,7 @@
             
             const tbody = document.getElementById('tabel-body');
             tbody.innerHTML = ''; 
-            const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
+
 
             // BUG-H2/H3 FIX: Gunakan stats dari server (total seluruh data, bukan hanya halaman ini)
             const stats = result.stats || {};
