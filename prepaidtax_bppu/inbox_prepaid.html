@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inbox Prepaid | Tax Database</title>
     <script src="/theme.js"></script>
+    <script src="/toast.js"></script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <script src="/pagination.js"></script>
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
@@ -14,8 +16,7 @@
 <script src="/sidebar.js"></script>
 </head>
 <body>
-    <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
-
+    
     <div class="app-wrapper">
         <div id="sidebar-container"></div>
 
@@ -143,7 +144,7 @@
         let dataInboxLokal = [];
         let loadedBranches = [];
         let arraySelectedInvoice = [];
-        let currentSearch = null, currentLimit = 50;
+        let currentSearch = null, currentLimit = 25;
 
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
@@ -165,7 +166,7 @@
 
         initPagination('pg-container', function(page, limit) { 
             loadInbox(page, limit); 
-        }, 50);
+        }, 25);
 
         async function loadInbox(page, limit, searchObj) {
             currentPage = page || currentPage || 1;
@@ -229,7 +230,7 @@
 
                 if (uploadStats.chunksDone === uploadStats.chunksTotal) {
                     uploadStats.isActive = false; 
-                    alert(`✅ PROSES UPLOAD PREPAID SELESAI!\n\nTotal Dibaca: ${uploadStats.totalFiles} Dokumen\nBerhasil Masuk Antrean: ${uploadStats.sukses}\nLewati (Sudah Ada/Duplikat): ${uploadStats.duplikat}\nGagal Ekstrak: ${uploadStats.gagal}`);
+                    showToast(`✅ PROSES UPLOAD PREPAID SELESAI!<br><br>Total Dibaca: ${uploadStats.totalFiles} Dokumen<br>Berhasil: ${uploadStats.sukses}<br>Lewati (Duplikat): ${uploadStats.duplikat}<br>Gagal Ekstrak: ${uploadStats.gagal}`, 'success', 8000);
                 }
             }
         });
@@ -271,7 +272,7 @@
 
         async function bukaJalurManual(idStr) {
             const rowData = dataInboxLokal.find(r => r.id == idStr);
-            if(!rowData) return alert("Data tidak ditemukan!");
+            if(!rowData) return showToast('Data tidak ditemukan!', 'error');
 
             let parsed = JSON.parse(rowData.data_ekstraksi);
             tempDataFinal = parsed;
@@ -333,7 +334,7 @@
             if (btn.disabled) return;
 
             var branch = document.getElementById('input_branch_baru').value;
-            if(!branch) return alert("Pilih Branch terlebih dahulu!");
+            if(!branch) return showToast('Pilih Branch terlebih dahulu!', 'warning');
             
             var manualArea = document.getElementById('manual-input-area');
             var invoiceVal = '';
@@ -364,8 +365,9 @@
             }, 500);
         }
 
-        socket.on('simpan-final-sukses', (res) => { alert(res.message); loadInbox(); });
-        socket.on('update-tabel-inbox-prepaid', () => loadInbox());
+        socket.on('simpan-final-sukses', (res) => { showToast(res.message, 'success'); loadInbox(); });
+        // FIX (W1): Hapus listener 'update-tabel-inbox-prepaid' — event tidak pernah di-emit server
+        // Server menggunakan 'update-tabel-prepaid' yang sudah di-listen di baris 563
 
         function formatRupiah(n) { return "Rp " + Number(n).toLocaleString('id-ID'); }
 

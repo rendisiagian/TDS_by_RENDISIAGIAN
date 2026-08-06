@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: shared_ui
+title: Shared UI & Theme Management
+scope:
+    - sidebar.js
+    - theme.js
+    - style.css
+source_files: []
+depends_on: []
+related_to:
+    - path: core_app

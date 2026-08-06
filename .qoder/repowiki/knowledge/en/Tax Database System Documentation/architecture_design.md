@@ -1,0 +1,3 @@
+- Product Requirements Document (PRD) establishes Node.js/Express backend with SQLite3 database and Socket.io for real-time operations.
+- Sequence diagrams detail six-phase workflow: authentication, batch PDF ingestion via client-side parsing, data verification, cross-module analytics, RBAC approval workflows, and reporting.
+- TODO.md outlines pending VAT IN audit features including orphaned replacement invoice detection and UI integration.

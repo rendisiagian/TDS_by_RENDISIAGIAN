@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Log Audit Aktivitas</title>
     <script src="/theme.js"></script>
+    <script src="/toast.js"></script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="stylesheet" href="/style.css">
     <style>
         .page-header {
@@ -46,8 +48,7 @@
 </head>
 
 <body>
-    <script>(function () { var t = localStorage.getItem("theme") || "light"; document.documentElement.setAttribute("data-theme", t) })()</script>
-
+    
     <div class="app-wrapper">
         <div id="sidebar-container"></div>
 
@@ -73,7 +74,7 @@
                             class="filter-input" style="width:250px; padding: 8px 12px;" onkeyup="renderTable()">
                     </div>
 
-                    <div class="table-responsive" style="max-height: 600px;">
+                    <div class="table-responsive" style="max-height: calc(100vh - 260px);">
                         <table style="width: 100%;">
                             <thead style="position: sticky; top: 0; background: var(--bg-primary); z-index: 10;">
                                 <tr>

@@ -58,8 +58,8 @@ const db = new sqlite3.Database('tax_database.db');
 const dbGet = (sql, params) => new Promise((resolve, reject) => db.get(sql, params, (err, row) => err ? reject(err) : resolve(row)));
 const dbRun = (sql, params) => new Promise((resolve, reject) => db.run(sql, params, function (err) { err ? reject(err) : resolve(this); }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(helmet({
     contentSecurityPolicy: false, // Dinonaktifkan sementara untuk mencegah bentrok dengan inline script bawaan
     crossOriginEmbedderPolicy: false
@@ -81,7 +81,7 @@ app.use(sessionMiddleware);
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 menit
     max: 20,                   // Maksimal 20 percobaan login per 15 menit
-    message: '<script>alert("Terlalu banyak percobaan login. Coba lagi dalam 15 menit."); window.location.href=\'/login\';</script>',
+    message: '<script>window.location.href=\'/login?error=2\';</script>',
     standardHeaders: true,
     legacyHeaders: false,
 });
@@ -492,6 +492,9 @@ const cekRoleAPI = (roles) => {
         return res.status(403).json({ error: 'Akses ditolak. Peran tidak mencukupi (RBAC).' });
     };
 };
+// Favicon — serve SVG icon
+app.get('/favicon.ico', (req, res) => res.redirect('/favicon.svg'));
+
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'login.html')));
 app.get('/sidebar.html', cekAuth, (req, res) => {
     const sidebarPath = path.join(__dirname, 'sidebar.html');
@@ -1208,7 +1211,7 @@ app.get('/api/years-vatout', cekAuth, (req, res) => {
 
 app.post('/login', loginLimiter, (req, res) => {
     if (!req.body.username || !req.body.password) {
-        return res.send(`<script>alert('Username dan password wajib diisi!'); window.location.href='/login';</script>`);
+        return res.send(`<script>window.location.href='/login?error=3';</script>`);
     }
     db.get(`SELECT * FROM users WHERE username = ?`, [req.body.username], (err, user) => {
         if (user && bcrypt.compareSync(req.body.password, user.password)) {
@@ -1216,7 +1219,7 @@ app.post('/login', loginLimiter, (req, res) => {
             res.redirect('/dashboard-utama');
         } else {
             // SECURITY: Pesan error generik agar tidak mengungkap apakah username ada atau tidak
-            res.send(`<script>alert('Username atau password salah!'); window.location.href='/login';</script>`);
+            res.send(`<script>window.location.href='/login?error=1';</script>`);
         }
     });
 });
@@ -1600,7 +1603,7 @@ app.get('/api/search-advance-ledger', cekAuth, (req, res) => {
                 return {
                     id: adv.id,
                     inv_no: adv.inv_no,
-                    nama_client: adv.waktu_input,
+                    nama_client: adv.nama_client,
                     total_advance: Number(adv.net_certificate || 0),
                     terpakai: totalDeductions,
                     sisa_saldo: balance
@@ -1648,7 +1651,14 @@ io.on('connection', (socket) => {
         if (isDummy(socket)) {
             return socket.emit('request-updated', { message: 'Mode Dummy: Permintaan disimulasi.' });
         }
-        const isSupervisor = ['supervisor', 'administrator'].includes(d.role.toLowerCase());
+        // SECURITY FIX (C1): Gunakan socket.user.role dari session server, BUKAN d.role dari client
+        const userRole = (socket.user && socket.user.role || '').toLowerCase();
+        const isSupervisor = ['supervisor', 'administrator'].includes(userRole);
+        // SECURITY FIX (C2): Validasi d.mod terhadap whitelist untuk mencegah SQL Injection
+        const VALID_MODS = ['vatin', 'vatout', 'payable', 'prepaid'];
+        if (!VALID_MODS.includes(d.mod)) {
+            return socket.emit('error-action', { message: 'Modul tidak valid.' });
+        }
         const isBPPU = (d.mod === 'payable' || d.mod === 'prepaid');
         const pkColumn = isBPPU ? 'no_bppu' : 'no_faktur';
 
@@ -1867,8 +1877,13 @@ io.on('connection', (socket) => {
                 db.run(`DELETE FROM item_vatin WHERE no_faktur = ?`, [d.noFakturNormal]);
             }
 
-            db.run(`INSERT INTO data_vatin (no_faktur, entitas, kode_cabang, npwp_penjual, nama_penjual, alamat_penjual, npwp_pembeli, nama_pembeli, alamat_pembeli, tanggal_faktur, harga_jual, diskon, uang_muka, referensi, kota_penerbit, penandatangan, dpp, ppn, no_invoice_internal, tgl_tukar_faktur, diinput_oleh, link_pdf_lokal, format_tipe) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [d.noFaktur, d.entitas, d.branchInput, d.npwpVendor, d.namaVendor, d.alamatVendor, d.npwpPembeli, d.namaPembeli, d.alamatPembeli, d.tanggalFaktur, d.hargaJual, d.diskon, d.uangMuka, d.referensi, d.kotaPenerbit, d.penandatangan, d.dpp, d.ppn, d.invoiceInput, d.tglTukarInput, d.username, d.link_pdf_lokal, d.format_tipe], function (err) {
+            // FIX (C4): Hitung kolom schema baru agar sinkron dengan upload-pdf-vatin-batch
+            const statusFaktur = parseStatusFaktur(d.noFaktur);
+            const masaPajak = extractMasaPajak(d.tanggalFaktur);
+            const noFakturNormal = d.isPengganti ? getNoFakturNormal(d.noFaktur) : null;
+
+            db.run(`INSERT INTO data_vatin (no_faktur, entitas, kode_cabang, npwp_penjual, nama_penjual, alamat_penjual, npwp_pembeli, nama_pembeli, alamat_pembeli, tanggal_faktur, harga_jual, diskon, uang_muka, referensi, kota_penerbit, penandatangan, dpp, ppn, no_invoice_internal, tgl_tukar_faktur, diinput_oleh, link_pdf_lokal, format_tipe, status_faktur, masa_pajak, no_faktur_normal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [d.noFaktur, d.entitas, d.branchInput, d.npwpVendor, d.namaVendor, d.alamatVendor, d.npwpPembeli, d.namaPembeli, d.alamatPembeli, d.tanggalFaktur, d.hargaJual, d.diskon, d.uangMuka, d.referensi, d.kotaPenerbit, d.penandatangan, d.dpp, d.ppn, d.invoiceInput, d.tglTukarInput, d.username, d.link_pdf_lokal, d.format_tipe, statusFaktur, masaPajak, noFakturNormal], function (err) {
                     if (err) { 
                         console.error("❌ DB Insert Error (data_vatin):", err.message); 
                         db.run("ROLLBACK"); 
@@ -2281,6 +2296,25 @@ io.on('connection', (socket) => {
             });
     });
 
+    // FIX (C3): Handler untuk menghapus Client Ledger (sebelumnya tidak ada)
+    socket.on('hapus-jurnal-ledger', (d) => {
+        if (isDummy(socket)) return io.emit('data-baru-ledger');
+        // Hanya supervisor/administrator yang boleh menghapus entry ledger
+        if (!isSupervisorOrAbove(socket)) {
+            return socket.emit('error-action', { message: 'Akses ditolak: Hanya Supervisor atau Administrator yang dapat menghapus jurnal ledger.' });
+        }
+        if (!d.id) return;
+        db.run(`DELETE FROM data_client_ledger WHERE id = ?`, [d.id], function(err) {
+            if (err) {
+                console.error('Error deleting ledger entry:', err.message);
+                return socket.emit('error-action', { message: 'Gagal menghapus data ledger.' });
+            }
+            if (this.changes === 0) return socket.emit('error-action', { message: 'Data ledger tidak ditemukan.' });
+            insertAuditLog(socket.user.id, socket.user.username, 'HAPUS', 'CLIENT LEDGER', `Menghapus jurnal ledger ID: ${d.id}`);
+            io.emit('data-baru-ledger');
+        });
+    });
+
     // --- MODUL ADMIN & PROSES REQUEST ---
     // SECURITY: Helper functions sudah dipindah ke atas (awal connection handler) pada BUG-C FIX
     // Baris lama dihapus untuk menghindari redeclaration error
@@ -2577,6 +2611,12 @@ io.on('connection', (socket) => {
                 }
                 else if (req.jenis_request.startsWith('HAPUS_')) {
                     let targetMod = req.jenis_request.split('_')[1].toLowerCase();
+                    // SECURITY FIX (C2): Validasi targetMod terhadap whitelist
+                    const VALID_MODS = ['vatin', 'vatout', 'payable', 'prepaid'];
+                    if (!VALID_MODS.includes(targetMod)) {
+                        db.run(`UPDATE user_requests SET status = 'Ditolak' WHERE id = ?`, [d.req_id], () => io.emit('request-updated'));
+                        return;
+                    }
                     let isBPPU = (targetMod === 'payable' || targetMod === 'prepaid');
                     let colKey = isBPPU ? 'no_bppu' : 'no_faktur';
 
@@ -2596,6 +2636,12 @@ io.on('connection', (socket) => {
                 }
                 else if (req.jenis_request.startsWith('EDIT_')) {
                     let targetMod = req.jenis_request.split('_')[1].toLowerCase();
+                    // SECURITY FIX (C2): Validasi targetMod terhadap whitelist
+                    const VALID_MODS = ['vatin', 'vatout', 'payable', 'prepaid'];
+                    if (!VALID_MODS.includes(targetMod)) {
+                        db.run(`UPDATE user_requests SET status = 'Ditolak' WHERE id = ?`, [d.req_id], () => io.emit('request-updated'));
+                        return;
+                    }
                     let isBPPU = (targetMod === 'payable' || targetMod === 'prepaid');
                     let val = JSON.parse(req.nilai_baru);
                     
@@ -2634,3 +2680,20 @@ io.on('connection', (socket) => {
 });
 
 http.listen(PORT, '0.0.0.0', () => console.log(`Tax Database by Rendi Siagian berjalan di Port ${PORT}`));
+
+// FIX (W8): Graceful shutdown — tutup koneksi database saat proses dihentikan
+process.on('SIGINT', () => {
+    console.log('\n[SHUTDOWN] Menutup koneksi database...');
+    db.close((err) => {
+        if (err) console.error('Error closing database:', err.message);
+        else console.log('[SHUTDOWN] Database ditutup dengan aman.');
+        process.exit(0);
+    });
+});
+process.on('SIGTERM', () => {
+    console.log('[SHUTDOWN] SIGTERM diterima, menutup server...');
+    db.close((err) => {
+        if (err) console.error('Error closing database:', err.message);
+        process.exit(0);
+    });
+});

@@ -4,13 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Tax Database System</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <script src="/theme.js"></script>
+    <script src="/toast.js"></script>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <script>
-        (function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t)})();
-    </script>
 
     <button class="dark-mode-toggle" onclick="(function(){var h=document.documentElement,c=h.getAttribute('data-theme')||'light',n=c==='dark'?'light':'dark';h.setAttribute('data-theme',n);localStorage.setItem('theme',n);document.getElementById('dm-login-icon').innerHTML=n==='dark'?'&#9728;&#65039;':'&#127769;'})()" title="Toggle Dark Mode" data-testid="login-dark-toggle" style="z-index:100;">
         <span id="dm-login-icon">&#127769;</span>
@@ -34,12 +33,29 @@
         </div>
     </div>
 
+    <!-- Toast Container (login page has no sidebar) -->
+    <div id="toast-container" class="toast-container"></div>
+
     <script>
         (function(){
             var t = localStorage.getItem('theme') || 'light';
             var icon = document.getElementById('dm-login-icon');
             if (icon && t === 'dark') icon.innerHTML = '&#9728;&#65039;';
         })();
+        // Show toast for login error
+        var errorMessages = {
+            '1': 'Username atau password salah!',
+            '2': 'Terlalu banyak percobaan login. Coba lagi dalam 15 menit.',
+            '3': 'Username dan password wajib diisi!'
+        };
+        var errorCode = new URLSearchParams(window.location.search).get('error');
+        if (errorCode && errorMessages[errorCode]) {
+            window.addEventListener('DOMContentLoaded', function() {
+                showToast(errorMessages[errorCode], 'error');
+                var card = document.querySelector('.login-card');
+                if (card) card.classList.add('shake');
+            });
+        }
     </script>
 </body>
 </html>

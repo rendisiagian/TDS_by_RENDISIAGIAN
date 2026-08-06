@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Client Ledger | Accounting Module</title>
     <script src="/theme.js"></script>
+    <script src="/toast.js"></script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <script src="/export.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@latest/dist/xlsx.full.min.js"></script>
     <script src="/pagination.js"></script>
@@ -22,8 +24,7 @@
 <script src="/sidebar.js"></script>
 </head>
 <body>
-    <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
-
+    
     <div class="app-wrapper">
         <div id="sidebar-container"></div>
 
@@ -335,7 +336,7 @@
         const socket = io();
         let aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
         let currentUser = {};
-        let currentPage = 1, currentLimit = 50, currentSearch = {};
+        let currentPage = 1, currentLimit = 25, currentSearch = {};
         
         let allAvailableInvoices = []; // Menyimpan semua faktur di memori lokal agar filter cepat
         let isLoadingInvoices = false; // Flag status memuat dari server
@@ -424,7 +425,7 @@
             loadAdvanceSummary();
         }
 
-        initPagination('pg-container', (p, l) => loadData(p, l), 50);
+        initPagination('pg-container', (p, l) => loadData(p, l), 25);
 
         // Inisialisasi format input Rupiah
         function initFormatRupiah() {
@@ -665,7 +666,7 @@
         }
 
         async function simpanJurnal() {
-            if (!selectedInvoiceData) return alert("Silakan pilih faktur terlebih dahulu!");
+            if (!selectedInvoiceData) return showToast('Silakan pilih faktur terlebih dahulu!', 'warning');
 
             const payload = {
                 entitas: aktifEntitas,
@@ -694,7 +695,7 @@
             
             // Kirim ke server
             socket.emit('simpan-jurnal-ledger', payload);
-            alert("Jurnal Project Billing berhasil disimpan!");
+            showToast('Jurnal Project Billing berhasil disimpan!', 'success');
             resetForm();
         }
 
@@ -760,7 +761,7 @@
             };
             
             socket.emit('update-jurnal-ledger', payload);
-            alert("Perubahan pelunasan berhasil disimpan!");
+            showToast('Perubahan pelunasan berhasil disimpan!', 'success');
             document.getElementById('modalEditJurnal').style.display = 'none';
         }
 
@@ -773,7 +774,7 @@
             targetBupotPrefix = prefix;
             let searchArr = [];
             if(prefix === 'f') {
-                if(!selectedInvoiceData || !selectedInvoiceData.no_faktur) return alert("Pilih faktur/invoice terlebih dahulu di Step 1!");
+                if(!selectedInvoiceData || !selectedInvoiceData.no_faktur) return showToast('Pilih faktur/invoice terlebih dahulu di Step 1!', 'warning');
                 searchArr.push(selectedInvoiceData.no_faktur);
                 if(selectedInvoiceData.no_invoice_internal && selectedInvoiceData.no_invoice_internal !== '-') {
                     searchArr.push(selectedInvoiceData.no_invoice_internal);
@@ -934,7 +935,7 @@
             // BUG-05 FIX: Gunakan e_inv_no dan nama client dari data yang sudah tersimpan
             // Hindari parsing teks dari innerText yang bisa rusak jika nama client mengandung "-"
             const invNoEdit = document.getElementById('e_inv_no').value;
-            if (!invNoEdit) return alert("Data Edit gagal dimuat.");
+            if (!invNoEdit) return showToast('Data Edit gagal dimuat.', 'error');
             // Ambil nama client dari baris edit modal info dengan pemisah yang lebih aman
             const infoText = document.getElementById('edit-jurnal-info').innerText;
             // Format: "INV_NO - NAMA_CLIENT \n(Gross...)"
@@ -942,9 +943,9 @@
             const dashIdx = infoText.indexOf(' - ');
             const newlineIdx = infoText.indexOf('\n');
             clientName = dashIdx !== -1 ? infoText.substring(dashIdx + 3, newlineIdx !== -1 ? newlineIdx : undefined).trim() : '';
-            if (!clientName) return alert("Gagal membaca nama client. Coba tutup dan buka kembali form edit.");
+            if (!clientName) return showToast('Gagal membaca nama client. Coba tutup dan buka kembali form edit.', 'error');
             } else {
-                if(!selectedInvoiceData || !selectedInvoiceData.nama_pembeli) return alert("Pilih faktur/invoice terlebih dahulu di Step 1!");
+                if(!selectedInvoiceData || !selectedInvoiceData.nama_pembeli) return showToast('Pilih faktur/invoice terlebih dahulu di Step 1!', 'warning');
                 clientName = selectedInvoiceData.nama_pembeli;
             }
             
@@ -992,7 +993,7 @@
             document.getElementById(prefix + '_advance').value = '0';
             document.getElementById(prefix + '_ref_advance').value = '';
             if(prefix === 'e') kalkulasiEdit();
-            alert("Referensi tarikan DP telah dilepas.");
+            showToast('Referensi tarikan DP telah dilepas.', 'info');
         }
 
         loadBranches().then(() => loadData());

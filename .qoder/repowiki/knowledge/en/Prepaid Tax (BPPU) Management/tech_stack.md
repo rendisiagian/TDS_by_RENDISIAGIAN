@@ -1,0 +1,1 @@
+Client-side PDF text extraction using pdf.js v2.16.105 for bulk document ingestion.

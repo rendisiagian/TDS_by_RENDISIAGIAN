@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: vat_input
+title: VAT Input Archive and Reports
+scope:
+    - vat_in/
+source_files: []
+depends_on: []
+related_to:
+    - path: vat_output

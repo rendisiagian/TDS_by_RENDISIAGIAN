@@ -73,7 +73,7 @@ window.__pgChangeLimit = function(containerId, val) {
 function initPagination(containerId, onPageChange, defaultLimit) {
     window.__pgState[containerId] = {
         page: 1,
-        limit: defaultLimit || 50,
+        limit: defaultLimit || 25,
         onPageChange: onPageChange
     };
 }

@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Project Management Report & Profitability</title>
     <script src="/theme.js"></script>
+    <script src="/toast.js"></script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
     <script src="/sidebar.js"></script>
@@ -74,6 +76,7 @@
             font-weight: 700;
             background: linear-gradient(90deg, var(--primary-600), var(--primary-400));
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
             font-size: 1.5rem;
         }
@@ -455,8 +458,7 @@
 </head>
 
 <body>
-    <script>(function () { var t = localStorage.getItem("theme") || "light"; document.documentElement.setAttribute("data-theme", t) })()</script>
-
+    
     <div class="app-wrapper">
         <div id="sidebar-container"></div>
 

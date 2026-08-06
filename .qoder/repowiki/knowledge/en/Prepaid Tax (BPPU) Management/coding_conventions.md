@@ -1,0 +1,2 @@
+- Socket.IO event handlers for data mutation (e.g., 'simpan-final-prepaid', 'upload-pdf-prepaid-batch') implement a 'dummy user' check to simulate operations without database writes for testing roles.
+- Financial values extracted from PDFs are normalized using a shared 'bersihkanAngka' helper that removes thousand separators and parses locale-specific decimal formats before database insertion.

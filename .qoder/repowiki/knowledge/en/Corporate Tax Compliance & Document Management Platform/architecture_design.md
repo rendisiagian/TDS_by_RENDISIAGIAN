@@ -1,0 +1,4 @@
+- Centralized Express.js server (`core_app`) acts as the single entry point, routing requests to domain-specific handlers for prepaid tax, VAT input, and VAT output.
+- Shared SQLite database (`tax_database.db`) serves as the persistent state layer, enforcing referential integrity between archived PDFs in domain directories (`prepaidtax_bppu`, `vat_in`, `vat_out`) and their corresponding financial records.
+- Common UI components (`shared_ui`) provide consistent navigation and theming across all domain dashboards (`dashboard_utama.html`, `dashboard_prepaid.html`, etc.), ensuring a cohesive user experience.
+- Startup is managed via `start.bat`, which initializes the Node.js environment and connects the server to the local SQLite instance.

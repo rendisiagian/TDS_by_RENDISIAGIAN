@@ -1,0 +1,3 @@
+- PDF Parsing: Custom regex-based extraction logic for Indonesian tax invoices (Faktur Pajak) and withholding tax documents (BPPU).
+- Authentication: `bcryptjs` for password hashing with 12 salt rounds.
+- Real-time Communication: `socket.io` with session middleware integration for authenticated WebSocket connections.

@@ -1,0 +1,1 @@
+Provides global styling, dark mode toggling, and dynamic sidebar navigation for the Tax Database System.

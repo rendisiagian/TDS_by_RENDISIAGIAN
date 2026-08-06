@@ -1,0 +1,1 @@
+Manages the lifecycle of outgoing VAT invoices, including PDF ingestion, data extraction, manual verification, and archival.

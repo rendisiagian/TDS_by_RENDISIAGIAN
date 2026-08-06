@@ -1,0 +1,1 @@
+Client-side PDF text extraction via pdf.js; Real-time event handling via socket.io; Data visualization via Chart.js.

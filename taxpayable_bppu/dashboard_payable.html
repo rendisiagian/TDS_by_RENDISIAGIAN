@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tax Payable | Tax Upload and Database</title>
     <script src="/theme.js"></script>
+    <script src="/toast.js"></script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <script src="/export.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@latest/dist/xlsx.full.min.js"></script>
     <script src="/pagination.js"></script>
@@ -16,8 +18,7 @@
 <script src="/sidebar.js"></script>
 </head>
 <body>
-    <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
-
+    
     <div class="app-wrapper">
         <div id="sidebar-container"></div>
 
@@ -126,7 +127,7 @@
 
         // STATE UNTUK SERVER-SIDE
         let currentPage = 1;
-        let currentLimit = 50;
+        let currentLimit = 25;
         let currentSearch = {};
 
         fetch('/api/me').then(res => res.json()).then(u => currentUser = u);
@@ -157,7 +158,7 @@
         // Pagination init
         initPagination('pg-container', function(page, limit) { 
             loadData(page, limit); 
-        }, 50);
+        }, 25);
 
         async function loadData(page, limit) {
             currentPage = page || 1;
@@ -267,10 +268,10 @@
             const isSupervisor = ['supervisor', 'administrator'].includes(userRole);
             
             if (actionType === 'DELETE') {
-                if(confirm(isSupervisor ? `Konfirmasi HAPUS BPPU ${noBppu}?` : `Ajukan penghapusan BPPU ${noBppu} ke Supervisor?`)) {
+                showConfirm(isSupervisor ? `Konfirmasi HAPUS BPPU ${noBppu}?` : `Ajukan penghapusan BPPU ${noBppu} ke Supervisor?`, function() {
                     socket.emit('request-action-faktur', { action: 'DELETE', mod: 'payable', faktur: noBppu, id_user: currentUser.id, username: currentUser.username, role: currentUser.role });
-                    if(!isSupervisor) alert("Permintaan hapus diajukan.");
-                }
+                    if(!isSupervisor) showToast('Permintaan hapus diajukan.', 'info');
+                }, { title: 'Hapus BPPU', danger: true });
             } else if (actionType === 'EDIT') {
                 targetEditFaktur = noBppu;
                 document.getElementById('edit-faktur-title').innerText = noBppu;
@@ -295,10 +296,10 @@
             const branch = document.getElementById('edit_branch').value;
             const invoice = document.getElementById('edit_invoice').value;
 
-            if (!branch) return alert("Branch wajib diisi!");
+            if (!branch) return showToast('Branch wajib diisi!', 'warning');
             socket.emit('request-action-faktur', { action: 'EDIT', mod: 'payable', faktur: targetEditFaktur, id_user: currentUser.id, username: currentUser.username, role: currentUser.role, newData: { branch, invoice, tanggal: '-' } });
             document.getElementById('modalEditData').style.display = 'none';
-            if(!isSupervisor) alert("Permintaan Edit diajukan ke Panel Approval.");
+            if(!isSupervisor) showToast('Permintaan Edit diajukan ke Panel Approval.', 'info');
         }
 
         function updateMoM(elId, current, previous, suffix) {
@@ -314,7 +315,7 @@
         }
 
         // Jalankan Pertama Kali
-        loadData(1, 50);
+        loadData(1, 25);
 
     </script>
 </body>

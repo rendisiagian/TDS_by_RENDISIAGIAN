@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bank Data Tax Payable | Tax Upload and Database</title>
     <script src="/theme.js"></script>
+    <script src="/toast.js"></script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <script src="/pagination.js"></script>
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
@@ -12,8 +14,7 @@
 <script src="/sidebar.js"></script>
 </head>
 <body>
-    <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
-
+    
     <div class="app-wrapper">
         <div id="sidebar-container"></div>
 
@@ -142,10 +143,10 @@
             loadInbox(); 
         };
 
-        let currentPage = 1, currentLimit = 50, currentSearch = null;
+        let currentPage = 1, currentLimit = 25, currentSearch = null;
         initPagination('pg-container', function(page, limit) { 
             loadInbox(page, limit); 
-        }, 50);
+        }, 25);
 
         async function loadInbox(page, limit, searchObj) {
             currentPage = page || currentPage || 1;
@@ -210,7 +211,7 @@
 
                 if (uploadStats.chunksDone === uploadStats.chunksTotal) {
                     uploadStats.isActive = false; 
-                    alert(`✅ PROSES UPLOAD PAYABLE SELESAI!\n\nTotal Dibaca: ${uploadStats.totalFiles} Dokumen\nBerhasil Masuk Antrean: ${uploadStats.sukses}\nLewati (Sudah Ada/Duplikat): ${uploadStats.duplikat}\nGagal Ekstrak: ${uploadStats.gagal}`);
+                    showToast(`✅ PROSES UPLOAD PAYABLE SELESAI!<br><br>Total Dibaca: ${uploadStats.totalFiles} Dokumen<br>Berhasil: ${uploadStats.sukses}<br>Lewati (Duplikat): ${uploadStats.duplikat}<br>Gagal Ekstrak: ${uploadStats.gagal}`, 'success', 8000);
                 }
             }
         });
@@ -219,7 +220,7 @@
             const files = e.target.files;
             if (files.length === 0) return;
 
-            alert(`Memproses ekstraksi ${files.length} file PDF Bukti Potong.\n\nSistem membaginya ke dalam beberapa tahap. Mohon tunggu Notifikasi Selesai!`);
+            showToast(`Memproses ekstraksi ${files.length} file PDF Bukti Potong.<br><br>Sistem membaginya ke dalam beberapa tahap. Mohon tunggu notifikasi selesai!`, 'info', 6000);
 
             const chunkSize = 5; 
             uploadStats = { isActive: true, totalFiles: files.length, chunksTotal: Math.ceil(files.length / chunkSize), chunksDone: 0, sukses: 0, duplikat: 0, gagal: 0 };
@@ -256,7 +257,7 @@
         async function bukaJalurManual(idStr) {
             const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
             const rowData = dataInboxLokal.find(r => r.id == idStr);
-            if(!rowData) return alert("Data tidak ditemukan!");
+            if(!rowData) return showToast('Data tidak ditemukan!', 'error');
 
             let parsed = JSON.parse(rowData.data_ekstraksi);
             tempDataFinal = parsed;
@@ -285,8 +286,10 @@
             const cbContainer = document.getElementById('checkbox-vatin-container');
             cbContainer.innerHTML = '<span style="color:#64748b; font-size:0.8rem;">Mencari referensi...</span>';
             try {
-                const vatinRes = await fetch('/api/data-vatin?entitas=' + rowData.entitas);
-                const vatinData = await vatinRes.json();
+                const vatinRes = await fetch('/api/data-vatin?entitas=' + rowData.entitas + '&limit=all');
+                const vatinJson = await vatinRes.json();
+                // FIX (C5): Response adalah object { data: [...] }, bukan array langsung
+                const vatinData = vatinJson.data || [];
                 
                 const matchedVatin = vatinData.filter(v => {
                     const npwpCocok = parsed.npwpLawan && v.npwp_penjual && v.npwp_penjual.includes(parsed.npwpLawan);
@@ -334,8 +337,8 @@
 
             tempDataFinal.invoiceInput = selectedInvoices.join(', ');
 
-            if (!tempDataFinal.branchInput) return alert("Branch wajib diisi!");
-            if (!tempDataFinal.invoiceInput) return alert("Harap pilih minimal satu Faktur atau ketik No Invoice/Faktur di kolom manual!");
+            if (!tempDataFinal.branchInput) return showToast('Branch wajib diisi!', 'warning');
+            if (!tempDataFinal.invoiceInput) return showToast('Harap pilih minimal satu Faktur atau ketik No Invoice/Faktur di kolom manual!', 'warning');
 
             // Bug Fix: Disable button to prevent double-click ENOENT errors
             btn.disabled = true;

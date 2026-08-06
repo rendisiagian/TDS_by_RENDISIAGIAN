@@ -5,12 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profil Saya</title>
     <script src="/theme.js"></script>
+    <script src="/toast.js"></script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
 <script src="/sidebar.js"></script>
 </head>
 <body>
-    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t)})()</script>
+    
     <div class="app-wrapper">
         <div id="sidebar-container"></div>
         <main class="main-content">
@@ -118,20 +120,22 @@
         function ajukanPerubahan() {
             const jenis = document.getElementById('jenis_req').value;
             const nilai = document.getElementById('nilai_baru').value.trim();
-            if (!nilai) return alert('Data baru tidak boleh kosong!');
+            if (!nilai) return showToast('Data baru tidak boleh kosong!', 'warning');
 
             if (isSelfManaged(currentUser.role)) {
                 // ============================================================
                 // ALUR SUPERVISOR & ADMINISTRATOR: Langsung simpan tanpa approval
                 // ============================================================
                 if (jenis === 'PASSWORD') {
-                    if (!confirm('Yakin ingin mengubah password Anda?')) return;
-                    socket.emit('reset-password-user', { user_id: currentUser.id, new_password: nilai });
-                    alert('Password berhasil diubah!');
+                    showConfirm('Yakin ingin mengubah password Anda?', function() {
+                        socket.emit('reset-password-user', { user_id: currentUser.id, new_password: nilai });
+                        showToast('Password berhasil diubah!', 'success');
+                    }, { title: 'Ubah Password' });
                 } else {
-                    if (!confirm('Yakin ingin mengubah nama lengkap Anda?')) return;
-                    socket.emit('admin-update-nama', { user_id: currentUser.id, nilai_baru: nilai });
-                    alert('Nama lengkap berhasil diperbarui!');
+                    showConfirm('Yakin ingin mengubah nama lengkap Anda?', function() {
+                        socket.emit('admin-update-nama', { user_id: currentUser.id, nilai_baru: nilai });
+                        showToast('Nama lengkap berhasil diperbarui!', 'success');
+                    }, { title: 'Ubah Nama' });
                 }
             } else {
                 // ============================================================
@@ -143,7 +147,7 @@
                     jenis: jenis,
                     nilai_baru: nilai
                 });
-                alert('Pengajuan berhasil dikirim! Menunggu persetujuan Supervisor / Administrator.');
+                showToast('Pengajuan berhasil dikirim! Menunggu persetujuan Supervisor / Administrator.', 'success', 5000);
             }
 
             document.getElementById('nilai_baru').value = '';

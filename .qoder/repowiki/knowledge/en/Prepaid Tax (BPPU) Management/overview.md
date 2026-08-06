@@ -1,0 +1,1 @@
+Manages the ingestion, verification, and reconciliation of prepaid income tax withholding documents (BPPU) against internal VAT output records.

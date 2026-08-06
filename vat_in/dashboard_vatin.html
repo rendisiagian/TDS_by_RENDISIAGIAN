@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VAT IN | Tax Upload and Database</title>
     <script src="/theme.js"></script>
+    <script src="/toast.js"></script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <script src="/export.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@latest/dist/xlsx.full.min.js"></script>
     <script src="/pagination.js"></script>
@@ -61,8 +63,7 @@
 <script src="/sidebar.js"></script>
 </head>
 <body>
-    <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
-
+    
     <div class="app-wrapper">
         <div id="sidebar-container"></div>
 
@@ -194,7 +195,7 @@
 
         // STATE UNTUK SERVER-SIDE
         let currentPage = 1;
-        let currentLimit = 50;
+        let currentLimit = 25;
         let currentSearch = {};
 
         fetch('/api/me').then(res => res.json()).then(u => currentUser = u);
@@ -221,7 +222,7 @@
 
                 if (uploadStats.chunksDone === uploadStats.chunksTotal) {
                     uploadStats.isActive = false;
-                    alert(`✅ PROSES UPLOAD SELESAI!\n\nTotal: ${uploadStats.totalFiles} Dokumen\nBerhasil Masuk: ${uploadStats.sukses}\nDuplikat: ${uploadStats.duplikat}\nGagal: ${uploadStats.gagal}`);
+                    showToast(`✅ PROSES UPLOAD SELESAI!<br><br>Total: ${uploadStats.totalFiles} Dokumen<br>Berhasil: ${uploadStats.sukses}<br>Duplikat: ${uploadStats.duplikat}<br>Gagal: ${uploadStats.gagal}`, 'success', 8000);
                     loadData(1, currentLimit);
                 }
             }
@@ -245,7 +246,7 @@
 
         initPagination('pg-container', function(page, limit) { 
             loadData(page, limit); 
-        }, 50);
+        }, 25);
 
         async function loadData(page, limit) {
             currentPage = page || 1;
@@ -448,7 +449,7 @@
                     container.innerHTML = tableHtml;
                 }
                 document.getElementById('modalViewItem').style.display = 'flex';
-            } catch (err) { alert("Terjadi kesalahan."); }
+            } catch (err) { showToast('Terjadi kesalahan.', 'error'); }
         }
 
         async function handleAction(noFaktur, actionType, curCabang = '', curInvoice = '', curTanggal = '') {
@@ -456,10 +457,10 @@
             const isSupervisor = ['supervisor', 'administrator'].includes(userRole);
             
             if (actionType === 'DELETE') {
-                if(confirm(isSupervisor ? `Konfirmasi HAPUS faktur ${noFaktur}?` : `Ajukan penghapusan faktur ${noFaktur} ke Supervisor?`)) {
+                showConfirm(isSupervisor ? `Konfirmasi HAPUS faktur ${noFaktur}?` : `Ajukan penghapusan faktur ${noFaktur} ke Supervisor?`, function() {
                     socket.emit('request-action-faktur', { action: 'DELETE', mod: 'vatin', faktur: noFaktur, id_user: currentUser.id, username: currentUser.username, role: currentUser.role });
-                    if(!isSupervisor) alert("Permintaan hapus diajukan.");
-                }
+                    if(!isSupervisor) showToast('Permintaan hapus diajukan.', 'info');
+                }, { title: 'Hapus Faktur', danger: true });
             } 
             else if (actionType === 'EDIT') {
                 targetEditFaktur = noFaktur;
@@ -499,10 +500,10 @@
             const invoice = document.getElementById('edit_invoice').value;
             const tanggal = document.getElementById('edit_tanggal').value;
 
-            if (!branch) return alert("Branch wajib diisi!");
+            if (!branch) return showToast('Branch wajib diisi!', 'warning');
             socket.emit('request-action-faktur', { action: 'EDIT', mod: 'vatin', faktur: targetEditFaktur, id_user: currentUser.id, username: currentUser.username, role: currentUser.role, newData: { branch, invoice, tanggal } });
             document.getElementById('modalEditData').style.display = 'none';
-            if(!isSupervisor) alert("Permintaan Edit diajukan ke Panel Approval.");
+            if(!isSupervisor) showToast('Permintaan Edit diajukan ke Panel Approval.', 'info');
         }
 
         function updateMoM(elId, current, previous, suffix) {
@@ -518,7 +519,7 @@
         }
 
         // Jalankan Pertama Kali
-        loadData(1, 50);
+        loadData(1, 25);
 
         // Inisialisasi Flatpickr
         flatpickr(".filter-date-range", {
@@ -532,7 +533,7 @@
         document.getElementById('filePdfUpload').addEventListener('change', async function (e) {
             const files = e.target.files;
             if (files.length === 0) return;
-            alert(`Memproses ekstraksi ${files.length} file PDF.\n\nData akan langsung masuk ke Dashboard dengan status "Perlu Verifikasi". Mohon tunggu notifikasi selesai!`);
+            showToast(`Memproses ekstraksi ${files.length} file PDF.<br><br>Data akan langsung masuk ke Dashboard. Mohon tunggu notifikasi selesai!`, 'info', 6000);
 
             const chunkSize = 5;
             uploadStats = { isActive: true, totalFiles: files.length, chunksTotal: Math.ceil(files.length / chunkSize), chunksDone: 0, sukses: 0, duplikat: 0, gagal: 0 };

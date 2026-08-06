@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Antrean Verifikasi VAT OUT | Tax Database System</title>
     <script src="/theme.js"></script>
+    <script src="/toast.js"></script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <script src="/pagination.js"></script>
     <script src="/sidebar.js"></script>
     <link rel="stylesheet" href="/style.css">
@@ -14,8 +16,7 @@
 </head>
 
 <body>
-    <script>(function () { var t = localStorage.getItem("theme") || "light"; document.documentElement.setAttribute("data-theme", t) })()</script>
-
+    
     <div class="app-wrapper">
         <div id="sidebar-container"></div>
 
@@ -220,10 +221,10 @@
             if (typeof window.refreshSidebarYears === 'function') window.refreshSidebarYears();
         };
 
-        let currentPage = 1, currentLimit = 50, currentSearch = null;
+        let currentPage = 1, currentLimit = 25, currentSearch = null;
         initPagination('pg-container', function (page, limit) { 
             loadInbox(page, limit); 
-        }, 50);
+        }, 25);
 
         async function loadInbox(page, limit, searchObj) {
             currentPage = page || currentPage || 1;
@@ -298,7 +299,7 @@
                 uploadStats.chunksDone++;
                 if (uploadStats.chunksDone === uploadStats.chunksTotal) {
                     uploadStats.isActive = false;
-                    alert(`✅ PROSES UPLOAD SEMUA SELESAI!\n\nTotal Dibaca: ${uploadStats.totalFiles} Dokumen\nBerhasil Masuk Antrean: ${uploadStats.sukses}\nLewati (Sudah Ada/Duplikat): ${uploadStats.duplikat}\nGagal (Format Salah/Beda PT): ${uploadStats.gagal}`);
+                    showToast(`✅ PROSES UPLOAD SELESAI!<br><br>Total Dibaca: ${uploadStats.totalFiles} Dokumen<br>Berhasil: ${uploadStats.sukses}<br>Lewati (Duplikat): ${uploadStats.duplikat}<br>Gagal: ${uploadStats.gagal}`, 'success', 8000);
                 }
             }
         });
@@ -306,7 +307,7 @@
         document.getElementById('filePdfUpload').addEventListener('change', async function (e) {
             const files = e.target.files;
             if (files.length === 0) return;
-            alert(`Memproses ekstraksi ${files.length} file PDF.\n\nKarena jumlah file banyak, sistem akan membaginya ke dalam beberapa tahap agar browser tidak hang. Mohon tunggu Notifikasi Selesai!`);
+            showToast(`Memproses ekstraksi ${files.length} file PDF.<br><br>Sistem membaginya ke dalam beberapa tahap. Mohon tunggu notifikasi selesai!`, 'info', 6000);
             const chunkSize = 5;
             uploadStats = { isActive: true, totalFiles: files.length, chunksTotal: Math.ceil(files.length / chunkSize), chunksDone: 0, sukses: 0, duplikat: 0, gagal: 0 };
             for (let i = 0; i < files.length; i += chunkSize) {
@@ -337,7 +338,7 @@
         async function bukaJalurManual(idStr) {
             const formatRupiah = (n) => "Rp " + Number(n).toLocaleString('id-ID');
             const rowData = dataInboxLokal.find(r => r.id == idStr);
-            if (!rowData) return alert("Data tidak ditemukan!");
+            if (!rowData) return showToast('Data tidak ditemukan!', 'error');
 
             let parsed = JSON.parse(rowData.data_ekstraksi);
             tempDataFinal = parsed; tempDataFinal.id_link = idStr; tempDataFinal.username = currentUserName;
@@ -501,8 +502,8 @@
             tempDataFinal.branchInput = document.getElementById('input_branch_baru').value;
             tempDataFinal.voInput = document.getElementById('input_vo_baru').value;
             tempDataFinal.username = currentUserName;
-            if (!tempDataFinal.branchInput) return alert("Branch wajib diisi!");
-            if (!tempDataFinal.invoiceInput) return alert("Nomor Invoice wajib diisi agar bisa ditarik oleh modul Prepaid!");
+            if (!tempDataFinal.branchInput) return showToast('Branch wajib diisi!', 'warning');
+            if (!tempDataFinal.invoiceInput) return showToast('Nomor Invoice wajib diisi agar bisa ditarik oleh modul Prepaid!', 'warning');
 
             // Bug Fix: Disable button to prevent double-click ENOENT errors
             btn.disabled = true;

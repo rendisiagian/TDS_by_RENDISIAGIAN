@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: project_docs
+title: Tax Database System Documentation
+scope:
+    - PRD_Tax_Database_System.md
+    - TDS_Sequence_Diagram.md
+    - TODO.md
+source_files: []
+depends_on: []
+related_to: []

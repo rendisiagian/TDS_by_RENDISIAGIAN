@@ -1,0 +1,3 @@
+- CSS variables are used extensively for theming, with specific overrides for `[data-theme="dark"]` to support seamless light/dark mode switching.
+- Global functions are attached to the `window` object (e.g., `window.toggleSidebarGroup`, `window.refreshSidebarYears`) to enable interaction between dynamically loaded sidebar content and other scripts.
+- DOM initialization often relies on `MutationObserver` or polling intervals (`setInterval`) to handle asynchronously loaded sidebar elements.

@@ -5,13 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel Approval & Manajemen Akun</title>
     <script src="/theme.js"></script>
+    <script src="/toast.js"></script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
 <script src="/sidebar.js"></script>
 </head>
 <body>
-    <script>(function(){var t=localStorage.getItem("theme")||"light";document.documentElement.setAttribute("data-theme",t)})()</script>
-
+    
     <div class="app-wrapper">
         <div id="sidebar-container"></div>
 
@@ -228,9 +229,9 @@
         }
 
         function prosesRequest(idReq, action) {
-            if(confirm(`Yakin ingin ${action.toUpperCase()} permintaan ini?`)) {
+            showConfirm(`Yakin ingin ${action.toUpperCase()} permintaan ini?`, function() {
                 socket.emit('proses-request', { req_id: idReq, action: action });
-            }
+            }, { title: 'Konfirmasi Approval' });
         }
 
         async function loadUsers() {
@@ -262,7 +263,7 @@
             const role = document.getElementById('new_role').value;
             const pass = document.getElementById('new_password').value;
 
-            if(!user || !nama || !pass) return alert("Harap isi seluruh kolom dengan lengkap!");
+            if(!user || !nama || !pass) return showToast('Harap isi seluruh kolom dengan lengkap!', 'warning');
             
             socket.emit('tambah-user', { username: user, nama: nama, role: role, password: pass });
             document.querySelectorAll('#admin-section input').forEach(i => i.value='');
@@ -272,11 +273,11 @@
             const newPass = prompt(`Masukkan password baru untuk akun '${username}' (minimal 6 karakter):`);
             if (newPass) {
                 if (newPass.length < 6) {
-                    alert('Password baru minimal harus 6 karakter!');
+                    showToast('Password baru minimal harus 6 karakter!', 'warning');
                     return;
                 }
                 socket.emit('reset-password-user', { user_id: id, new_password: newPass });
-                alert("Password berhasil direset!");
+                showToast('Password berhasil direset!', 'success');
             }
         }
 
