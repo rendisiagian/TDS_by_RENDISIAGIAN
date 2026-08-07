@@ -1,1 +1,0 @@
-Client-side HTML pages for the Prepaid Tax (BPPU) module that display registered withholding slips, manage a verification inbox with PDF upload and manual completion, and show summary comparisons between BPPU and VAT OUT invoices.

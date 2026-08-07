@@ -1,1 +1,0 @@
-Vanilla HTML/CSS/JS front-end consuming a Node.js backend; uses Socket.IO for real-time updates, pdf.js (CDN 2.16.105) for client-side PDF text extraction during batch upload, and SheetJS (xlsx.full.min.js) for client-side Excel export.

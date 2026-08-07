@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: vat_input
+title: VAT Input (Faktur Masukan) Client Dashboard
+scope:
+    - vat_in/
+source_files: []
+depends_on: []
+related_to:
+    - path: core_app
+    - path: shared_ui

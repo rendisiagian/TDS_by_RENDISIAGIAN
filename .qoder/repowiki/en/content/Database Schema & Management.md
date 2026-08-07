@@ -5,11 +5,19 @@
 - [PRD_Tax_Database_System.md](file://PRD_Tax_Database_System.md)
 - [TDS_Sequence_Diagram.md](file://TDS_Sequence_Diagram.md)
 - [app.js](file://app.js)
-- [test_query.js](file://test_query.js)
-- [fix_masa_pajak.js](file://fix_masa_pajak.js)
+- [taxprojectreport.html](file://taxprojectreport.html)
+- [vat_out/dashboard_vatout.html](file://vat_out/dashboard_vatout.html)
 - [export.js](file://export.js)
 - [pagination.js](file://pagination.js)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Added comprehensive documentation for the new `porsi_vatout` table for JO member allocation tracking
+- Updated entity relationship diagrams to include porsi relationships
+- Enhanced reporting section with JO member allocation capabilities
+- Added new API endpoints documentation for porsi management
+- Updated data lifecycle management to include porsi allocation workflow
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -24,7 +32,7 @@
 10. [Appendices](#appendices)
 
 ## Introduction
-This document describes the database schema and management system used by the TDS (Tax Data System). It focuses on the SQLite-based relational model, table relationships, data models, indexing strategies, query optimization, data lifecycle management, backup procedures, and administrative guidance. It also documents PRD-derived specifications, schema evolution, and troubleshooting practices.
+This document describes the database schema and management system used by the TDS (Tax Data System). It focuses on the SQLite-based relational model, table relationships, data models, indexing strategies, query optimization, data lifecycle management, backup procedures, and administrative guidance. It also documents PRD-derived specifications, schema evolution, and troubleshooting practices. **Updated** to include the new JO member allocation system for internal reporting.
 
 ## Project Structure
 The database is implemented as a single SQLite file managed by the backend service. The backend initializes tables, enforces access controls, and exposes paginated queries to frontend modules. Supporting scripts handle data fixes, exports, and pagination.
@@ -50,8 +58,6 @@ PAG --> DBF
 
 **Diagram sources**
 - [app.js:52-58](file://app.js#L52-L58)
-- [test_query.js:1-50](file://test_query.js#L1-L50)
-- [fix_masa_pajak.js:1-50](file://fix_masa_pajak.js#L1-L50)
 - [export.js:1-50](file://export.js#L1-L50)
 - [pagination.js:1-50](file://pagination.js#L1-L50)
 
@@ -66,6 +72,7 @@ PAG --> DBF
 - Pagination: Server-side LIMIT/OFFSET applied to high-volume tables.
 - Audit Trail: Immutable audit logs capture all data mutations.
 - Backup: Scheduled backups via Cron Job for disaster recovery.
+- **JO Member Allocation**: New porsi_vatout table enables granular financial tracking per JO member while maintaining legal invoice validity under JO name.
 
 **Section sources**
 - [PRD_Tax_Database_System.md:12-20](file://PRD_Tax_Database_System.md#L12-L20)
@@ -73,7 +80,7 @@ PAG --> DBF
 - [app.js:41-58](file://app.js#L41-L58)
 
 ## Architecture Overview
-The system architecture centers on a single SQLite database file accessed through a Node.js backend. The backend creates tables, applies schema evolution, executes queries, and enforces access restrictions. Frontend modules consume paginated data and trigger exports.
+The system architecture centers on a single SQLite database file accessed through a Node.js backend. The backend creates tables, applies schema evolution, executes queries, and enforces access restrictions. Frontend modules consume paginated data and trigger exports. **Updated** to include JO member allocation workflow for internal reporting.
 
 ```mermaid
 graph TB
@@ -84,6 +91,7 @@ SCHEMA["Schema Manager<br/>CREATE/ALTER"]
 QUERIES["Query Engine<br/>GET/POST handlers"]
 AUDIT["Audit Logs<br/>Immutable records"]
 DB["tax_database.db"]
+PORSI["Porsi Manager<br/>JO Member Allocation"]
 CLIENT --> ROUTER
 ROUTER --> AUTH
 ROUTER --> SCHEMA
@@ -91,6 +99,7 @@ ROUTER --> QUERIES
 QUERIES --> DB
 SCHEMA --> DB
 AUDIT --> DB
+PORSI --> DB
 ```
 
 **Diagram sources**
@@ -283,6 +292,52 @@ datetime waktu_input
 **Section sources**
 - [PRD_Tax_Database_System.md:41-43](file://PRD_Tax_Database_System.md#L41-L43)
 
+### JO Member Allocation (Porsi) System
+- **Purpose**: Internal reporting mechanism for recording portion allocations of DPP/PPN per JO member (BBS/BMP) while maintaining legal invoice validity under JO name.
+- **Table Structure**: 
+  - `no_faktur`: Links to original invoice
+  - `anggota`: JO member identifier (BBS/BMP)
+  - `dpp_porsi`: Allocated DPP amount for member
+  - `ppn_porsi`: Allocated PPN amount for member
+- **Business Logic**: 
+  - Invoices remain legally valid under JO name
+  - Granular financial tracking enabled per member entity
+  - Automatic percentage calculation based on allocated amounts
+  - Integration with project reporting for JO projects
+
+```mermaid
+erDiagram
+DATA_VATOUT {
+string no_faktur
+string entitas
+string kode_cabang
+float dpp
+float ppn
+}
+PORSI_VATOUT {
+string no_faktur
+string anggota
+float dpp_porsi
+float ppn_porsi
+}
+MASTER_CABANG {
+string kode_cabang
+string nama_cabang
+string entitas
+}
+DATA_VATOUT ||--o{ PORSI_VATOUT : "allocated to members"
+MASTER_CABANG ||--o{ PORSI_VATOUT : "member identity"
+```
+
+**Diagram sources**
+- [app.js:359-361](file://app.js#L359-L361)
+- [app.js:843-848](file://app.js#L843-L848)
+
+**Section sources**
+- [app.js:359-361](file://app.js#L359-L361)
+- [app.js:843-848](file://app.js#L843-L848)
+- [vat_out/dashboard_vatout.html:166-203](file://vat_out/dashboard_vatout.html#L166-L203)
+
 ### Inbox and Verification Flow
 - Inbox tables: Temporary staging for VAT OUT and BPPU entries with status tracking and extraction data.
 - Business logic: Verified rows are moved into respective transaction tables after approval.
@@ -295,6 +350,7 @@ datetime waktu_input
 - Initialization: CREATE TABLE statements executed during startup for core and module-specific tables.
 - Column additions: Dynamic ALTER TABLE commands append new columns to existing tables.
 - Example: Adding columns to module data tables ensures backward compatibility.
+- **New**: porsi_vatout table created for JO member allocation tracking.
 
 **Section sources**
 - [app.js:341-350](file://app.js#L341-L350)
@@ -305,6 +361,7 @@ datetime waktu_input
 - Primary keys: Enforced at schema level (e.g., npwp as PK for master tables, no_faktur/no_bppu as PK for transaction headers).
 - Defaults: CURRENT_TIMESTAMP for audit/tracking fields; Pending for request status; format_tipe LEGACY for certain transactions.
 - Referential intent: Foreign keys not enforced by SQLite; maintain referential integrity at application level.
+- **New**: Composite primary key (no_faktur, anggota) ensures unique member allocations per invoice.
 
 **Section sources**
 - [PRD_Tax_Database_System.md:23-31](file://PRD_Tax_Database_System.md#L23-L31)
@@ -314,6 +371,7 @@ datetime waktu_input
 ### Indexing Strategies
 - Primary keys: Implicitly indexed by SQLite for fast lookups.
 - Recommendations: Add indexes on frequently filtered columns (e.g., masa_pajak, kode_cabang, entitas, npwp, tanggal_faktur/tanggal_dokumen) to improve query performance on large datasets.
+- **New**: Composite index consideration for porsi_vatout table on (no_faktur, anggota) for efficient allocation lookups.
 
 **Section sources**
 - [PRD_Tax_Database_System.md:152-156](file://PRD_Tax_Database_System.md#L152-L156)
@@ -322,6 +380,7 @@ datetime waktu_input
 - Server-side pagination: LIMIT and OFFSET applied at the database level to reduce payload sizes.
 - Selective projections: Retrieve only required columns to minimize I/O.
 - Prepared statements: Use parameterized queries to avoid SQL injection and enable plan reuse.
+- **New**: LEFT JOIN optimization for JO member allocation queries to efficiently retrieve portioned data.
 
 **Section sources**
 - [PRD_Tax_Database_System.md:114-156](file://PRD_Tax_Database_System.md#L114-L156)
@@ -331,6 +390,7 @@ datetime waktu_input
 - Staging: Inbox tables collect incoming data until verified.
 - Verification: Approved rows move into transaction tables.
 - Archiving: Not defined in current schema; consider partitioning or archival tables for historical data.
+- **New**: Porsi allocation lifecycle - allocations are maintained separately from legal invoices, allowing flexible internal reporting without affecting legal compliance.
 
 **Section sources**
 - [PRD_Tax_Database_System.md:46-49](file://PRD_Tax_Database_System.md#L46-L49)
@@ -352,13 +412,22 @@ datetime waktu_input
 
 ### Export and Reporting
 - Export utilities: Scripts to produce spreadsheet-ready outputs for tax consolidation and ERP integration.
+- **New**: JO member allocation reporting integrated into project reports with automatic percentage calculations and member-specific breakdowns.
 
 **Section sources**
 - [export.js:1-50](file://export.js#L1-L50)
 - [TDS_Sequence_Diagram.md:202-206](file://TDS_Sequence_Diagram.md#L202-L206)
 
+### API Endpoints for Porsi Management
+- **GET /api/porsi-vatout/:faktur**: Retrieves portion allocations for a specific invoice
+- **Integration**: Used by VAT Out dashboard for editing member allocations
+- **Validation**: Ensures allocations match invoice totals and member identities
+
+**Section sources**
+- [app.js:892-898](file://app.js#L892-L898)
+
 ## Dependency Analysis
-The backend orchestrates schema creation and data operations. Module-specific tables depend on shared master/reference tables. Audit logs depend on users and actions.
+The backend orchestrates schema creation and data operations. Module-specific tables depend on shared master/reference tables. Audit logs depend on users and actions. **Updated** to include porsi_vatout dependencies on both data_vatout and master_cabang tables.
 
 ```mermaid
 graph LR
@@ -369,6 +438,8 @@ MASTER_CLIENT["master_client"] --> DATA_VATIN
 MASTER_VENDOR["master_vendor"] --> DATA_VATIN
 DATA_VATIN --> ITEM_VATIN["item_vatin"]
 DATA_VATOUT --> ITEM_VATOUT["item_vatout"]
+DATA_VATOUT --> PORSI_VATOUT["porsi_vatout"]
+MASTER_CABANG --> PORSI_VATOUT
 DATA_PAYABLE["data_payable"] --> INBOX_PAYABLE["inbox_payable"]
 DATA_PREPAID["data_prepaid"] --> INBOX_PREPAID["inbox_prepaid"]
 ```
@@ -376,6 +447,7 @@ DATA_PREPAID["data_prepaid"] --> INBOX_PREPAID["inbox_prepaid"]
 **Diagram sources**
 - [app.js:341-350](file://app.js#L341-L350)
 - [app.js:370-464](file://app.js#L370-L464)
+- [app.js:359-361](file://app.js#L359-L361)
 
 **Section sources**
 - [app.js:341-350](file://app.js#L341-L350)
@@ -386,6 +458,7 @@ DATA_PREPAID["data_prepaid"] --> INBOX_PREPAID["inbox_prepaid"]
 - Indexing: Add indexes on high-cardinality filter columns (masa_pajak, kode_cabang, entitas, npwp).
 - Query patterns: Prefer exact-match lookups and range scans; avoid SELECT * on wide tables.
 - Maintenance: Regular VACUUM and ANALYZE to keep SQLite optimized.
+- **New**: JO member allocation queries use LEFT JOIN optimization to efficiently combine invoice data with member allocations.
 
 **Section sources**
 - [PRD_Tax_Database_System.md:114-156](file://PRD_Tax_Database_System.md#L114-L156)
@@ -396,14 +469,14 @@ DATA_PREPAID["data_prepaid"] --> INBOX_PREPAID["inbox_prepaid"]
 - Schema Issues: Confirm CREATE/ALTER statements executed; check column addition logic.
 - Data Fix: Use targeted scripts to correct anomalies (e.g., masa_pajak normalization).
 - Exports: Validate export script outputs and formats.
+- **New**: Porsi Allocation Issues - Verify composite key uniqueness and ensure allocations sum to invoice totals.
 
 **Section sources**
 - [app.js:41-58](file://app.js#L41-L58)
-- [fix_masa_pajak.js:1-50](file://fix_masa_pajak.js#L1-L50)
-- [test_query.js:1-50](file://test_query.js#L1-L50)
+- [export.js:1-50](file://export.js#L1-L50)
 
 ## Conclusion
-The TDS database system employs a robust SQLite schema with clear separation of concerns across modules. The backend enforces access control, manages schema evolution, and optimizes queries through pagination and indexing. Adhering to the PRD guidelines ensures reliable data lifecycle management, backup, and maintainability.
+The TDS database system employs a robust SQLite schema with clear separation of concerns across modules. The backend enforces access control, manages schema evolution, and optimizes queries through pagination and indexing. **Updated** to include the new JO member allocation system that enables granular financial tracking while maintaining legal invoice validity. Adhering to the PRD guidelines ensures reliable data lifecycle management, backup, and maintainability.
 
 ## Appendices
 
@@ -413,8 +486,23 @@ The TDS database system employs a robust SQLite schema with clear separation of 
 - Load time targets: Optimized for high-volume tables.
 - Backup: Daily Cron Job for tax_database.db.
 - Export: Spreadsheet outputs for tax consolidation and ERP integration.
+- **New**: JO member allocation system for internal reporting with legal invoice preservation.
 
 **Section sources**
 - [PRD_Tax_Database_System.md:12-20](file://PRD_Tax_Database_System.md#L12-L20)
 - [PRD_Tax_Database_System.md:114-160](file://PRD_Tax_Database_System.md#L114-L160)
 - [TDS_Sequence_Diagram.md:202-206](file://TDS_Sequence_Diagram.md#L202-L206)
+
+### JO Member Allocation Technical Details
+- **Table Creation**: `CREATE TABLE IF NOT EXISTS porsi_vatout (no_faktur TEXT, anggota TEXT, dpp_porsi REAL DEFAULT 0, ppn_porsi REAL DEFAULT 0, PRIMARY KEY (no_faktur, anggota))`
+- **Business Rule**: Invoices remain legally valid under JO name while enabling granular financial tracking per member entity
+- **Integration Points**: 
+  - VAT Out dashboard for editing allocations
+  - Project report for JO member-specific reporting
+  - Automatic percentage calculation based on allocated amounts
+- **Validation**: Ensures allocations match invoice totals and member identities
+
+**Section sources**
+- [app.js:359-361](file://app.js#L359-L361)
+- [vat_out/dashboard_vatout.html:166-203](file://vat_out/dashboard_vatout.html#L166-L203)
+- [taxprojectreport.html:765-800](file://taxprojectreport.html#L765-L800)

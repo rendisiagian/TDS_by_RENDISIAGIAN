@@ -205,6 +205,10 @@ function deduplicateFakturData(rows) {
         });
         
         let chosen = sorted[0];
+
+        // ATURAN BATAL: jika faktur berstatus tertinggi dalam grup dibatalkan (tgl_batal terisi),
+        // seluruh rantai (Normal + semua Pengganti) dianggap batal dan dikeluarkan dari agregasi.
+        if (chosen.tgl_batal) continue;
         
         // BUG-FIX: Sinkronisasi masa pajak faktur pengganti dengan masa pajak faktur normal
         const normalRow = groupRows.find(r => r.status_faktur === 'Normal');
@@ -461,8 +465,8 @@ db.serialize(() => {
         db.run(`CREATE TABLE IF NOT EXISTS inbox_${mod.id} (id INTEGER PRIMARY KEY AUTOINCREMENT, entitas TEXT, link_pdf_lokal TEXT, status TEXT DEFAULT 'Menunggu Lengkapi', diinput_oleh TEXT, data_ekstraksi TEXT, waktu DATETIME DEFAULT CURRENT_TIMESTAMP)`);
 
         if (mod.id.startsWith('vat')) {
-            db.run(`CREATE TABLE IF NOT EXISTS data_${mod.id} (no_faktur TEXT PRIMARY KEY, entitas TEXT, kode_cabang TEXT, npwp_penjual TEXT, nama_penjual TEXT, alamat_penjual TEXT, npwp_pembeli TEXT, nama_pembeli TEXT, alamat_pembeli TEXT, tanggal_faktur DATE, harga_jual REAL, diskon REAL, uang_muka REAL, dpp REAL, ppn REAL, referensi TEXT, kota_penerbit TEXT, penandatangan TEXT, no_invoice_internal TEXT, tgl_tukar_faktur DATE, diinput_oleh TEXT, link_pdf_lokal TEXT, format_tipe TEXT DEFAULT 'LEGACY', status_faktur TEXT DEFAULT 'Normal', masa_pajak TEXT, no_faktur_normal TEXT, waktu_input DATETIME DEFAULT CURRENT_TIMESTAMP)`);
-            const alterCols = ['alamat_penjual TEXT', 'alamat_pembeli TEXT', 'diskon REAL', 'uang_muka REAL', 'kota_penerbit TEXT', 'penandatangan TEXT', 'harga_jual REAL', 'format_tipe TEXT', 'status_faktur TEXT', 'masa_pajak TEXT', 'no_faktur_normal TEXT'];
+            db.run(`CREATE TABLE IF NOT EXISTS data_${mod.id} (no_faktur TEXT PRIMARY KEY, entitas TEXT, kode_cabang TEXT, npwp_penjual TEXT, nama_penjual TEXT, alamat_penjual TEXT, npwp_pembeli TEXT, nama_pembeli TEXT, alamat_pembeli TEXT, tanggal_faktur DATE, harga_jual REAL, diskon REAL, uang_muka REAL, dpp REAL, ppn REAL, referensi TEXT, kota_penerbit TEXT, penandatangan TEXT, no_invoice_internal TEXT, tgl_tukar_faktur DATE, tgl_batal DATE, diinput_oleh TEXT, link_pdf_lokal TEXT, format_tipe TEXT DEFAULT 'LEGACY', status_faktur TEXT DEFAULT 'Normal', masa_pajak TEXT, no_faktur_normal TEXT, waktu_input DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+            const alterCols = ['alamat_penjual TEXT', 'alamat_pembeli TEXT', 'diskon REAL', 'uang_muka REAL', 'kota_penerbit TEXT', 'penandatangan TEXT', 'harga_jual REAL', 'format_tipe TEXT', 'status_faktur TEXT', 'masa_pajak TEXT', 'no_faktur_normal TEXT', 'tgl_batal DATE'];
             alterCols.forEach(col => { db.run(`ALTER TABLE data_${mod.id} ADD COLUMN ${col}`, () => { }); });
             db.run(`CREATE TABLE IF NOT EXISTS item_${mod.id} (id INTEGER PRIMARY KEY AUTOINCREMENT, no_faktur TEXT, nama_barang TEXT, harga_satuan REAL, qty REAL, satuan TEXT, diskon REAL, total_harga REAL)`);
         } else {
@@ -845,10 +849,12 @@ app.get('/api/project-summary/:id', cekAuth, (req, res) => {
                                       d.dpp as dpp_full, d.ppn as ppn_full
                                FROM data_vatout d
                                LEFT JOIN porsi_vatout p ON p.no_faktur = d.no_faktur AND p.anggota = ?
-                               WHERE d.entitas = 'JO' ORDER BY d.tanggal_faktur ASC`;
+                               WHERE d.entitas = 'JO' AND (d.tgl_batal IS NULL OR d.tgl_batal = '') ORDER BY d.tanggal_faktur ASC`;
+        // Faktur non-JO & faktur masukan per proyek; grup yang faktur tertingginya dibatalkan ikut dikeluarkan
+        const whereProyek = `(d.kode_cabang = ? OR d.project_id = ?)`;
         const queryKeluaran = isJOProject
             ? (cb) => db.all(sqlKeluaranJO, [proj.nama_cabang], cb)
-            : (cb) => db.all(`SELECT d.tanggal_faktur as tanggal, d.no_faktur as no_faktur, d.nama_pembeli as client, d.dpp, d.ppn, d.kode_vo FROM data_vatout d WHERE d.kode_cabang = ? OR d.project_id = ?`, [projectId, projectId], cb);
+            : (cb) => db.all(`SELECT d.tanggal_faktur as tanggal, d.no_faktur as no_faktur, d.nama_pembeli as client, d.dpp, d.ppn, d.kode_vo FROM data_vatout d WHERE ${whereProyek} AND (d.tgl_batal IS NULL OR d.tgl_batal = '')`, [projectId, projectId], cb);
 
         queryKeluaran((err, keluaran) => {
             if (err) {
@@ -857,15 +863,30 @@ app.get('/api/project-summary/:id', cekAuth, (req, res) => {
             }
 
             // Query faktur masukan
-            db.all(`SELECT d.tanggal_faktur as tanggal, d.no_faktur as no_faktur, d.nama_penjual as supplier, d.dpp, d.ppn FROM data_vatin d WHERE d.kode_cabang = ? OR d.project_id = ?`, [projectId, projectId], (err, masukan) => {
+            db.all(`SELECT d.tanggal_faktur as tanggal, d.no_faktur as no_faktur, d.nama_penjual as supplier, d.dpp, d.ppn, d.tgl_batal, d.status_faktur FROM data_vatin d WHERE ${whereProyek}`, [projectId, projectId], (err, masukanSemua) => {
                 if (err) {
                     console.error('Error querying data_vatin:', err);
                     return res.status(500).json({ error: 'Database error' });
                 }
 
+                // Buang grup faktur masukan yang dibatalkan (faktur tertinggi dalam grup punya tgl_batal)
+                const grupBatal = new Set();
+                const grupMasukan = {};
+                (masukanSemua || []).forEach(r => {
+                    const f = r.no_faktur || '';
+                    const key = f.length >= 5 ? f.substring(4) : f;
+                    (grupMasukan[key] = grupMasukan[key] || []).push(r);
+                });
+                const rankStatus = (x) => { const m = (x.status_faktur || '').match(/Pengganti\s+(\d+)/); return m ? 10 + parseInt(m[1]) : 1; };
+                Object.values(grupMasukan).forEach(rowsG => {
+                    const puncak = rowsG.reduce((a, b) => (rankStatus(b) > rankStatus(a) ? b : a));
+                    if (puncak.tgl_batal) rowsG.forEach(r => grupBatal.add(r.no_faktur));
+                });
+                const masukan = (masukanSemua || []).filter(r => !grupBatal.has(r.no_faktur));
+
                 res.json({
                     keluaran: keluaran || [],
-                    masukan: masukan || [],
+                    masukan: masukan,
                     porsi_anggota: isJOProject ? proj.nama_cabang : null
                 });
             });
@@ -924,7 +945,8 @@ app.get('/api/prepaid-comparison/:noBppu', cekAuth, (req, res) => {
 
         const placeholders = refs.map(() => '?').join(',');
         const sql = `SELECT * FROM data_vatout 
-                     WHERE no_invoice_internal IN (${placeholders}) OR no_faktur IN (${placeholders})`;
+                     WHERE no_invoice_internal IN (${placeholders}) OR no_faktur IN (${placeholders})
+                                          AND (tgl_batal IS NULL OR tgl_batal = '')`;
 
         // Kita masukkan array refs dua kali untuk mencakup kedua kolom di IN clause
         db.all(sql, [...refs, ...refs], (err2, rows) => {
@@ -969,7 +991,7 @@ app.get('/api/prepaid-comparison-bulk', cekAuth, (req, res) => {
     const entitas = req.query.entitas || 'BBS';
     db.all(`SELECT * FROM data_prepaid WHERE entitas = ?`, [entitas], (err, prepaids) => {
         if (err) return res.status(500).json({ error: err.message });
-        db.all(`SELECT no_faktur, no_invoice_internal, ppn, dpp, harga_jual FROM data_vatout WHERE entitas = ?`, [entitas], (err2, vatouts) => {
+        db.all(`SELECT no_faktur, no_invoice_internal, ppn, dpp, harga_jual, tgl_batal FROM data_vatout WHERE entitas = ? AND (tgl_batal IS NULL OR tgl_batal = '')`, [entitas], (err2, vatouts) => {
             if (err2) return res.status(500).json({ error: err2.message });
 
             // Index faktur keluaran berdasarkan referensi internal & nomor faktur
@@ -997,7 +1019,7 @@ app.get('/api/prepaid-comparison-bulk', cekAuth, (req, res) => {
                 // (stabil untuk rezim 2024 maupun 2025+ dan faktur UM/Pelunasan).
                 // DPP tercetak & Harga Jual ikut dikirim untuk transparansi tampilan.
                 let totalPpn = 0, totalDpp = 0, totalHJ = 0;
-                matched.forEach(v => { totalPpn += (v.ppn || 0); totalDpp += (v.dpp || 0); totalHJ += (v.harga_jual || 0); });
+                matched.forEach(v => { if (v.tgl_batal) return; totalPpn += (v.ppn || 0); totalDpp += (v.dpp || 0); totalHJ += (v.harga_jual || 0); });
                 result[p.no_bppu] = {
                     dpp: Math.round(totalPpn / 0.11),
                     ppn: totalPpn,
@@ -1015,7 +1037,7 @@ app.get('/api/prepaid-comparison-bulk', cekAuth, (req, res) => {
 // API: Summary Prepaid Tax
 app.get('/api/summary-prepaid', cekAuth, (req, res) => {
     const entitas = req.query.entitas || 'BBS';
-    db.all(`SELECT v.no_faktur, v.tanggal_faktur, strftime('%d-%m-%Y', v.tanggal_faktur) AS tanggal_faktur_format, strftime('%m-%Y', v.tanggal_faktur) AS masa_pajak_faktur, d.masa_pajak AS masa_pajak_bppu, COUNT(*) AS jumlah_bppu, COALESCE(SUM(d.dpp), 0) AS total_dpp, COALESCE(SUM(d.nilai_pph), 0) AS total_pph FROM data_prepaid d LEFT JOIN data_vatout v ON d.no_invoice_internal = v.no_invoice_internal AND d.entitas = v.entitas WHERE d.entitas = ? GROUP BY v.no_faktur, v.tanggal_faktur, d.masa_pajak ORDER BY v.tanggal_faktur DESC, d.masa_pajak`, [entitas], (err, rows) => {
+    db.all(`SELECT v.no_faktur, v.tanggal_faktur, strftime('%d-%m-%Y', v.tanggal_faktur) AS tanggal_faktur_format, strftime('%m-%Y', v.tanggal_faktur) AS masa_pajak_faktur, d.masa_pajak AS masa_pajak_bppu, COUNT(*) AS jumlah_bppu, COALESCE(SUM(d.dpp), 0) AS total_dpp, COALESCE(SUM(d.nilai_pph), 0) AS total_pph FROM data_prepaid d LEFT JOIN data_vatout v ON d.no_invoice_internal = v.no_invoice_internal AND d.entitas = v.entitas AND (v.tgl_batal IS NULL OR v.tgl_batal = '') WHERE d.entitas = ? GROUP BY v.no_faktur, v.tanggal_faktur, d.masa_pajak ORDER BY v.tanggal_faktur DESC, d.masa_pajak`, [entitas], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows || []);
     });
@@ -1119,7 +1141,7 @@ modules.forEach(mod => {
         let baseSql = mod.id.startsWith('vat')
             ? `FROM data_${mod.id} d LEFT JOIN master_cabang c ON d.kode_cabang = c.kode_cabang WHERE d.entitas = ?`
             : mod.id === 'prepaid'
-            ? `FROM data_${mod.id} d LEFT JOIN master_cabang c ON d.kode_cabang = c.kode_cabang LEFT JOIN data_vatout v ON d.no_invoice_internal = v.no_invoice_internal AND d.entitas = v.entitas WHERE d.entitas = ?`
+            ? `FROM data_${mod.id} d LEFT JOIN master_cabang c ON d.kode_cabang = c.kode_cabang LEFT JOIN data_vatout v ON d.no_invoice_internal = v.no_invoice_internal AND d.entitas = v.entitas AND (v.tgl_batal IS NULL OR v.tgl_batal = '') WHERE d.entitas = ?`
             : `FROM data_${mod.id} d LEFT JOIN master_cabang c ON d.kode_cabang = c.kode_cabang WHERE d.entitas = ?`;
 
         let params = [entitas];
@@ -1221,6 +1243,7 @@ modules.forEach(mod => {
                         // Hitung stats dari deduplicated data
                         let total_dpp = 0, total_tax = 0, cur_jml = 0, cur_tax = 0, prev_jml = 0, prev_tax = 0;
                         deduplicatedRows.forEach(row => {
+                            if (row.tgl_batal) return; // Faktur batal tidak dihitung di statistik
                             total_dpp += (row.dpp || 0);
                             total_tax += (row.ppn || 0);
 
@@ -1236,7 +1259,7 @@ modules.forEach(mod => {
                         });
 
                         // Continue dengan query untuk display (paginated, dengan original filter)
-                        let selectSql = `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_faktur) AS tanggal_format, strftime('%d-%m-%Y', d.tgl_tukar_faktur) AS tgl_tukar_format, d.status_faktur, d.masa_pajak, d.no_faktur_normal ${baseSql} ORDER BY CAST(SUBSTR(d.no_invoice_internal, 1, MAX(1, INSTR(d.no_invoice_internal, '/') - 1)) AS INTEGER) ASC, d.waktu_input DESC`;
+                        let selectSql = `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_faktur) AS tanggal_format, strftime('%d-%m-%Y', d.tgl_tukar_faktur) AS tgl_tukar_format, strftime('%d-%m-%Y', d.tgl_batal) AS tgl_batal_format, d.status_faktur, d.masa_pajak, d.no_faktur_normal ${baseSql} ORDER BY CAST(SUBSTR(d.no_invoice_internal, 1, MAX(1, INSTR(d.no_invoice_internal, '/') - 1)) AS INTEGER) ASC, d.waktu_input DESC`;
 
                         const limitParams = [...params];
                         if (limit) {
@@ -1268,12 +1291,12 @@ modules.forEach(mod => {
                         COALESCE(SUM(CASE WHEN strftime('%Y-%m', ${colTgl}) = ? THEN ${colTax} ELSE 0 END), 0) as cur_tax,
                         COALESCE(SUM(CASE WHEN strftime('%Y-%m', ${colTgl}) = ? THEN 1 ELSE 0 END), 0) as prev_jml,
                         COALESCE(SUM(CASE WHEN strftime('%Y-%m', ${colTgl}) = ? THEN ${colTax} ELSE 0 END), 0) as prev_tax
-                        ${baseSql}`;
+                        ${baseSql}${mod.id.startsWith('vat') ? " AND (d.tgl_batal IS NULL OR d.tgl_batal = '')" : ''}`;
                     const statsParams = [curYM, curYM, prevYM, prevYM, ...params];
 
                     db.get(statsSql, statsParams, (errS, statsRow) => {
                         let selectSql = mod.id.startsWith('vat')
-                            ? `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_faktur) AS tanggal_format, strftime('%d-%m-%Y', d.tgl_tukar_faktur) AS tgl_tukar_format, d.status_faktur, d.masa_pajak, d.no_faktur_normal ${baseSql} ORDER BY CAST(SUBSTR(d.no_invoice_internal, 1, MAX(1, INSTR(d.no_invoice_internal, '/') - 1)) AS INTEGER) ASC, d.waktu_input DESC`
+                            ? `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_faktur) AS tanggal_format, strftime('%d-%m-%Y', d.tgl_tukar_faktur) AS tgl_tukar_format, strftime('%d-%m-%Y', d.tgl_batal) AS tgl_batal_format, d.status_faktur, d.masa_pajak, d.no_faktur_normal ${baseSql} ORDER BY CAST(SUBSTR(d.no_invoice_internal, 1, MAX(1, INSTR(d.no_invoice_internal, '/') - 1)) AS INTEGER) ASC, d.waktu_input DESC`
                             : mod.id === 'prepaid'
                             ? `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_dokumen) AS tgl_dokumen_format, strftime('%m-%Y', v.tanggal_faktur) AS masa_pajak_faktur ${baseSql} ORDER BY d.waktu_input DESC`
                             : `SELECT d.*, c.nama_cabang, strftime('%d-%m-%Y', d.tanggal_dokumen) AS tgl_dokumen_format ${baseSql} ORDER BY d.waktu_input DESC`;
@@ -1988,6 +2011,26 @@ io.on('connection', (socket) => {
                         kirimRequest(null);
                     }
                 });
+            }
+        }
+        else if (d.action === 'BATAL' || d.action === 'AKTIFKAN') {
+            // Pembatalan faktur pajak (BATAL) & pengaktifan kembali (AKTIFKAN), hanya modul VAT
+            if (isBPPU) return socket.emit('error-action', { message: 'Pembatalan faktur hanya berlaku untuk modul VAT IN / VAT OUT.' });
+            const tanggalBatal = (d.newData && d.newData.tanggalBatal ? String(d.newData.tanggalBatal) : '').trim();
+            if (d.action === 'BATAL' && (!tanggalBatal || tanggalBatal === '-')) {
+                return socket.emit('error-action', { message: 'Tanggal pembatalan wajib diisi.' });
+            }
+            if (isSupervisor) {
+                const nilaiBatal = d.action === 'BATAL' ? tanggalBatal : null;
+                db.run(`UPDATE data_${d.mod} SET tgl_batal = ? WHERE no_faktur = ?`, [nilaiBatal, d.faktur], () => {
+                    insertAuditLog(socket.user.id, socket.user.username, d.action === 'BATAL' ? 'BATAL' : 'AKTIFKAN', d.mod.toUpperCase(),
+                        d.action === 'BATAL' ? `Supervisor membatalkan faktur ${d.faktur} (tanggal batal ${tanggalBatal})` : `Supervisor mengaktifkan kembali faktur ${d.faktur}`);
+                    io.emit(`data-baru-${d.mod}`);
+                });
+            } else {
+                const requestValue = JSON.stringify({ faktur: d.faktur, tanggal: d.action === 'BATAL' ? tanggalBatal : null });
+                db.run(`INSERT INTO user_requests (user_id, username, jenis_request, nilai_baru) VALUES (?, ?, ?, ?)`,
+                    [d.id_user, d.username, `${d.action}_${d.mod.toUpperCase()}`, requestValue], () => io.emit('request-updated'));
             }
         }
     });
@@ -2915,6 +2958,27 @@ io.on('connection', (socket) => {
                             }
                         });
                     }
+                }
+                else if (req.jenis_request.startsWith('BATAL_') || req.jenis_request.startsWith('AKTIFKAN_')) {
+                    const targetMod = req.jenis_request.split('_')[1].toLowerCase();
+                    // SECURITY FIX (C2): hanya modul VAT yang mengenal pembatalan faktur
+                    if (!['vatin', 'vatout'].includes(targetMod)) {
+                        db.run(`UPDATE user_requests SET status = 'Ditolak' WHERE id = ?`, [d.req_id], () => io.emit('request-updated'));
+                        return;
+                    }
+                    // FIX: JSON.parse tanpa pengaman bisa menghentikan proses server jika payload korup
+                    let val;
+                    try { val = JSON.parse(req.nilai_baru); } catch (e) {
+                        return socket.emit('error-action', { message: `Gagal memproses request #${d.req_id}: format data pengajuan tidak valid.` });
+                    }
+                    const v = val.new || val;
+                    db.run(`UPDATE data_${targetMod} SET tgl_batal = ? WHERE no_faktur = ?`, [v.tanggal || null, v.faktur], () => {
+                        insertAuditLog(socket.user.id, socket.user.username, req.jenis_request.startsWith('BATAL_') ? 'BATAL' : 'AKTIFKAN', targetMod.toUpperCase(),
+                            `Persetujuan ${req.jenis_request}: faktur ${v.faktur}${v.tanggal ? ' (tanggal batal ' + v.tanggal + ')' : ''}`);
+                        db.run(`UPDATE user_requests SET status = 'Disetujui' WHERE id = ?`, [d.req_id], () => {
+                            io.emit('request-updated'); io.emit(`data-baru-${targetMod}`);
+                        });
+                    });
                 }
             } else {
                 db.run(`UPDATE user_requests SET status = 'Ditolak' WHERE id = ?`, [d.req_id], () => io.emit('request-updated'));

@@ -1,0 +1,1 @@
+Client-side HTML/JS pages for managing Indonesian output VAT invoices, providing a register dashboard, a PDF upload/verification inbox with manual data completion, and a summary analytics view backed by REST and Socket.IO.

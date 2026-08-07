@@ -1,6 +1,0 @@
-- Each page initializes its active entity from `localStorage.getItem('lastEntitas')` and exposes a global `window.gantiEntitas(entitas)` function to switch entities across all views.
-- Server communication follows a consistent pattern: REST endpoints return JSON with `{ data, total, stats }` shapes, while state changes are propagated via Socket.IO events listened on both the dashboard and inbox pages.
-- Per-column filtering is implemented by attaching `.filter-input` (or `.filter-input-inbox`) inputs in a filter row, debouncing input at 500ms, and serializing non-empty filters into a `search` query parameter as a JSON string.
-- The VAT OUT invoice selection UI is duplicated across dashboard and inbox pages using the same structure: a search input, an auto-populated dropdown from `/api/available-vatout`, a toggle to manual input mode, and a selected-items list persisted as a comma-separated hidden field.
-- Maker-checker authorization is enforced by checking `currentUser.role` against `['supervisor', 'administrator']` before allowing direct actions; non-supervisors submit requests via `socket.emit('request-action-faktur', ...)` instead of calling APIs directly.
-- Branch selection is locked to a single fixed value (`Berca JO`) when `aktifEntitas === 'JO'`, otherwise populated dynamically from `/api/branches?entitas=...`.

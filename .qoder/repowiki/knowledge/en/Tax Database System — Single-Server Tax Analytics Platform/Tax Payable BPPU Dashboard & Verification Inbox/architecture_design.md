@@ -1,6 +1,0 @@
-Two standalone HTML pages share a common client-side architecture built on top of shared scripts loaded from `/` (`theme.js`, `toast.js`, `pagination.js`, `utils.js`, `sidebar.js`) and Socket.IO for real-time communication.
-
-- `dashboard_payable.html`: Displays paginated BPPU records via server-side filtering (`/api/data-payable`), shows aggregate stats (total docs, PPh, DPP, pending count), supports inline search with debounced filters, and provides Edit/Delete actions routed through a Maker-Checker role model (supervisor/administrator can delete directly; others submit requests via `request-action-faktur`).
-- `inbox_payable.html`: Handles PDF batch upload using pdf.js to extract text client-side, emits chunks via `upload-pdf-payable-batch`, listens for `upload-batch-selesai` progress events, and provides a verification modal (`bukaJalurManual`) that cross-references VAT IN invoices (`/api/data-vatin`) by NPWP/name matching before final submission via `simpan-final-payable`.
-
-Both pages fetch the sidebar dynamically from `/sidebar.html`, resolve the current user from `/api/me`, and persist the active entity (`lastEntitas`) in localStorage. Server communication uses both REST (`fetch`) and Socket.IO events, with the inbox page also listening for `update-tabel-payable` and `hapus-inbox-payable`.

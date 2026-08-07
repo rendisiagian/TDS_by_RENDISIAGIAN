@@ -209,11 +209,26 @@
             </div>
         </div>
     </div>
+
+    <!-- MODAL PEMBATALAN FAKTUR: minta tanggal pembatalan; faktur batal tetap tersimpan sebagai jejak audit -->
+    <div id="modalBatalFaktur" class="modal-overlay">
+        <div class="modal-box" style="max-width: 440px;">
+            <h3 style="border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; color: #dc2626;">&#128683; Pembatalan Faktur Pajak</h3>
+            <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 8px;">Faktur: <b id="batal-faktur-title"></b></p>
+            <p style="font-size: 0.78rem; color: #b91c1c; margin-bottom: 15px;">Faktur yang dibatalkan tidak dihitung dalam seluruh rekapitulasi (DPP/PPN), termasuk faktur Normal bila faktur ini adalah Pengganti terakhir. Data tetap tersimpan sebagai jejak audit.</p>
+            <div class="form-group"><label>Tanggal Pembatalan</label><input type="date" id="batal_tanggal"></div>
+            <div style="display:flex; gap:10px; margin-top: 20px;">
+                <button class="btn-simpan" style="background-color: #dc2626; flex: 2;" onclick="submitBatal()">&#128683; Batalkan Faktur</button>
+                <button class="btn-simpan btn-cancel" style="flex: 1; margin-top:0;" onclick="document.getElementById('modalBatalFaktur').style.display='none'">Tutup</button>
+            </div>
+        </div>
+    </div>
     <script>
         const socket = io();
         let aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
         let currentUser = {};
         let targetEditFaktur = '';
+        let targetBatalFaktur = '';
         // PORSI JO: DPP/PPN total faktur yang sedang diedit (basis perhitungan persen)
         let editDppTotal = 0;
         let editPpnTotal = 0;
@@ -333,6 +348,9 @@
                 let curVO = baris.kode_vo || '';
                 let barisNo = offset + index + 1; // Penomoran Akurat
 
+                // Faktur batal: baris diredupkan agar mudah dibedakan (tetap tampil sebagai jejak audit)
+                if (baris.tgl_batal) tr.style.opacity = '0.55';
+
                 tr.innerHTML = `
                     <td class="text-center">${barisNo}</td>
                     <td class="text-center" style="white-space:nowrap;"></td>
@@ -341,7 +359,8 @@
                     <td class="text-center">${baris.no_invoice_internal || '-'}</td>
                     <td class="text-bold">${baris.nama_pembeli || '-'}</td>
                     <td class="text-center" style="font-weight:bold;">
-                        ${baris.status_faktur === 'Normal' ? '<span class="status-badge status-normal" style="font-size: 0.8rem;">Normal</span>' : 
+                        ${baris.tgl_batal ? `<span class="status-badge" style="font-size: 0.8rem; background:#fee2e2; color:#dc2626;" title="Tanggal batal: ${baris.tgl_batal_format || baris.tgl_batal}">Dibatalkan</span>` :
+                          baris.status_faktur === 'Normal' ? '<span class="status-badge status-normal" style="font-size: 0.8rem;">Normal</span>' : 
                           `<span class="status-badge status-pengganti" style="font-size: 0.8rem;">${baris.status_faktur || '-'}</span>`}
                     </td>
                     <td class="text-center" style="color:#ea580c; font-weight:bold;">${baris.no_faktur || '-'}</td>
@@ -362,10 +381,18 @@
                 const btnEdit = document.createElement('button');
                 btnEdit.className = 'btn-tbl btn-tbl-edit'; btnEdit.title = 'Edit'; btnEdit.textContent = 'Edit';
                 btnEdit.onclick = () => handleAction(baris.no_faktur, 'EDIT', curBr, curInv, curTgl, curVO, baris.dpp, baris.ppn);
+                const btnBatal = document.createElement('button');
+                if (baris.tgl_batal) {
+                    btnBatal.className = 'btn-tbl btn-tbl-view'; btnBatal.title = 'Aktifkan kembali faktur ini'; btnBatal.textContent = 'Aktifkan';
+                    btnBatal.onclick = () => handleAction(baris.no_faktur, 'AKTIFKAN');
+                } else {
+                    btnBatal.className = 'btn-tbl btn-tbl-del'; btnBatal.title = 'Batalkan faktur ini'; btnBatal.textContent = 'Batal';
+                    btnBatal.onclick = () => handleAction(baris.no_faktur, 'BATAL');
+                }
                 const btnDel = document.createElement('button');
                 btnDel.className = 'btn-tbl btn-tbl-del'; btnDel.title = 'Hapus'; btnDel.textContent = 'Hapus';
                 btnDel.onclick = () => handleAction(baris.no_faktur, 'DELETE');
-                aksiCell.append(btnView, ' ', btnEdit, ' ', btnDel);
+                aksiCell.append(btnView, ' ', btnEdit, ' ', btnBatal, ' ', btnDel);
 
                 const pdfCell = tr.children[2];
                 if (baris.link_pdf_lokal) {
@@ -531,6 +558,27 @@
 
                 document.getElementById('modalEditData').style.display = 'flex';
             }
+            else if (actionType === 'BATAL') {
+                targetBatalFaktur = noFaktur;
+                document.getElementById('batal-faktur-title').innerText = noFaktur;
+                document.getElementById('batal_tanggal').value = new Date().toISOString().slice(0, 10);
+                document.getElementById('modalBatalFaktur').style.display = 'flex';
+            }
+            else if (actionType === 'AKTIFKAN') {
+                showConfirm(isSupervisor ? `Aktifkan kembali faktur ${noFaktur}?` : `Ajukan pengaktifan kembali faktur ${noFaktur} ke Supervisor?`, function() {
+                    socket.emit('request-action-faktur', { action: 'AKTIFKAN', mod: 'vatout', faktur: noFaktur, id_user: currentUser.id, username: currentUser.username, role: currentUser.role, newData: { tanggalBatal: '' } });
+                    if (!isSupervisor) showToast('Permintaan pengaktifan kembali diajukan.', 'info');
+                }, { title: 'Aktifkan Kembali Faktur' });
+            }
+        }
+
+        function submitBatal() {
+            const isSupervisor = ['supervisor', 'administrator'].includes((currentUser.role || '').toLowerCase());
+            const tanggalBatal = document.getElementById('batal_tanggal').value;
+            if (!tanggalBatal) return showToast('Tanggal pembatalan wajib diisi!', 'warning');
+            socket.emit('request-action-faktur', { action: 'BATAL', mod: 'vatout', faktur: targetBatalFaktur, id_user: currentUser.id, username: currentUser.username, role: currentUser.role, newData: { tanggalBatal } });
+            document.getElementById('modalBatalFaktur').style.display = 'none';
+            if (!isSupervisor) showToast('Permintaan pembatalan diajukan ke Panel Approval.', 'info');
         }
 
         async function autoLoadVOs(branchKode, selectedVO = '') {

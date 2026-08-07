@@ -1,1 +1,0 @@
-Node.js + Express, sqlite3 (with Promise wrappers `dbGet`/`dbRun`), express-session with bcryptjs for password hashing, socket.io for real-time features, helmet for security headers, express-rate-limit for brute-force protection, dotenv for environment config, and client-side SheetJS (XLSX) for Excel export with a legacy HTML-to-XLS fallback.

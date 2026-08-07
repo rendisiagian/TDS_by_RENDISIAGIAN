@@ -1,6 +1,0 @@
-- Each page loads shared shell scripts (`/theme.js`, `/toast.js`, `/export.js`, `/sidebar.js`, `/utils.js`) and a global stylesheet (`/style.css`) from the root path rather than bundling them.
-- Entity context is persisted in `localStorage.lastEntitas` and every API call appends `?entitas=<value>` as the first query parameter.
-- Sidebar injection follows a fixed pattern: `fetch('/sidebar.html').then(res => res.text()).then(html => document.getElementById('sidebar-container').innerHTML = html)`.
-- Error handling uses explicit `res.ok` checks before parsing JSON, followed by a guard ensuring payload fields are arrays before iteration.
-- DOM manipulation avoids innerHTML string interpolation for user-controlled values; buttons and rows are created via DOM APIs to prevent XSS (as documented in BUG-2 FIX comments).
-- Socket.IO event names follow a `<action>-<module>` naming convention (`upload-pdf-vatin-batch`, `request-action-faktur`, `data-baru-vatin`, `upload-batch-selesai`) with `mod: 'vatin'` in payloads.

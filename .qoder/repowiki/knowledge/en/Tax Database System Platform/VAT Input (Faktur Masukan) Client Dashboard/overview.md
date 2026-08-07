@@ -1,0 +1,1 @@
+Client-side Indonesian VAT input (faktur masukan) module providing a register dashboard, integrity audit view, and period-over-period summary charts backed by vendor PDF archives.

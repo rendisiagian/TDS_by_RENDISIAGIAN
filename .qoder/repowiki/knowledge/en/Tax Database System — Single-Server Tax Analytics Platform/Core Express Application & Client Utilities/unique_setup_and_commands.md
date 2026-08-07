@@ -1,1 +1,0 @@
-Requires a `.env` file with at least `PORT` and `SESSION_SECRET` (minimum 32 characters, non-default); on first run the server creates default users (`admin` / `rendisiagian`) with bcrypt-hashed password `Emergent@2024!` and seeds `master_cabang` entries. The SQLite database `tax_database.db` is auto-created along with all tables and indexes on startup.

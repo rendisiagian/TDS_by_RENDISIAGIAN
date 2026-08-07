@@ -1,1 +1,0 @@
-Client-side VAT Out (Indonesian output VAT invoice) management UI providing a dashboard register, a PDF upload/verification inbox with manual data completion, and a summary analytics page backed by server APIs.

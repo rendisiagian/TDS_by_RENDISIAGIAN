@@ -1,0 +1,1 @@
+Client-side HTML pages for the Prepaid Tax (BPPU) module that render the BPPU register, manage a verification inbox with PDF upload and review, and compare BPPU vs VAT OUT invoices by tax period.

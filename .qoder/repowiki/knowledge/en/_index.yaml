@@ -3,11 +3,11 @@ schema_version: 1
 locale: en-US
 branch: main
 nodes_managed: true
-exported_at: "2026-08-06T09:19:59Z"
+exported_at: "2026-08-07T08:36:57Z"
 modules:
     "":
-        dir_name: Tax Database System — Single-Server Tax Analytics Platform
-        title: Tax Database System — Single-Server Tax Analytics Platform
+        dir_name: Tax Database System Platform
+        title: Tax Database System Platform
         scope: []
         source_files: []
         children:
@@ -21,8 +21,8 @@ modules:
         depends_on: []
         related_to: []
     core_app:
-        dir_name: Core Express Application & Client Utilities
-        title: Core Express Application & Client Utilities
+        dir_name: Tax Management App Server & Client Utilities
+        title: Tax Management App Server & Client Utilities
         scope:
             - app.js
             - export.js
@@ -30,16 +30,22 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to: []
+        related_to:
+            - path: prepaid_tax
+            - path: taxpayable_bppu
+            - path: vat_input
+            - path: vat_output
     prepaid_tax:
-        dir_name: Prepaid Tax (BPPU) Dashboard, Inbox & Summary
-        title: Prepaid Tax (BPPU) Dashboard, Inbox & Summary
+        dir_name: Prepaid Tax (BPPU) Client Dashboard, Inbox & Summary
+        title: Prepaid Tax (BPPU) Client Dashboard, Inbox & Summary
         scope:
             - prepaidtax_bppu/
         source_files: []
         children: []
         depends_on: []
-        related_to: []
+        related_to:
+            - path: core_app
+            - path: shared_ui
     project_docs:
         dir_name: Tax Database System Documentation
         title: Tax Database System Documentation
@@ -52,8 +58,8 @@ modules:
         depends_on: []
         related_to: []
     shared_ui:
-        dir_name: Shared UI — Sidebar, Theme & Global Styles
-        title: Shared UI — Sidebar, Theme & Global Styles
+        dir_name: Shared Sidebar, Theme & Design System
+        title: Shared Sidebar, Theme & Design System
         scope:
             - sidebar.js
             - theme.js
@@ -61,32 +67,42 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to: []
+        related_to:
+            - path: prepaid_tax
+            - path: taxpayable_bppu
+            - path: vat_input
+            - path: vat_output
     taxpayable_bppu:
-        dir_name: Tax Payable BPPU Dashboard & Verification Inbox
-        title: Tax Payable BPPU Dashboard & Verification Inbox
+        dir_name: Tax Payable (BPPU) Dashboard & Inbox Pages
+        title: Tax Payable (BPPU) Dashboard & Inbox Pages
         scope:
             - taxpayable_bppu/dashboard_payable.html
             - taxpayable_bppu/inbox_payable.html
         source_files: []
         children: []
         depends_on: []
-        related_to: []
+        related_to:
+            - path: core_app
+            - path: shared_ui
     vat_input:
-        dir_name: VAT Input (Faktur Masukan) Frontend & Document Archive
-        title: VAT Input (Faktur Masukan) Frontend & Document Archive
+        dir_name: VAT Input (Faktur Masukan) Client Dashboard
+        title: VAT Input (Faktur Masukan) Client Dashboard
         scope:
             - vat_in/
         source_files: []
         children: []
         depends_on: []
-        related_to: []
+        related_to:
+            - path: core_app
+            - path: shared_ui
     vat_output:
-        dir_name: VAT Out (Faktur Keluaran) Dashboard & Verification Inbox
-        title: VAT Out (Faktur Keluaran) Dashboard & Verification Inbox
+        dir_name: VAT Out (Indonesian Output VAT Invoice) Management UI
+        title: VAT Out (Indonesian Output VAT Invoice) Management UI
         scope:
             - vat_out/
         source_files: []
         children: []
         depends_on: []
-        related_to: []
+        related_to:
+            - path: core_app
+            - path: shared_ui

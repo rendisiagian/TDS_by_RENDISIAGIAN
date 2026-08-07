@@ -6,6 +6,12 @@
 - [TDS_Sequence_Diagram.md](file://TDS_Sequence_Diagram.md)
 </cite>
 
+## Update Summary
+**Changes Made**
+- Added new `/api/porsi-vatout/:faktur` endpoint for retrieving internal portion records supporting edit and view operations
+- Enhanced `/api/project-summary/:id` endpoint to include `porsi_anggota` field for JO member perspective display
+- Added `/api/prepaid-comparison-bulk` endpoint for bulk comparison functionality replacing inefficient per-item queries
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Project Structure](#project-structure)
@@ -18,7 +24,7 @@
 9. [Conclusion](#conclusion)
 
 ## Introduction
-This document provides comprehensive REST API documentation for the TDS system. It covers HTTP endpoints for master data, audit logs, migrations, project management, and item/detail retrieval. For each endpoint, we specify method, URL pattern, authentication and authorization requirements, parameters, request/response formats, and practical usage notes. The backend is implemented using Express.js with SQLite storage and session-based authentication.
+This document provides comprehensive REST API documentation for the TDS system. It covers HTTP endpoints for master data, audit logs, migrations, project management, items, details, and auxiliary APIs including new bulk comparison and internal portion management features. For each endpoint, we specify method, URL pattern, authentication and authorization requirements, parameters, request/response formats, and practical usage notes. The backend is implemented using Express.js with SQLite storage and session-based authentication.
 
 ## Project Structure
 The API surface is primarily defined in the server entry file. Key areas:
@@ -38,31 +44,32 @@ Routes --> Audit["Audit Logging"]
 ```
 
 **Diagram sources**
-- [app.js:486-494](file://app.js#L486-L494)
-- [app.js:528-536](file://app.js#L528-L536)
-- [app.js:539-544](file://app.js#L539-L544)
+- [app.js:504-512](file://app.js#L504-L512)
+- [app.js:546-554](file://app.js#L546-L554)
+- [app.js:557-575](file://app.js#L557-L575)
 
 **Section sources**
-- [app.js:486-494](file://app.js#L486-L494)
-- [app.js:528-536](file://app.js#L528-L536)
-- [app.js:539-544](file://app.js#L539-L544)
+- [app.js:504-512](file://app.js#L504-L512)
+- [app.js:546-554](file://app.js#L546-L554)
+- [app.js:557-575](file://app.js#L557-L575)
 
 ## Core Components
 - Authentication middleware ensures only logged-in users can access protected routes.
 - RBAC middleware enforces role-based permissions for sensitive endpoints.
 - Database helpers wrap SQLite operations for queries and transactions.
 - Export endpoints support filtered reporting across modules.
+- New bulk comparison and internal portion management capabilities enhance performance and functionality.
 
 Key implementation references:
-- Authentication and RBAC: [app.js:486-494](file://app.js#L486-L494)
-- Static protection for HTML routes: [app.js:528-536](file://app.js#L528-L536)
-- Database initialization and helpers: [app.js:341-347](file://app.js#L341-L347), [app.js:57-58](file://app.js#L57-L58)
+- Authentication and RBAC: [app.js:504-512](file://app.js#L504-L512)
+- Static protection for HTML routes: [app.js:546-554](file://app.js#L546-L554)
+- Database initialization and helpers: [app.js:65-69](file://app.js#L65-L69), [app.js:351-499](file://app.js#L351-L499)
 
 **Section sources**
-- [app.js:486-494](file://app.js#L486-L494)
-- [app.js:528-536](file://app.js#L528-L536)
-- [app.js:341-347](file://app.js#L341-L347)
-- [app.js:57-58](file://app.js#L57-L58)
+- [app.js:504-512](file://app.js#L504-L512)
+- [app.js:546-554](file://app.js#L546-L554)
+- [app.js:65-69](file://app.js#L65-L69)
+- [app.js:351-499](file://app.js#L351-L499)
 
 ## Architecture Overview
 The API follows a layered architecture:
@@ -89,9 +96,9 @@ API-->>Client : "JSON Response"
 ```
 
 **Diagram sources**
-- [app.js:486-494](file://app.js#L486-L494)
-- [app.js:528-536](file://app.js#L528-L536)
-- [app.js:539-544](file://app.js#L539-L544)
+- [app.js:504-512](file://app.js#L504-L512)
+- [app.js:546-554](file://app.js#L546-L554)
+- [app.js:557-575](file://app.js#L557-L575)
 
 ## Detailed Component Analysis
 
@@ -118,9 +125,9 @@ API-->>Client : "JSON Response"
   - Behavior: Destroys session and redirects to login
 
 **Section sources**
-- [app.js:1212-1225](file://app.js#L1212-L1225)
-- [app.js:1226-1227](file://app.js#L1226-L1227)
-- [app.js:486-494](file://app.js#L486-L494)
+- [app.js:1434-1444](file://app.js#L1434-L1444)
+- [app.js:1419-1433](file://app.js#L1419-L1433)
+- [app.js:504-512](file://app.js#L504-L512)
 
 ### Master Data APIs
 - Endpoint: GET /api/master-cabang-all
@@ -151,10 +158,10 @@ API-->>Client : "JSON Response"
   - Response: Array of users with id, username, nama_lengkap, role
 
 **Section sources**
-- [app.js:539-544](file://app.js#L539-L544)
-- [app.js:546-553](file://app.js#L546-L553)
-- [app.js:1227-1228](file://app.js#L1227-L1228)
-- [app.js:1229-1230](file://app.js#L1229-L1230)
+- [app.js:557-563](file://app.js#L557-L563)
+- [app.js:565-571](file://app.js#L565-L571)
+- [app.js:1445-1446](file://app.js#L1445-L1446)
+- [app.js:1446-1447](file://app.js#L1446-L1447)
 
 ### Audit Logs API
 - Endpoint: GET /api/audit-logs
@@ -165,7 +172,7 @@ API-->>Client : "JSON Response"
   - Notes: Administrative audit trail
 
 **Section sources**
-- [app.js:554-558](file://app.js#L554-L558)
+- [app.js:573-575](file://app.js#L573-L575)
 
 ### Migration APIs
 - Endpoint: POST /api/migrate-vatin-status
@@ -184,8 +191,8 @@ API-->>Client : "JSON Response"
   - Notes: Validates migration outcomes
 
 **Section sources**
-- [app.js:559-568](file://app.js#L559-L568)
-- [app.js:641-645](file://app.js#L641-L645)
+- [app.js:577-657](file://app.js#L577-L657)
+- [app.js:741-814](file://app.js#L741-L814)
 
 ### Project Management APIs
 - Endpoint: GET /api/projects
@@ -208,12 +215,25 @@ API-->>Client : "JSON Response"
   - Auth: cekAuth
   - Path: id (required)
   - Response: Aggregated financial summary across related modules
-  - Notes: Cross-module aggregation for reporting
+  - **Updated**: Now includes `porsi_anggota` field for JO member perspective display when dealing with JO projects
+  - Notes: Cross-module aggregation for reporting with enhanced JO project support
 
 **Section sources**
-- [app.js:716-718](file://app.js#L716-L718)
-- [app.js:725-727](file://app.js#L725-L727)
-- [app.js:733-735](file://app.js#L733-L735)
+- [app.js:817-823](file://app.js#L817-L823)
+- [app.js:825-831](file://app.js#L825-L831)
+- [app.js:833-874](file://app.js#L833-L874)
+
+### Internal Portion Management APIs
+- Endpoint: GET /api/porsi-vatout/:faktur
+  - Method: GET
+  - URL: /api/porsi-vatout/:faktur
+  - Auth: cekAuth
+  - Path: faktur (required)
+  - Response: Array of internal portion records { anggota, dpp_porsi, ppn_porsi }
+  - Notes: Retrieves internal portion allocation records for JO member perspective display and editing
+
+**Section sources**
+- [app.js:892-898](file://app.js#L892-L898)
 
 ### Item APIs
 - Endpoint: GET /api/items/:mod/:faktur
@@ -225,7 +245,7 @@ API-->>Client : "JSON Response"
   - Notes: Supports module-specific item retrieval
 
 **Section sources**
-- [app.js:758-760](file://app.js#L758-L760)
+- [app.js:900-902](file://app.js#L900-L902)
 
 ### Detail APIs
 - Endpoint: GET /api/detail-vatin/:faktur
@@ -245,10 +265,10 @@ API-->>Client : "JSON Response"
   - Notes: Retrieves detailed invoice data for VATOUT
 
 **Section sources**
-- [app.js:763-765](file://app.js#L763-L765)
-- [app.js:767-769](file://app.js#L767-L769)
+- [app.js:904-907](file://app.js#L904-L907)
+- [app.js:909-911](file://app.js#L909-L911)
 
-### Additional Reporting and Utility APIs
+### Prepaid Comparison APIs
 - Endpoint: GET /api/prepaid-comparison/:noBppu
   - Method: GET
   - URL: /api/prepaid-comparison/:noBppu
@@ -257,6 +277,20 @@ API-->>Client : "JSON Response"
   - Response: Comparison data for prepaid entries
   - Notes: Supports reconciliation workflows
 
+- Endpoint: GET /api/prepaid-comparison-bulk
+  - Method: GET
+  - URL: /api/prepaid-comparison-bulk
+  - Auth: cekAuth
+  - Query: entitas (optional; defaults to 'BBS')
+  - Response: Bulk comparison results mapping BPPU numbers to aggregated VATOUT data
+  - **New**: Replaces inefficient per-item queries with single bulk operation for improved performance
+  - Notes: Provides comprehensive comparison data for all prepaid entries within an entity in one request
+
+**Section sources**
+- [app.js:913-964](file://app.js#L913-L964)
+- [app.js:966-1013](file://app.js#L966-L1013)
+
+### Additional Reporting and Utility APIs
 - Endpoint: GET /api/summary-prepaid
   - Method: GET
   - URL: /api/summary-prepaid
@@ -294,19 +328,18 @@ API-->>Client : "JSON Response"
   - Notes: Multi-module overview
 
 **Section sources**
-- [app.js:772-774](file://app.js#L772-L774)
-- [app.js:818-820](file://app.js#L818-L820)
-- [app.js:827-829](file://app.js#L827-L829)
-- [app.js:1191-1210](file://app.js#L1191-L1210)
-- [app.js:1235-1285](file://app.js#L1235-L1285)
-- [app.js:1286-1288](file://app.js#L1286-L1288)
+- [app.js:1015-1022](file://app.js#L1015-L1022)
+- [app.js:1024-1098](file://app.js#L1024-L1098)
+- [app.js:1399-1417](file://app.js#L1399-L1417)
+- [app.js:1453-1503](file://app.js#L1453-L1503)
+- [app.js:1504-1562](file://app.js#L1504-L1562)
 
 ### Requests and Approvals
 - Endpoint: GET /api/my-requests
   - Method: GET
   - URL: /api/my-requests
   - Auth: cekAuth
-  - Response: User’s pending/approved requests
+  - Response: User's pending/approved requests
   - Notes: Self-service request history
 
 - Endpoint: GET /api/pending-requests
@@ -317,8 +350,8 @@ API-->>Client : "JSON Response"
   - Notes: Supervisor dashboard for approvals
 
 **Section sources**
-- [app.js:1229-1231](file://app.js#L1229-L1231)
-- [app.js:1231-1233](file://app.js#L1231-L1233)
+- [app.js:1447-1448](file://app.js#L1447-L1448)
+- [app.js:1448-1449](file://app.js#L1448-L1449)
 
 ### Export APIs
 - Endpoint: GET /api/export/vatout
@@ -364,6 +397,7 @@ API-->>Client : "JSON Response"
 - Database operations are centralized with helper wrappers for queries and runs.
 - Export endpoints depend on filtered queries and workbook generation utilities.
 - Audit logging is integrated into mutation workflows.
+- New bulk comparison endpoints reduce database load by consolidating multiple queries.
 
 ```mermaid
 graph LR
@@ -375,45 +409,50 @@ Routes --> Export["Export Utils"]
 ```
 
 **Diagram sources**
-- [app.js:486-494](file://app.js#L486-L494)
-- [app.js:539-544](file://app.js#L539-L544)
-- [app.js:364-366](file://app.js#L364-L366)
+- [app.js:504-512](file://app.js#L504-L512)
+- [app.js:557-575](file://app.js#L557-L575)
+- [app.js:375-379](file://app.js#L375-L379)
 
 **Section sources**
-- [app.js:486-494](file://app.js#L486-L494)
-- [app.js:539-544](file://app.js#L539-L544)
-- [app.js:364-366](file://app.js#L364-L366)
+- [app.js:504-512](file://app.js#L504-L512)
+- [app.js:557-575](file://app.js#L557-L575)
+- [app.js:375-379](file://app.js#L375-L379)
 
 ## Performance Considerations
 - Pagination and debounced SQL logic are used for data-vatin listings to reduce load.
 - Indexes are created on frequently queried columns to improve query performance.
 - Rate limiting is applied to login attempts to mitigate brute-force attacks.
+- **Updated**: New bulk comparison endpoint (`/api/prepaid-comparison-bulk`) replaces N+1 query patterns for improved performance.
+- **Updated**: Internal portion management reduces redundant database calls for JO member calculations.
 
 Practical tips:
 - Prefer filtered queries with appropriate LIMIT/OFFSET for large datasets.
 - Use entity and branch filters to minimize result sets.
 - Leverage export endpoints for bulk operations instead of repeated GET calls.
+- Use bulk comparison endpoints for better performance when processing multiple prepaid items.
 
 **Section sources**
 - [TDS_Sequence_Diagram.md:107-108](file://TDS_Sequence_Diagram.md#L107-L108)
-- [app.js:477-481](file://app.js#L477-L481)
-- [app.js:80-87](file://app.js#L80-L87)
+- [app.js:485-499](file://app.js#L485-L499)
+- [app.js:91-97](file://app.js#L91-L97)
+- [app.js:966-1013](file://app.js#L966-L1013)
 
 ## Troubleshooting Guide
 Common errors and resolutions:
 - 401 Unauthorized: Occurs when accessing protected endpoints without a valid session. Ensure the user is logged in and the session cookie is present.
-- 403 Forbidden: Occurs when the user’s role lacks permission for the endpoint. Verify the user role and required roles for the endpoint.
+- 403 Forbidden: Occurs when the user's role lacks permission for the endpoint. Verify the user role and required roles for the endpoint.
 - 500 Internal Server Error: Indicates database or server-side issues. Check server logs and ensure database connectivity and table integrity.
 
 Operational checks:
 - Confirm authentication middleware is invoked before RBAC for all protected endpoints.
 - Validate that static HTML protection prevents direct access to .html files.
 - Review audit logs for mutation events and approval trails.
+- Monitor bulk comparison endpoints for performance improvements over individual queries.
 
 **Section sources**
-- [app.js:486-494](file://app.js#L486-L494)
-- [app.js:528-536](file://app.js#L528-L536)
-- [app.js:364-366](file://app.js#L364-L366)
+- [app.js:504-512](file://app.js#L504-L512)
+- [app.js:546-554](file://app.js#L546-L554)
+- [app.js:375-379](file://app.js#L375-L379)
 
 ## Conclusion
-The TDS REST API provides comprehensive coverage for master data, audit logs, migrations, project management, items, and details, along with robust authentication and export capabilities. Adhering to the documented authentication and authorization requirements ensures secure and reliable access to system resources. For production usage, follow the parameter specifications and response formats outlined above, and leverage the export endpoints for efficient reporting workflows.
+The TDS REST API provides comprehensive coverage for master data, audit logs, migrations, project management, items, details, and auxiliary APIs, along with robust authentication and export capabilities. Recent enhancements include improved performance through bulk comparison operations and enhanced JO project support with internal portion management. Adhering to the documented authentication and authorization requirements ensures secure and reliable access to system resources. For production usage, follow the parameter specifications and response formats outlined above, and leverage the optimized endpoints for efficient reporting workflows.

@@ -1,0 +1,6 @@
+- Server data is fetched via `fetch('/api/...')` with `entitas` passed as a query parameter, and the active entity is persisted in `localStorage.lastEntitas` and synchronized through a global `window.gantiEntitas(entitas)` function exposed by both pages.
+- Real-time updates use Socket.IO: pages emit action events (e.g., `request-action-faktur`, `simpan-final-payable`) and listen for corresponding events (e.g., `data-baru-payable`, `update-tabel-payable`, `upload-batch-selesai`) rather than polling.
+- Table filtering uses debounced input listeners (500ms timeout) that collect values from `.filter-input` elements into a `currentSearch` object and re-fetch data from the server with JSON-encoded search parameters.
+- User roles gate actions through a Maker-Checker pattern: non-supervisor users trigger socket-based approval requests while supervisors execute actions directly, with toast notifications distinguishing between direct and request-based operations.
+- Modal dialogs follow a consistent structure with a `.modal-overlay` wrapper, a `.modal-box` content area, and explicit show/hide via `style.display = 'flex'` / `'none'`, with form validation performed before emitting socket events.
+- Action buttons are created via DOM API (`document.createElement`) with `onclick` handlers bound programmatically instead of inline `onclick` attributes to avoid XSS risks.

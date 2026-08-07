@@ -1,1 +1,0 @@
-No build step required — pages are served directly by the web server. PDF upload requires pdf.js worker loaded from CDN (`https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`). Entity scoping is controlled via `localStorage.lastEntitas` (default `'BBS'`) and propagated to all API calls through the `entitas` query parameter.
