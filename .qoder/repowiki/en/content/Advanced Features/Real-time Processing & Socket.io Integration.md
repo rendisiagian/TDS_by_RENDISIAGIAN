@@ -5,13 +5,16 @@
 - [app.js](file://app.js)
 - [utils.js](file://utils.js)
 - [pagination.js](file://pagination.js)
-- [vat_out/inbox_vatout.html](file://vat_out/inbox_vatout.html)
+- [vat_in/dashboard_vatin.html](file://vat_in/dashboard_vatin.html)
+- [vat_out/dashboard_vatout.html](file://vat_out/dashboard_vatout.html)
+- [audit_logs.html](file://audit_logs.html)
 </cite>
 
 ## Update Summary
 **Changes Made**
 - Updated Socket.IO implementation with streamlined role-based access control and enhanced validation
 - **NEW**: Enhanced PDF archive cleanup system ensuring proper removal of physical PDF files when records are deleted
+- **NEW**: Enhanced Socket.io handlers now support BATAL (cancel) and AKTIFKAN (activate) events with role-based access controls and audit logging for invoice cancellation workflows
 - Consolidated helper functions for improved security and maintainability
 - Enhanced security measures including session validation and role-based authorization
 - Streamlined batch upload workflows while maintaining real-time update capabilities
@@ -30,7 +33,7 @@
 10. [Appendices](#appendices)
 
 ## Introduction
-This document explains the real-time processing system built on Socket.io, focusing on batch PDF upload workflows, live data updates, and real-time synchronization between clients and the server. The system has been streamlined with improved role-based access control, enhanced security measures, and consolidated helper functions while maintaining robust real-time update capabilities for document processing workflows across multiple tax modules (VAT IN, VAT OUT, Prepaid Tax, Tax Payable). **The system now includes comprehensive PDF archive cleanup functionality to prevent orphaned files when records are deleted.**
+This document explains the real-time processing system built on Socket.io, focusing on batch PDF upload workflows, live data updates, and real-time synchronization between clients and the server. The system has been streamlined with improved role-based access control, enhanced security measures, and consolidated helper functions while maintaining robust real-time update capabilities for document processing workflows across multiple tax modules (VAT IN, VAT OUT, Prepaid Tax, Tax Payable). **The system now includes comprehensive PDF archive cleanup functionality to prevent orphaned files when records are deleted and enhanced invoice cancellation workflows with BATAL (cancel) and AKTIFKAN (activate) event support.**
 
 ## Project Structure
 The real-time features are implemented primarily in the server-side application with module-specific client pages:
@@ -46,22 +49,26 @@ APP["app.js<br/>Socket.io server + event handlers"]
 UTILS["utils.js<br/>Shared helper functions"]
 end
 subgraph "Clients"
-Vatin["vat_in/dashboard_vatin.html<br/>VAT IN Batch Upload"]
-Vatout["vat_out/inbox_vatout.html<br/>VAT OUT Live Updates"]
+Vatin["vat_in/dashboard_vatin.html<br/>VAT IN Batch Upload & Cancellation"]
+Vatout["vat_out/dashboard_vatout.html<br/>VAT OUT Live Updates & Cancellation"]
 Prepaid["prepaidtax_bppu/dashboard_prepaid.html<br/>Prepaid Batch Upload"]
 Payable["taxpayable_bppu/dashboard_payable.html<br/>Payable Batch Upload"]
+Audit["audit_logs.html<br/>Audit Log Monitoring"]
 end
 Vatin --> APP
 Vatout --> APP
 Prepaid --> APP
 Payable --> APP
+Audit --> APP
 APP --> UTILS
 ```
 
 **Diagram sources**
 - [app.js](file://app.js)
 - [utils.js](file://utils.js)
-- [vat_out/inbox_vatout.html](file://vat_out/inbox_vatout.html)
+- [vat_in/dashboard_vatin.html](file://vat_in/dashboard_vatin.html)
+- [vat_out/dashboard_vatout.html](file://vat_out/dashboard_vatout.html)
+- [audit_logs.html](file://audit_logs.html)
 
 **Section sources**
 - [app.js](file://app.js)
@@ -70,6 +77,7 @@ APP --> UTILS
 ## Core Components
 - Socket.io server initialization with enhanced buffer sizing for large PDF payloads
 - **Enhanced PDF archive cleanup system** that systematically removes physical PDF files when database records are deleted
+- **Enhanced invoice cancellation workflow** supporting BATAL (cancel) and AKTIFKAN (activate) events with role-based access controls
 - Streamlined batch upload handlers for all tax modules with improved validation
 - Real-time notifications for upload completion and module-wide data changes
 - Action request pipeline with enhanced supervisor checks and comprehensive audit logging
@@ -78,9 +86,11 @@ APP --> UTILS
 
 Key implementation anchors:
 - Server initialization and enhanced buffer size: [app.js](file://app.js)
-- **PDF archive cleanup function**: [hapusArsipFisik:1882-1887](file://app.js#L1882-L1887)
+- **PDF archive cleanup function**: [hapusArsipFisik:1905-1910](file://app.js#L1905-L1910)
+- **BATAL/AKTIFKAN event handlers**: [request-action-faktur:2016-2035](file://app.js#L2016-L2035)
+- **Approval workflow for cancellations**: [proses-request handler:2962-2982](file://app.js#L2962-L2982)
 - Streamlined batch upload events and completion notifications: [app.js](file://app.js)
-- Client-side batch upload triggers and progress handling: [vat_out/inbox_vatout.html](file://vat_out/inbox_vatout.html)
+- Client-side batch upload triggers and progress handling: [vat_in/dashboard_vatin.html](file://vat_in/dashboard_vatin.html)
 - Action request handling and real-time emits: [app.js](file://app.js)
 - Shared utility functions: [utils.js](file://utils.js)
 
@@ -89,7 +99,7 @@ Key implementation anchors:
 - [utils.js](file://utils.js)
 
 ## Architecture Overview
-The real-time architecture centers on Socket.io for bidirectional communication with enhanced security and validation. Clients emit batch upload requests and action commands; the server validates, processes, persists data, broadcasts live updates, and **ensures proper cleanup of associated PDF archives**. Security and audit are enforced server-side with improved role-based access control.
+The real-time architecture centers on Socket.io for bidirectional communication with enhanced security and validation. Clients emit batch upload requests and action commands; the server validates, processes, persists data, broadcasts live updates, and **ensures proper cleanup of associated PDF archives**. Security and audit are enforced server-side with improved role-based access control. **The system now supports comprehensive invoice cancellation workflows with BATAL (cancel) and AKTIFKAN (activate) events, featuring role-based permissions and complete audit trails.**
 
 ```mermaid
 sequenceDiagram
@@ -102,17 +112,15 @@ Socket->>Socket : "Validate payload and module"
 Socket->>DB : "Insert parsed records (pending)"
 DB-->>Socket : "OK"
 Socket-->>Client : "upload-batch-selesai"<br/>result stats
-Client->>Socket : "request-action-faktur"<br/>{ mod, action, faktur, newData }
+Client->>Socket : "request-action-faktur"<br/>{ mod, action : 'BATAL', faktur, newData }
 Socket->>Socket : "Authorize and validate"
-alt Supervisor/Admin Delete
-Socket->>DB : "SELECT link_pdf_lokal before DELETE"
-DB-->>Socket : "PDF path info"
-Socket->>DB : "DELETE record"
+alt Supervisor/BATAL
+Socket->>DB : "UPDATE tgl_batal for faktur"
 DB-->>Socket : "OK"
-Socket->>FS : "hapusArsipFisik() - Remove PDF file"
-FS-->>Socket : "File removed"
-else Non-supervisor
-Socket->>DB : "Insert user_requests"
+Socket->>DB : "INSERT audit_logs (BATAL)"
+DB-->>Socket : "OK"
+else Non-supervisor/BATAL
+Socket->>DB : "INSERT user_requests (Pending)"
 DB-->>Socket : "OK"
 end
 Socket-->>Client : "data-baru-{mod}"
@@ -132,6 +140,42 @@ Operational highlights:
 - Enhanced buffer sizing for large payloads: [app.js](file://app.js)
 - Per-connection user context and dummy mode simulation: [app.js](file://app.js)
 - Real-time emits after DB operations with improved error handling: [app.js](file://app.js)
+
+**Section sources**
+- [app.js](file://app.js)
+
+### Enhanced Invoice Cancellation Workflow (BATAL & AKTIFKAN)
+**Updated** The system now supports comprehensive invoice cancellation workflows with BATAL (cancel) and AKTIFKAN (activate) events, featuring role-based access controls and complete audit logging.
+
+The cancellation workflow works as follows:
+- **Role-based Access Control**: Only supervisors and administrators can directly cancel invoices; regular users must submit requests for approval
+- **Validation Requirements**: BATAL actions require a valid cancellation date; AKTIFKAN actions clear the cancellation date
+- **Module Restriction**: Cancellation is only supported for VAT IN and VAT OUT modules (not applicable to BPPU modules)
+- **Audit Trail**: All cancellation activities are logged with user information, timestamps, and detailed descriptions
+- **Real-time Updates**: Changes are immediately broadcast to all connected clients via `data-baru-{mod}` events
+
+```mermaid
+sequenceDiagram
+participant UI as "User Interface"
+participant Sock as "Socket.io Server"
+participant DB as "Database"
+UI->>Sock : "request-action-faktur<br/>{action : 'BATAL', faktur, tanggalBatal}"
+Sock->>Sock : "Validate role and module"
+alt Supervisor/Admin
+Sock->>DB : "UPDATE data_{mod} SET tgl_batal = ?"
+DB-->>Sock : "OK"
+Sock->>DB : "INSERT audit_logs (BATAL)"
+DB-->>Sock : "OK"
+Sock-->>UI : "data-baru-{mod}"
+else Regular User
+Sock->>DB : "INSERT user_requests (Pending)"
+DB-->>Sock : "OK"
+Sock-->>UI : "request-updated"
+end
+```
+
+**Diagram sources**
+- [app.js](file://app.js)
 
 **Section sources**
 - [app.js](file://app.js)
@@ -188,15 +232,16 @@ Sock-->>UI : "upload-batch-selesai"<br/>{ total, sukses, duplikat, gagal }
 
 **Diagram sources**
 - [app.js](file://app.js)
-- [vat_out/inbox_vatout.html](file://vat_out/inbox_vatout.html)
+- [vat_in/dashboard_vatin.html](file://vat_in/dashboard_vatin.html)
 
 **Section sources**
 - [app.js](file://app.js)
-- [vat_out/inbox_vatout.html](file://vat_out/inbox_vatout.html)
+- [vat_in/dashboard_vatin.html](file://vat_in/dashboard_vatin.html)
 
 ### Enhanced Real-time Data Updates and Synchronization
 - After successful edits/deletes or bulk actions, the server emits module-specific real-time events to synchronize client views
 - **With integrated PDF archive cleanup**, deletions now ensure both database records and physical files are removed
+- **Cancellation workflow updates** trigger immediate UI refreshes across all connected clients
 - Clients listen for these events and refresh their UI accordingly with improved error handling
 
 ```mermaid
@@ -205,11 +250,15 @@ participant Client as "Any Module UI"
 participant Sock as "Socket.io Server"
 participant DB as "SQLite"
 participant FS as "File System"
-Sock->>DB : "Apply change (edit/delete)"
+Sock->>DB : "Apply change (edit/delete/cancel)"
 DB-->>Sock : "OK"
 alt Delete operation
 Sock->>FS : "Cleanup associated PDF files"
 FS-->>Sock : "Files removed"
+end
+alt Cancel/Activate operation
+Sock->>DB : "Update tgl_batal field"
+DB-->>Sock : "OK"
 end
 Sock-->>Client : "data-baru-{mod}"
 Client->>Client : "Reload filtered data and metrics"
@@ -225,6 +274,7 @@ Client->>Client : "Reload filtered data and metrics"
 - Clients can request edits/deletes via a dedicated action event with enhanced validation
 - Supervisor/admin roles bypass direct changes; others trigger approval workflows
 - **Deletion requests now include automatic PDF archive cleanup** after approval
+- **Cancellation requests follow the same approval pattern** with BATAL_ and AKTIFKAN_ prefixes
 - Audit logs are inserted for transparency with comprehensive tracking
 
 ```mermaid
@@ -273,7 +323,7 @@ The real-time system relies on:
 
 ```mermaid
 graph LR
-PDFJS["PDF.js (Client)"] --> Inbox["Module Inbox Pages"]
+PDFJS["PDF.js (Client)"] --> Inbox["Module Dashboard Pages"]
 Inbox --> SocketIO["Socket.io Client"]
 SocketIO --> Server["app.js"]
 Server --> SQLite["SQLite Database"]
@@ -285,7 +335,7 @@ Utils --> Frontend["Frontend Applications"]
 **Diagram sources**
 - [app.js](file://app.js)
 - [utils.js](file://utils.js)
-- [vat_out/inbox_vatout.html](file://vat_out/inbox_vatout.html)
+- [vat_in/dashboard_vatin.html](file://vat_in/dashboard_vatin.html)
 
 **Section sources**
 - [app.js](file://app.js)
@@ -294,6 +344,7 @@ Utils --> Frontend["Frontend Applications"]
 ## Performance Considerations
 - Large payload handling: Server buffer sizing accommodates substantial PDFs with improved memory management
 - **Efficient PDF cleanup**: File deletion is performed asynchronously to avoid blocking database operations
+- **Optimized cancellation workflow**: Direct supervisor actions bypass approval queue for better performance
 - Chunked uploads: Client splits files into manageable chunks to reduce memory pressure and improve reliability
 - Debounced filtering and server-side pagination minimize UI lag and database load
 - Real-time emits are scoped to module-specific channels to avoid unnecessary broadcasts
@@ -305,6 +356,7 @@ Recommendations:
 - Implement rate limiting for repeated action requests
 - Leverage consolidated utility functions for consistent performance
 - **Monitor file system operations for cleanup efficiency**
+- **Track cancellation request approval times for workflow optimization**
 
 **Section sources**
 - [app.js](file://app.js)
@@ -323,7 +375,14 @@ Common issues and resolutions:
   - Ensure the server emits the correct channel (e.g., data-baru-{mod})
   - Confirm clients listen for the appropriate event
   - Check connection authentication and session validation
-  - References: [app.js](file://app.js), [vat_out/inbox_vatout.html](file://vat_out/inbox_vatout.html)
+  - References: [app.js](file://app.js), [vat_in/dashboard_vatin.html](file://vat_in/dashboard_vatin.html)
+
+- **Invoice cancellation not working**
+  - Verify the action type is correctly set to 'BATAL' or 'AKTIFKAN'
+  - Check that the module is VAT IN or VAT OUT (not BPPU modules)
+  - For BATAL actions, ensure a valid cancellation date is provided
+  - Verify user has appropriate role permissions (supervisor/administrator for direct action)
+  - References: [app.js](file://app.js)
 
 - **Orphaned PDF files after deletion**
   - Verify the `hapusArsipFisik()` function is being called after database deletions
@@ -341,14 +400,21 @@ Common issues and resolutions:
   - Check consolidated utility function usage
   - References: [pagination.js](file://pagination.js), [utils.js](file://utils.js)
 
+- **Cancellation requests stuck in pending status**
+  - Check the approval panel for pending requests
+  - Verify supervisor/administrator is reviewing and approving/rejecting requests
+  - Monitor audit logs for cancellation-related entries
+  - References: [audit_logs.html](file://audit_logs.html), [app.js](file://app.js)
+
 **Section sources**
 - [app.js](file://app.js)
 - [pagination.js](file://pagination.js)
 - [utils.js](file://utils.js)
-- [vat_out/inbox_vatout.html](file://vat_out/inbox_vatout.html)
+- [vat_in/dashboard_vatin.html](file://vat_in/dashboard_vatin.html)
+- [audit_logs.html](file://audit_logs.html)
 
 ## Conclusion
-The real-time processing system leverages Socket.io to deliver responsive batch PDF ingestion, live synchronization, and secure action workflows across tax modules. **The enhanced PDF archive cleanup system ensures data integrity by preventing orphaned files when records are deleted.** The streamlined implementation with improved role-based access control, enhanced security measures, and consolidated helper functions ensures maintainability. With proper monitoring and scaling strategies, the system can handle increased loads while maintaining responsiveness and security.
+The real-time processing system leverages Socket.io to deliver responsive batch PDF ingestion, live synchronization, and secure action workflows across tax modules. **The enhanced invoice cancellation workflow with BATAL (cancel) and AKTIFKAN (activate) events provides comprehensive control over invoice status management with role-based permissions and complete audit trails.** The enhanced PDF archive cleanup system ensures data integrity by preventing orphaned files when records are deleted. The streamlined implementation with improved role-based access control, enhanced security measures, and consolidated helper functions ensures maintainability. With proper monitoring and scaling strategies, the system can handle increased loads while maintaining responsiveness and security.
 
 ## Appendices
 
@@ -359,6 +425,8 @@ The real-time processing system leverages Socket.io to deliver responsive batch 
   - upload-pdf-prepaid-batch: { files[], entitas, username }
   - upload-pdf-payable-batch: { files[], entitas, username }
   - request-action-faktur: { mod, action, faktur, newData?, id_user?, username? }
+    - **New**: action can be 'BATAL' or 'AKTIFKAN' for invoice cancellation workflows
+    - **New**: newData.tanggalBatal required for BATAL actions
   - tambah-cabang, edit-cabang, hapus-cabang, tambah-kontak, edit-kontak, hapus-kontak (admin-only)
 
 - Server to Client
@@ -371,8 +439,9 @@ Security and validation:
 - Dummy mode simulation for safe testing
 - Role-based access checks with enhanced validation
 - Module whitelist enforcement
+- **Enhanced invoice cancellation workflow with role-based permissions**
 - **Automatic PDF archive cleanup on record deletion**
-- Audit log insertion for all sensitive actions
+- **Comprehensive audit logging for all cancellation activities**
 - Session validation and authentication
 
 **Section sources**
@@ -383,6 +452,7 @@ Security and validation:
 - Broadcast scope: Limit emits to module-specific channels to reduce overhead
 - Database contention: Use transactions and batch writes for uploads; consider read replicas for reporting
 - **File system scalability**: Consider distributed file storage solutions for large-scale PDF archive management
+- **Cancellation workflow scalability**: Approval queues should be monitored and optimized for high-volume environments
 - Horizontal scaling: Distribute clients across nodes and route Socket.io connections via a load balancer supporting WebSocket passthrough
 - Consolidated utilities: Reduce code duplication and improve maintainability across scaled instances
 

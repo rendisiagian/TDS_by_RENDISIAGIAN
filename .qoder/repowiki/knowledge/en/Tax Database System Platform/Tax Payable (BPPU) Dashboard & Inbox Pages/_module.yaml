@@ -6,6 +6,4 @@ scope:
     - taxpayable_bppu/inbox_payable.html
 source_files: []
 depends_on: []
-related_to:
-    - path: core_app
-    - path: shared_ui
+related_to: []

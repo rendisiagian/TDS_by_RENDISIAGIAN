@@ -3,7 +3,7 @@ schema_version: 1
 locale: en-US
 branch: main
 nodes_managed: true
-exported_at: "2026-08-07T08:36:57Z"
+exported_at: "2026-08-07T10:07:19Z"
 modules:
     "":
         dir_name: Tax Database System Platform
@@ -31,8 +31,6 @@ modules:
         children: []
         depends_on: []
         related_to:
-            - path: prepaid_tax
-            - path: taxpayable_bppu
             - path: vat_input
             - path: vat_output
     prepaid_tax:
@@ -43,9 +41,7 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: core_app
-            - path: shared_ui
+        related_to: []
     project_docs:
         dir_name: Tax Database System Documentation
         title: Tax Database System Documentation
@@ -67,11 +63,7 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: prepaid_tax
-            - path: taxpayable_bppu
-            - path: vat_input
-            - path: vat_output
+        related_to: []
     taxpayable_bppu:
         dir_name: Tax Payable (BPPU) Dashboard & Inbox Pages
         title: Tax Payable (BPPU) Dashboard & Inbox Pages
@@ -81,9 +73,7 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: core_app
-            - path: shared_ui
+        related_to: []
     vat_input:
         dir_name: VAT Input (Faktur Masukan) Client Dashboard
         title: VAT Input (Faktur Masukan) Client Dashboard
@@ -94,10 +84,9 @@ modules:
         depends_on: []
         related_to:
             - path: core_app
-            - path: shared_ui
     vat_output:
-        dir_name: VAT Out (Indonesian Output VAT Invoice) Management UI
-        title: VAT Out (Indonesian Output VAT Invoice) Management UI
+        dir_name: VAT Out Invoice Output & Verification Portal
+        title: VAT Out Invoice Output & Verification Portal
         scope:
             - vat_out/
         source_files: []
@@ -105,4 +94,3 @@ modules:
         depends_on: []
         related_to:
             - path: core_app
-            - path: shared_ui

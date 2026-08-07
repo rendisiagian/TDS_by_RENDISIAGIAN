@@ -12,6 +12,13 @@
 - [prepaidtax_bppu/inbox_prepaid.html](file://prepaidtax_bppu/inbox_prepaid.html)
 </cite>
 
+## Update Summary
+**Changes Made**
+- Enhanced `/api/project-summary/:id` endpoint to include JO member allocation data via `porsi_anggota` field
+- Updated multiple aggregation endpoints to exclude cancelled invoices (where `tgl_batal` is set) from statistics
+- Added comprehensive cancelled invoice filtering across VAT OUT queries and dashboard summaries
+- Enhanced project summary response structure with JO-specific allocation handling
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Project Structure](#project-structure)
@@ -171,19 +178,43 @@ WS-->>Client : emit update-tabel-*, data-baru-*
 - [app.js](file://app.js)
 
 #### Analytics and Reporting
+
+##### Project Summary API
+- GET /api/project-summary/:id
+  - **Updated**: Enhanced with JO member allocation support
+  - Query: projectId (path parameter)
+  - Response: 
+    ```json
+    {
+      "keluaran": [...], // VAT OUT invoices (excludes cancelled)
+      "masukan": [...], // VAT IN invoices (excludes cancelled groups)
+      "porsi_anggota": "JO_MEMBER_CODE" | null // JO member allocation for JO projects
+    }
+    ```
+  - **Key Changes**:
+    - For JO projects (entitas='JO'), joins with `porsi_vatout` table to get member-specific allocations
+    - Excludes cancelled invoices where `tgl_batal IS NULL OR tgl_batal = ''`
+    - Returns `porsi_anggota` field indicating the JO member code for allocation calculations
+  - **Cancelled Invoice Handling**: Both keluaran and masukan arrays exclude cancelled invoices through SQL filters and grouping logic
+
+**Updated** Enhanced project summary endpoint now supports JO member allocation data and excludes cancelled invoices from aggregations
+
+**Section sources**
+- [app.js:837-895](file://app.js#L837-L895)
+
+##### Other Analytics Endpoints
 - GET /api/projects
   - Query: entitas (default BBS)
   - Response: Branch list suitable for project selection
 - GET /api/vo/:kode_cabang
   - Response: Variation Orders for the branch
-- GET /api/project-summary/:id
-  - Response: { keluaran: [...], masukan: [...] } aggregated by project
 - GET /api/items/:mod/:faktur
   - Response: Line items for the invoice
 - GET /api/detail-vatin/:faktur, GET /api/detail-vatout/:faktur
   - Response: Single invoice record
 - GET /api/prepaid-comparison/:noBppu
   - Response: { prepaid, vatout: aggregated PPN across related invoices }
+  - **Note**: Excludes cancelled invoices in aggregation logic
 - GET /api/summary-prepaid
   - Response: Aggregated prepaid stats
 - GET /api/data-client-ledger
@@ -218,9 +249,10 @@ Notes:
 - GET /api/dashboard-summary
   - Query: entitas (default BBS)
   - Response: Summary metrics across modules
+  - **Note**: All aggregation queries exclude cancelled invoices where applicable
 
 **Section sources**
-- [app.js](file://app.js)
+- [app.js:1476-1526](file://app.js#L1476-L1526)
 
 ### Socket.io Events and Real-Time Workflows
 
@@ -359,6 +391,7 @@ SQLite["sqlite3"] --> App
 - Database indexing: Indexes on frequently queried columns (e.g., entitas + tanggal_faktur)
 - Bulk processing: Promise wrappers for safe bulk operations
 - Pagination and debounce: Implemented in module dashboards to reduce load
+- **Cancelled Invoice Optimization**: SQL queries now filter out cancelled invoices at database level using `(d.tgl_batal IS NULL OR d.tgl_batal = '')` conditions
 
 [No sources needed since this section provides general guidance]
 
@@ -383,12 +416,16 @@ Common issues and remedies:
 - Migration verification:
   - Symptom: Missing status/masa_pajak after migration
   - Action: Run verify endpoint and review samples
+- **Cancelled Invoice Issues**:
+  - Symptom: Statistics don't match expected values
+  - Cause: Cancelled invoices may be excluded from aggregations
+  - Action: Check `tgl_batal` field in database and verify cancellation status
 
 **Section sources**
 - [app.js](file://app.js)
 
 ## Conclusion
-The TDS system combines REST APIs and Socket.io to support batch ingestion, real-time updates, and comprehensive reporting across tax modules. Secure session-based authentication, RBAC, and audit logging protect sensitive operations. The export utilities enable flexible report generation. For production deployments, monitor rate limits, optimize database queries, and ensure proper file permissions for PDF archival.
+The TDS system combines REST APIs and Socket.io to support batch ingestion, real-time updates, and comprehensive reporting across tax modules. Secure session-based authentication, RBAC, and audit logging protect sensitive operations. The export utilities enable flexible report generation. **Recent enhancements include improved project summary API with JO member allocation support and comprehensive cancelled invoice exclusion from all statistical aggregations.** For production deployments, monitor rate limits, optimize database queries, and ensure proper file permissions for PDF archival.
 
 [No sources needed since this section summarizes without analyzing specific files]
 
@@ -411,9 +448,33 @@ The TDS system combines REST APIs and Socket.io to support batch ingestion, real
   - After verifying staging, emit simpan-final-<module> with required metadata
 - Export:
   - Use exportTableData with CSV or Excel format to produce downloadable reports
+- **Project Summary Usage**:
+  - Call `/api/project-summary/:id` to get project data with JO member allocations
+  - Handle `porsi_anggota` field for JO-specific allocation calculations
+  - Note that cancelled invoices are automatically excluded from results
 
 **Section sources**
 - [vat_in/dashboard_vatin.html](file://vat_in/dashboard_vatin.html)
 - [vat_out/inbox_vatout.html](file://vat_out/inbox_vatout.html)
 - [prepaidtax_bppu/inbox_prepaid.html](file://prepaidtax_bppu/inbox_prepaid.html)
 - [export.js](file://export.js)
+
+### Cancelled Invoice Handling
+The system now consistently excludes cancelled invoices from all statistical aggregations:
+
+- **SQL Level Filtering**: Queries use `(d.tgl_batal IS NULL OR d.tgl_batal = '')` conditions
+- **Group-Level Exclusion**: For grouped invoices, if the highest-priority invoice in a group is cancelled, entire group is excluded
+- **Affected Endpoints**:
+  - `/api/project-summary/:id` - Both keluaran and masukan arrays
+  - `/api/dashboard-summary` - All module totals and recent items
+  - `/api/prepaid-comparison*` - VAT OUT comparisons
+  - Module-specific dashboards and summaries
+
+**Section sources**
+- [app.js:852-857](file://app.js#L852-L857)
+- [app.js:872-885](file://app.js#L872-L885)
+- [app.js:1245-1246](file://app.js#L1245-L1246)
+- [app.js:1294](file://app.js#L1294)
+- [app.js:949](file://app.js#L949)
+- [app.js:994](file://app.js#L994)
+- [app.js:1022](file://app.js#L1022)

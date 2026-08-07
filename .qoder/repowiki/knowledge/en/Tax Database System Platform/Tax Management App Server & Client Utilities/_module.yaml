@@ -8,7 +8,5 @@ scope:
 source_files: []
 depends_on: []
 related_to:
-    - path: prepaid_tax
-    - path: taxpayable_bppu
     - path: vat_input
     - path: vat_output

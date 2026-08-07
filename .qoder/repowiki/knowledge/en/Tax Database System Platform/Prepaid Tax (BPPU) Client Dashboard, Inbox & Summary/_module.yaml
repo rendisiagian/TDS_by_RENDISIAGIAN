@@ -5,6 +5,4 @@ scope:
     - prepaidtax_bppu/
 source_files: []
 depends_on: []
-related_to:
-    - path: core_app
-    - path: shared_ui
+related_to: []
