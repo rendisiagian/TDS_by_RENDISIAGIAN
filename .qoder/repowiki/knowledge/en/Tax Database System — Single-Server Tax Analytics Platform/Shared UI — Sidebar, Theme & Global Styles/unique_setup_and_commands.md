@@ -1,0 +1,1 @@
+No build or install commands. Files must be linked in every HTML page that needs the sidebar/theme. The sidebar expects a `#global-entity-select` element and a `#sub-vatout` container; the theme toggle expects elements with ids `dm-icon` and `dm-text`; user display expects `#header-user-name` and optionally `#user-name-display`.

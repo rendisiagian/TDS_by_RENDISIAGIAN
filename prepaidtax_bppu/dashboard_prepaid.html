@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prepaid Tax | Tax Upload and Database</title>
+    <title>Dashboard Prepaid Tax | Tax Database System</title>
     <script src="/theme.js"></script>
     <script src="/toast.js"></script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -90,12 +90,12 @@
 
             <div class="container">
                 <div class="stats-grid" id="stats-cards" data-testid="stats-cards">
-                    <div class="stat-card accent-purple" data-testid="stat-total-doc">
+                    <div class="stat-card accent-blue" data-testid="stat-total-doc">
                         <span class="stat-label">Total Dokumen BPPU</span>
                         <span class="stat-value" id="stat-total">0</span>
                         <div class="stat-mom neutral" id="mom-total">-- vs bulan lalu</div>
                     </div>
-                    <div class="stat-card accent-blue" data-testid="stat-total-ppn">
+                    <div class="stat-card accent-green" data-testid="stat-total-ppn">
                         <span class="stat-label">Total PPh Dipotong</span>
                         <span class="stat-value" id="stat-ppn">Rp 0</span>
                         <div class="stat-mom neutral" id="mom-ppn">-- vs bulan lalu</div>
@@ -105,7 +105,7 @@
                         <span class="stat-value" id="stat-dpp">Rp 0</span>
                     </div>
                     <div class="stat-card accent-orange" data-testid="stat-pending">
-                        <span class="stat-label">Menunggu Verifikasi</span>
+                        <span class="stat-label">Perlu Verifikasi</span>
                         <span class="stat-value" id="stat-pending">0</span>
                         <span class="stat-sub">dokumen dalam antrean</span>
                     </div>
@@ -258,6 +258,8 @@
             });
             const sidebarSelect = document.getElementById('global-entity-select');
             if (sidebarSelect) sidebarSelect.value = aktifEntitas;
+            const subPrepaid = document.getElementById('sub-prepaid');
+            if (subPrepaid) subPrepaid.classList.add('open');
         });
 
         socket.on('data-baru-prepaid', () => loadData(currentPage, currentLimit));
@@ -316,6 +318,13 @@
                 tbody.innerHTML = `<tr><td colspan="14" class="text-center" style="padding:20px; color:var(--text-tertiary);">Data tidak ditemukan.</td></tr>`;
             }
 
+            // PERF FIX: komparasi diambil sekali per halaman lewat endpoint bulk (hindari N+1 fetch per baris)
+            let comparisonMap = {};
+            try {
+                const resBulk = await fetch('/api/prepaid-comparison-bulk?entitas=' + aktifEntitas);
+                if (resBulk.ok) comparisonMap = await resBulk.json();
+            } catch (err) { comparisonMap = {}; }
+
             // BUG-H4 FIX: Gunakan for...of agar baris tabel dirender secara berurutan
             for (const [index, baris] of data.entries()) {
                 const tr = document.createElement('tr');
@@ -323,35 +332,23 @@
                 let curInv = baris.no_invoice_internal || '';
                 let barisNo = offset + index + 1;
 
-                let btnView = `<button class="btn-tbl btn-tbl-view" title="Komparasi Faktur" onclick="viewItems('${baris.no_bppu}')">Lihat</button>`;
-                let btnEdit = `<button class="btn-tbl btn-tbl-edit" title="Edit Data" onclick="handleAction('${baris.no_bppu}', 'EDIT', '${curBr}', '${curInv}', '${(baris.nama_pemotong || '').replace(/'/g, "\\'").replace(/"/g, '&quot;')}')">Edit</button>`;
-                let btnDel = `<button class="btn-tbl btn-tbl-del" title="Hapus Data" onclick="handleAction('${baris.no_bppu}', 'DELETE')">Hapus</button>`;
-                let btnPdf = baris.link_pdf_lokal ? `<a href="/${baris.link_pdf_lokal}" target="_blank" class="btn-tbl btn-tbl-pdf">PDF</a>` : `-`;
-
-                // Hitung selisih DPP
+                // Hitung selisih DPP (dari data komparasi bulk)
                 let selisihText = '<span style="color:var(--text-tertiary);">-</span>';
                 let selisihValue = 0;
-                try {
-                    const resCmp = await fetch(`/api/prepaid-comparison/${baris.no_bppu}`);
-                    const comparisonData = await resCmp.json();
-                    if (comparisonData.prepaid && comparisonData.vatout) {
-                        const dppBP = comparisonData.prepaid.dpp || 0;
-                        const dppVO = comparisonData.vatout.dpp || 0;
-                        const selisih = dppBP - dppVO;
-                        selisihValue = selisih;
-                        const selisihClass = selisih === 0 ? 'color:var(--text-primary)' : (selisih > 0 ? 'color:var(--success-600)' : 'color:var(--danger-600)');
-                        selisihText = `<span style="${selisihClass}; font-weight:600;" data-selisih="${selisih}">${formatRupiah(selisih)}</span>`;
-                    } else {
-                        selisihText = '<span style="color:var(--text-tertiary);" data-selisih="0">-</span>';
-                    }
-                } catch (err) {
-                    selisihText = '<span style="color:var(--text-tertiary);" data-selisih="0">-</span>';
+                const cmp = comparisonMap[baris.no_bppu];
+                if (cmp) {
+                    const dppBP = baris.dpp || 0;
+                    const dppVO = cmp.dpp || 0;
+                    const selisih = dppBP - dppVO;
+                    selisihValue = selisih;
+                    const selisihClass = selisih === 0 ? 'color:var(--text-primary)' : (selisih > 0 ? 'color:var(--success-600)' : 'color:var(--danger-600)');
+                    selisihText = `<span style="${selisihClass}; font-weight:600;" data-selisih="${selisih}">${formatRupiah(selisih)}</span>`;
                 }
 
                 tr.innerHTML = `
                     <td class="text-center">${barisNo}</td>
-                    <td class="text-center" style="white-space:nowrap;">${btnView} ${btnEdit} ${btnDel}</td>
-                    <td class="text-center">${btnPdf}</td>
+                    <td class="text-center" style="white-space:nowrap;"></td>
+                    <td class="text-center"></td>
                     <td class="text-center"><span class="badge-role">${baris.nama_cabang || baris.kode_cabang || '-'}</span></td>
                     <td class="text-center"><span class="badge-success">${baris.masa_pajak || '-'}</span></td>
                     <td class="text-bold">${baris.nama_pemotong || '-'}</td>
@@ -364,6 +361,31 @@
                     <td class="text-center text-diinput">${baris.diinput_oleh || '-'}</td>
                     <td class="text-center">${baris.no_invoice_internal || '-'}</td>
                 `;
+
+                // BUG-2 FIX (port dari baseline vat_in): tombol aksi dibuat lewat DOM API,
+                // bukan interpolasi string onclick, agar aman dari XSS
+                const aksiCell = tr.children[1];
+                const btnView = document.createElement('button');
+                btnView.className = 'btn-tbl btn-tbl-view'; btnView.title = 'Komparasi Faktur'; btnView.textContent = 'Lihat';
+                btnView.onclick = () => viewItems(baris.no_bppu);
+                const btnEdit = document.createElement('button');
+                btnEdit.className = 'btn-tbl btn-tbl-edit'; btnEdit.title = 'Edit Data'; btnEdit.textContent = 'Edit';
+                btnEdit.onclick = () => handleAction(baris.no_bppu, 'EDIT', curBr, curInv, baris.nama_pemotong || '');
+                const btnDel = document.createElement('button');
+                btnDel.className = 'btn-tbl btn-tbl-del'; btnDel.title = 'Hapus Data'; btnDel.textContent = 'Hapus';
+                btnDel.onclick = () => handleAction(baris.no_bppu, 'DELETE');
+                aksiCell.append(btnView, ' ', btnEdit, ' ', btnDel);
+
+                const pdfCell = tr.children[2];
+                if (baris.link_pdf_lokal) {
+                    const aPdf = document.createElement('a');
+                    aPdf.href = '/' + baris.link_pdf_lokal; aPdf.target = '_blank';
+                    aPdf.className = 'btn-tbl btn-tbl-pdf'; aPdf.textContent = 'PDF';
+                    pdfCell.appendChild(aPdf);
+                } else {
+                    pdfCell.textContent = '-';
+                }
+
                 tbody.appendChild(tr);
             }
 
@@ -428,6 +450,11 @@
                 html += '<thead><tr><th>Keterangan</th><th class="text-right">Nilai di BPPU</th><th class="text-right">Nilai di Faktur (VAT OUT)</th></tr></thead><tbody>';
                 html += '<tr style="font-weight:700; background:var(--bg-secondary);"><td style="padding:0.5rem;">DPP / Harga Jual</td><td style="text-align:right; padding:0.5rem;">' + fRp(dppBP) + '</td><td style="text-align:right; padding:0.5rem;">' + (data.vatout ? fRp(dppVO) : '-') + '</td></tr>';
                 html += '<tr><td style="padding:0.5rem;">PPh / PPN</td><td style="text-align:right; padding:0.5rem;">' + fRp(data.prepaid.nilai_pph) + '</td><td style="text-align:right; padding:0.5rem;">' + (data.vatout ? fRp(data.vatout.ppn) : '-') + '</td></tr>';
+                // Nilai tercetak di faktur sebagai referensi (DPP faktur UM/Pelunasan bisa berbeda dari basis BPPU)
+                if (data.vatout) {
+                    html += '<tr><td style="padding:0.5rem;">DPP Faktur (tercetak)</td><td colspan="2" style="text-align:right; padding:0.5rem; color:var(--text-secondary);">' + fRp(data.vatout.dpp_faktur) + '</td></tr>';
+                    html += '<tr><td style="padding:0.5rem;">Harga Jual Faktur (tercetak)</td><td colspan="2" style="text-align:right; padding:0.5rem; color:var(--text-secondary);">' + fRp(data.vatout.harga_jual) + '</td></tr>';
+                }
                 html += '<tr style="background:var(--bg-tertiary);"><td style="padding:0.5rem; font-weight:700;">Selisih DPP</td><td colspan="2" style="text-align:right; padding:0.5rem; font-weight:700; font-size:1rem; ' + selisihClass + '">' + fRp(selisih) + '</td></tr>';
                 html += '</tbody></table>';
 

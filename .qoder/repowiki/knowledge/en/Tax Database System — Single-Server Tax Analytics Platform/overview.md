@@ -1,0 +1,1 @@
+Single Node.js/Express server that bootstraps four Indonesian tax modules (VAT Input, VAT Out, Prepaid Tax BPPU, Payable Tax BPPU) sharing one SQLite database, session auth, Socket.IO uploads, and a common client-side UI framework.

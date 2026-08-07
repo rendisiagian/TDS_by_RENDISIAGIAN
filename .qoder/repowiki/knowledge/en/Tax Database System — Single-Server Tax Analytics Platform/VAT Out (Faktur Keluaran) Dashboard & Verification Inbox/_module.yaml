@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: vat_output
+title: VAT Out (Faktur Keluaran) Dashboard & Verification Inbox
+scope:
+    - vat_out/
+source_files: []
+depends_on: []
+related_to: []

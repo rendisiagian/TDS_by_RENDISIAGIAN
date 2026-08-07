@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Summary Prepaid Tax | Tax Upload and Database</title>
+    <title>Summary Masa Pajak Prepaid | Tax Database System</title>
     <script src="/theme.js"></script>
     <script src="/toast.js"></script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -33,7 +33,7 @@
 
         <main class="main-content">
             <header class="header">
-                <h2>Summary Prepaid Tax</h2>
+                <h2>Summary Masa Pajak Prepaid</h2>
                 <div class="user-profile"><span id="header-user-name"></span>
                     <a href="/logout" class="btn-logout">Logout</a>
                 </div>
@@ -87,6 +87,8 @@
             });
             const sidebarSelect = document.getElementById('global-entity-select');
             if (sidebarSelect) sidebarSelect.value = aktifEntitas;
+            const subPrepaid = document.getElementById('sub-prepaid');
+            if (subPrepaid) subPrepaid.classList.add('open');
         });
 
         socket.on('data-baru-prepaid', () => loadSummary());
@@ -100,12 +102,20 @@
         };
 
         async function loadSummary() {
-            const res = await fetch('/api/summary-prepaid?entitas=' + aktifEntitas);
-            const data = await res.json();
-            
             const tbody = document.getElementById('tabel-body');
             tbody.innerHTML = '';
 
+            let data = [];
+            try {
+                const res = await fetch('/api/summary-prepaid?entitas=' + aktifEntitas);
+                // BUG-5 FIX (port dari baseline): cek HTTP status sebelum akses payload
+                if (!res.ok) throw new Error('Server error: HTTP ' + res.status);
+                const result = await res.json();
+                data = Array.isArray(result) ? result : [];
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding:20px; color:var(--danger-600);">Gagal memuat data summary. ${err.message}</td></tr>`;
+                return;
+            }
 
             if (data.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding:20px; color:var(--text-tertiary);">Data tidak ditemukan.</td></tr>`;

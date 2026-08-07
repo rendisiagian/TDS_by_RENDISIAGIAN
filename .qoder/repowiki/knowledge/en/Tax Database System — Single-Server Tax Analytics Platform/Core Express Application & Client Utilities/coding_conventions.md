@@ -1,0 +1,6 @@
+- Database access goes through Promise-wrapped helpers `dbGet` and `dbRun` rather than raw callbacks, used consistently across migration and API handlers.
+- Route protection follows a two-tier pattern: `cekAuth` checks `req.session.user` existence, while `cekRoleAPI(roles)` enforces RBAC by comparing `req.session.user.role` against an allowed list.
+- Dynamic module tables are created via a `modules` array loop, generating matching `data_<id>`, `item_<id>`, and `inbox_<id>` tables plus archive directory mounts under `/arsip_*`.
+- Column evolution uses an `ensureColumn` helper that runs `ALTER TABLE ... ADD COLUMN` unconditionally so schema changes survive repeated server starts.
+- Client-side exports use a single `exportTableData(tableId, filename, format, ignoreCols)` entry point that branches to modern XLSX or legacy HTML-table generation based on whether the global `XLSX` library is loaded.
+- Pagination state is stored in a global `window.__pgState` keyed by container ID, with callback hooks `__pgGo` and `__pgChangeLimit` invoked through `onPageChange(page, limit)`.

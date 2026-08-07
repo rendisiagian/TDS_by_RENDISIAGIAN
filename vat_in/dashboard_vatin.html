@@ -128,6 +128,7 @@
                                     <th class="text-center">No. Faktur</th>
                                     <th class="text-center">Masa Pajak</th>
                                     <th class="text-center">Tanggal Faktur</th>
+                                    <th class="text-center">Harga Jual</th>
                                     <th class="text-center">DPP</th>
                                     <th class="text-center">PPN</th>
                                     <th class="text-center">Diinput Oleh</th>
@@ -147,6 +148,7 @@
                                     <th><input type="text" class="filter-input" data-col="d.no_faktur" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.masa_pajak" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input filter-date-range" data-col="d.tanggal_faktur" placeholder="Range Tgl..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.harga_jual" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.dpp" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.ppn" placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.diinput_oleh" placeholder="🔍 Cari..."></th>
@@ -282,7 +284,7 @@
             updateMoM('mom-ppn', stats.cur_tax || 0, stats.prev_tax || 0, '');
 
             if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="14" class="text-center" style="padding:20px; color:#64748b;">Data tidak ditemukan.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="15" class="text-center" style="padding:20px; color:#64748b;">Data tidak ditemukan.</td></tr>`;
             }
 
             data.forEach((baris, index) => {
@@ -336,6 +338,7 @@
                     <td class="text-center" style="color:#2563eb; font-weight:bold;">${baris.no_faktur || '-'}</td>
                     <td class="text-center">${baris.masa_pajak || '-'}</td>
                     <td class="text-center">${baris.tanggal_format || '-'}</td>
+                    <td class="text-right">${formatRupiah(baris.harga_jual)}</td>
                     <td class="text-right">${formatRupiah(baris.dpp)}</td>
                     <td class="text-right">${formatRupiah(baris.ppn)}</td>
                     <td class="text-center">${baris.diinput_oleh || '-'}</td>
@@ -516,7 +519,7 @@
             var pct = ((diff / previous) * 100).toFixed(1);
             if (diff > 0) { el.className = 'stat-mom up'; el.innerHTML = '&#9650; +' + pct + '% vs bulan lalu'; }
             else if (diff < 0) { el.className = 'stat-mom down'; el.innerHTML = '&#9660; ' + pct + '% vs bulan lalu'; }
-            else { el.className = 'stat-mom neutral'; el.textContent = '&#9644; Sama dengan bulan lalu'; }
+            else { el.className = 'stat-mom neutral'; el.innerHTML = '&#9644; Sama dengan bulan lalu'; } // FIX: textContent tidak mendekode entitas HTML
         }
 
         // Jalankan Pertama Kali

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Audit VAT IN</title>
+  <title>Audit Integritas Faktur Masukan | Tax Database System</title>
   <script src="/theme.js"></script>
   <script src="/toast.js"></script>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -129,7 +129,10 @@
   <script>
     let aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
 
-    let chartPPN = null;
+    fetch('/api/me').then(res => res.json()).then(u => {
+        const el = document.getElementById('header-user-name');
+        if (el) el.textContent = u.nama || u.username || '';
+    });
 
     async function loadAudit() {
       try {
@@ -226,6 +229,8 @@
     window.gantiEntitas = function(entitas) {
       aktifEntitas = entitas;
       localStorage.setItem('lastEntitas', entitas);
+      const sidebarSelect = document.getElementById('global-entity-select');
+      if (sidebarSelect && sidebarSelect.value !== entitas) sidebarSelect.value = entitas;
       loadAudit();
     };
 
@@ -237,6 +242,17 @@
       .then(res => res.text())
       .then(html => {
         document.getElementById('sidebar-container').innerHTML = html;
+        // FIX: tandai link aktif, buka submenu, dan sinkronkan dropdown entitas (sebelumnya tidak dilakukan)
+        const currentPath = window.location.pathname;
+        document.querySelectorAll('.sidebar-link').forEach(link => {
+            if (link.getAttribute('href') === currentPath) link.classList.add('active');
+        });
+        document.querySelectorAll('.sidebar-link.active').forEach(link => {
+            const nested = link.closest('.sidebar-item-nested');
+            if (nested) nested.classList.add('open');
+        });
+        const sidebarSelect = document.getElementById('global-entity-select');
+        if (sidebarSelect) sidebarSelect.value = aktifEntitas;
       });
 
     loadAudit();

@@ -1,0 +1,1 @@
+Vanilla JavaScript (ES6+), CSS Custom Properties (CSS variables) for theming, MutationObserver for DOM readiness, localStorage for persistence, and Fetch API for `/api/years-vatout` and `/api/me` endpoints. No build step or framework.

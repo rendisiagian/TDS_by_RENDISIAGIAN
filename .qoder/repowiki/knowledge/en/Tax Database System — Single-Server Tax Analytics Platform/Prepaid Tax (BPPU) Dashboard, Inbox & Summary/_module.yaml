@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: prepaid_tax
+title: Prepaid Tax (BPPU) Dashboard, Inbox & Summary
+scope:
+    - prepaidtax_bppu/
+source_files: []
+depends_on: []
+related_to: []

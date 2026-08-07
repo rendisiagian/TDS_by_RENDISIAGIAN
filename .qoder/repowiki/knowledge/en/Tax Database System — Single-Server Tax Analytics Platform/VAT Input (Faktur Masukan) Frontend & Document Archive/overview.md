@@ -1,0 +1,1 @@
+Client-side VAT input (faktur masukan) module providing dashboard, audit integrity checks, and summary reporting for Indonesian PPN invoices, backed by a large archive of vendor PDF documents.

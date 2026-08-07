@@ -3114,6 +3114,42 @@ tbody:empty::after {
     color: #fcd34d;
 }
 
+/* --- Status Faktur badges (dashboard_vatout) --- */
+.status-badge {
+    display: inline-block;
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.72rem;
+    letter-spacing: 0.3px;
+    border: 1px solid transparent;
+}
+
+/* Semantik warna mengikuti baseline vat_in: Normal hijau, Pengganti amber */
+.status-normal {
+    background: var(--success-50);
+    color: var(--success-700);
+    border-color: rgba(16, 185, 129, 0.25);
+}
+
+.status-pengganti {
+    background: var(--warning-50);
+    color: var(--warning-600);
+    border-color: rgba(245, 158, 11, 0.25);
+}
+
+[data-theme="dark"] .status-normal {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.3);
+    color: #6ee7b7;
+}
+
+[data-theme="dark"] .status-pengganti {
+    background: rgba(245, 158, 11, 0.15);
+    border-color: rgba(245, 158, 11, 0.3);
+    color: #fcd34d;
+}
+
 [data-theme="dark"] .badge-pending-edit,
 [data-theme="dark"] .badge-role {
     background: rgba(59, 130, 246, 0.15);

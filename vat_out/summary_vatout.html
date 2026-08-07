@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Summary VAT OUT - Analisis Tren Pajak</title>
+    <title>Laporan Rekapitulasi VAT OUT | Tax Database System</title>
     <script src="/theme.js"></script>
     <script src="/toast.js"></script>
     <script src="/utils.js"></script>
@@ -21,10 +21,10 @@
         
         <main class="main-content">
             <header class="header">
-                <h2>Tren & Analisis Faktur Keluaran</h2>
+                <h2>Laporan Rekapitulasi Faktur Keluaran</h2>
                 <div class="user-profile"><span id="header-user-name"></span>
                     <div class="toolbar-actions">
-                        <button class="btn-toolbar btn-toolbar-export" onclick="showExportMenu(event, 'tabel-summary', 'summary_vatout_' + aktifEntitas)" data-testid="btn-export-summary">Export</button>
+                        <button id="btn-export-summary" class="btn-toolbar btn-toolbar-export" onclick="showExportMenu(event, 'tabel-summary', 'summary_vatout_' + aktifEntitas)" data-testid="btn-export-summary">Export</button>
                         <button class="btn-toolbar btn-toolbar-print" onclick="window.print()" data-testid="btn-print-summary">&#128424; Print</button>
                     </div>
                     <a href="/logout" class="btn-logout">Logout</a>
@@ -95,6 +95,13 @@
             loadSummary();
         };
 
+        // FIX (port dari baseline vat_in): re-render chart saat ganti tema gelap/terang
+        var _origToggle = window.__toggleDarkMode;
+        window.__toggleDarkMode = function() {
+            if (_origToggle) _origToggle();
+            setTimeout(function() { loadSummary(); }, 200);
+        };
+
         function getChartColors() {
             var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
             return {
@@ -106,18 +113,28 @@
         }
 
         async function loadSummary() {
+            // BUG-4 FIX (port dari baseline): nonaktifkan tombol export selama data dimuat
+            const btnExport = document.getElementById('btn-export-summary');
+            if (btnExport) btnExport.disabled = true;
             try {
                 const response = await fetch('/api/summary-vatout?entitas=' + aktifEntitas);
+                // BUG-5 FIX (port dari baseline): cek HTTP status sebelum akses payload
+                if (!response.ok) {
+                    throw new Error('Server error: HTTP ' + response.status);
+                }
                 let result = await response.json();
-                let trendData = result.trend || [];
-                let branchData = result.branch || [];
+                // BUG-5 FIX: guard struktur payload
+                let trendData = Array.isArray(result.trend) ? result.trend : [];
+                let branchData = Array.isArray(result.branch) ? result.branch : [];
                 
-                // Sort trend by period (MM-YYYY) ascending
+                // Sort trend by period (MM-YYYY) ascending — BUG-9 FIX: aman dari periode null/kosong
                 trendData.sort((a, b) => {
-                    const [monthA, yearA] = a.periode.split('-').map(Number);
-                    const [monthB, yearB] = b.periode.split('-').map(Number);
-                    if (yearA !== yearB) return yearA - yearB;
-                    return monthA - monthB;
+                    const pA = String(a.periode || '');
+                    const pB = String(b.periode || '');
+                    const [monthA, yearA] = pA.split('-').map(Number);
+                    const [monthB, yearB] = pB.split('-').map(Number);
+                    if ((yearA || 0) !== (yearB || 0)) return (yearA || 0) - (yearB || 0);
+                    return (monthA || 0) - (monthB || 0);
                 });
                 
                 const tbody = document.getElementById('body-compare');
@@ -207,6 +224,11 @@
 
             } catch (err) {
                 console.error("Gagal memuat summary", err);
+                // BUG-5 FIX (port dari baseline): tampilkan pesan error di tabel agar user tahu ada masalah
+                const tbody = document.getElementById('body-compare');
+                if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="text-center" style="padding:20px; color:#ef4444;">&#9888; Gagal memuat data rekapitulasi: ${err.message}</td></tr>`;
+            } finally {
+                if (btnExport) btnExport.disabled = false;
             }
         }
 

@@ -1,1 +1,0 @@
-Centralized Express.js server handling PDF tax document ingestion, SQLite data persistence, real-time Socket.IO processing, and client ledger accounting.

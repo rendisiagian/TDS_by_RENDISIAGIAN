@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inbox Prepaid | Tax Database</title>
+    <title>Antrean Verifikasi Prepaid Tax | Tax Database System</title>
     <script src="/theme.js"></script>
     <script src="/toast.js"></script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -30,7 +30,7 @@
             <div class="container">
                 <div class="card">
                     <div class="card-header-padding" style="display:flex; justify-content:space-between; align-items:center;">
-                        <h3 class="title-primary" style="border-left-color: #4f46e5; margin: 0;">Dokumen Menunggu Verifikasi</h3>
+                        <h3 class="title-primary" style="border-left-color: #4f46e5; margin: 0;">Dokumen Perlu Verifikasi</h3>
                         
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <button id="btnHapusFilter" class="btn-clear-filter" style="display:none;" onclick="resetSemuaFilter()">🗑️ Hapus Filter</button>
@@ -146,6 +146,7 @@
         let loadedBranches = [];
         let arraySelectedInvoice = [];
         let currentPage = 1, currentSearch = null, currentLimit = 25;
+        let uploadStats = { isActive: false, totalFiles: 0, chunksTotal: 0, chunksDone: 0, sukses: 0, duplikat: 0, gagal: 0 };
 
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
@@ -153,6 +154,12 @@
             document.getElementById('sidebar-container').innerHTML = html; 
             const sidebarSelect = document.getElementById('global-entity-select');
             if (sidebarSelect) sidebarSelect.value = aktifEntitas;
+            // Tandai menu aktif & buka submenu Prepaid Tax
+            document.querySelectorAll('.sidebar-link').forEach(l => {
+                if (l.getAttribute('href') === '/inbox-prepaid') l.classList.add('active');
+            });
+            const subPrepaid = document.getElementById('sub-prepaid');
+            if (subPrepaid) subPrepaid.classList.add('open');
         });
         fetch('/api/me').then(res => res.json()).then(user => { if(user.nama) currentUserName = user.nama; });
 
@@ -218,9 +225,9 @@
         }
 
         function hapusInbox(id) {
-            if(confirm("Yakin ingin menghapus antrean Bukti Potong Prepaid ini beserta file PDF fisiknya?")) {
+            showConfirm("Yakin ingin menghapus antrean Bukti Potong Prepaid ini beserta file PDF fisiknya?", function() {
                 socket.emit('hapus-inbox-prepaid', id);
-            }
+            }, { title: 'Hapus Antrean', danger: true });
         }
         
         socket.on('upload-batch-selesai', (res) => {

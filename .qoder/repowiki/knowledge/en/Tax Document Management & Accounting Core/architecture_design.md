@@ -1,5 +1,0 @@
-- Entry Point: `app.js` serves as the monolithic application root, initializing Express, HTTP, and Socket.IO servers.
-- Data Layer: Uses `sqlite3` with a custom Promise-wrapper (`dbGet`, `dbRun`) for asynchronous database operations, managing tables for VAT In/Out, Payable/Prepaid taxes, and Client Ledgers.
-- Real-time Processing: Implements a Socket.IO event-driven architecture for bulk PDF uploads, where files are parsed, validated against business rules (e.g., duplicate checks, entity matching), and stored in an 'inbox' before final verification.
-- Security Middleware: Integrates `helmet`, `express-rate-limit`, and session-based authentication (`express-session`) with Role-Based Access Control (RBAC) for API and Socket endpoints.
-- Utility Modules: `export.js` provides client-side data export functionality (CSV/Excel), while `pagination.js` handles generic server-side pagination UI rendering.

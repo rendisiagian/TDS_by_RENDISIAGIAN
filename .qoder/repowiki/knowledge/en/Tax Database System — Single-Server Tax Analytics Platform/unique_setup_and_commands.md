@@ -1,0 +1,1 @@
+Start the entire platform with `npm start` or `start.bat`; configure via `.env` requiring `SESSION_SECRET` ≥ 32 chars. Each module's archive folder is auto-created on first run and served statically.

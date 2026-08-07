@@ -39,12 +39,12 @@
 
             <div class="container">
                 <div class="stats-grid" id="stats-cards" data-testid="stats-cards">
-                    <div class="stat-card accent-orange" data-testid="stat-total-doc">
+                    <div class="stat-card accent-blue" data-testid="stat-total-doc">
                         <span class="stat-label">Total Dokumen</span>
                         <span class="stat-value" id="stat-total">0</span>
                         <div class="stat-mom neutral" id="mom-total">-- vs bulan lalu</div>
                     </div>
-                    <div class="stat-card accent-purple" data-testid="stat-total-ppn">
+                    <div class="stat-card accent-green" data-testid="stat-total-ppn">
                         <span class="stat-label">Total PPN</span>
                         <span class="stat-value" id="stat-ppn">Rp 0</span>
                         <div class="stat-mom neutral" id="mom-ppn">-- vs bulan lalu</div>
@@ -53,8 +53,8 @@
                         <span class="stat-label">Total DPP</span>
                         <span class="stat-value" id="stat-dpp">Rp 0</span>
                     </div>
-                    <div class="stat-card accent-blue" data-testid="stat-pending">
-                        <span class="stat-label">Menunggu Verifikasi</span>
+                    <div class="stat-card accent-orange" data-testid="stat-pending">
+                        <span class="stat-label">Perlu Verifikasi</span>
                         <span class="stat-value" id="stat-pending">0</span>
                         <span class="stat-sub">dokumen dalam antrean</span>
                     </div>
@@ -94,6 +94,7 @@
                                     <th class="text-center">No. Faktur</th>
                                     <th class="text-center">Masa Pajak</th>
                                     <th class="text-center">Tanggal Faktur</th>
+                                    <th class="text-center">Harga Jual</th>
                                     <th class="text-center">DPP</th>
                                     <th class="text-center">PPN</th>
                                     <th class="text-center">Diinput Oleh</th>
@@ -116,6 +117,8 @@
                                             placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input filter-date-range" data-col="d.tanggal_faktur"
                                             placeholder="Range Tgl..."></th>
+                                    <th><input type="text" class="filter-input" data-col="d.harga_jual"
+                                            placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.dpp"
                                             placeholder="🔍 Cari..."></th>
                                     <th><input type="text" class="filter-input" data-col="d.ppn"
@@ -157,9 +160,47 @@
                     <option value="">-- Pilih VO jika ada --</option>
                 </select>
             </div>
-            <div class="form-group"><label>No. Invoice Internal Baru</label><input type="text" id="edit_invoice"
+            <div class="form-group"><label>No. Invoice Internal</label><input type="text" id="edit_invoice"
                     autocomplete="off" placeholder="Ketik No Invoice..."></div>
-            <div class="form-group"><label>Tanggal Baru</label><input type="date" id="edit_tanggal"></div>
+            <div class="form-group"><label>Tanggal Tukar Faktur</label><input type="date" id="edit_tanggal"></div>
+            <!-- PORSI JO: catatan internal pembagian DPP/PPN anggota JO (BBS/BMP).
+                 Faktur tetap utuh atas nama Berca JO; persen dihitung otomatis dari DPP porsi. -->
+            <div id="edit-group-porsi" style="display:none; margin-top: 12px; border-top: 1px dashed #e2e8f0; padding-top: 12px;">
+                <label style="font-weight:600; font-size:0.85rem;">Porsi Kepemilikan JO
+                    <small style="color:var(--text-tertiary);">(catatan internal)</small></label>
+                <table style="width:100%; margin-top:8px; font-size:0.82rem; border-collapse:collapse;">
+                    <thead>
+                        <tr style="color:var(--text-secondary);">
+                            <th style="text-align:left; padding:4px;">Anggota</th>
+                            <th style="text-align:left; padding:4px;">DPP Porsi</th>
+                            <th style="text-align:center; padding:4px;">%</th>
+                            <th style="text-align:left; padding:4px;">PPN Porsi</th>
+                            <th style="text-align:center; padding:4px;">%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding:4px; font-weight:600;">BBS</td>
+                            <td style="padding:4px;"><input type="number" id="porsi_dpp_BBS" min="0" step="1"
+                                    style="width:130px;" oninput="updatePorsiHitung()"></td>
+                            <td style="padding:4px; text-align:center; font-weight:600; color:#ea580c;" id="porsi_pct_dpp_BBS">0%</td>
+                            <td style="padding:4px;"><input type="number" id="porsi_ppn_BBS" min="0" step="1"
+                                    style="width:110px;" oninput="updatePorsiHitung()"></td>
+                            <td style="padding:4px; text-align:center; font-weight:600; color:#ea580c;" id="porsi_pct_ppn_BBS">0%</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:4px; font-weight:600;">BMP</td>
+                            <td style="padding:4px;"><input type="number" id="porsi_dpp_BMP" min="0" step="1"
+                                    style="width:130px;" oninput="updatePorsiHitung()"></td>
+                            <td style="padding:4px; text-align:center; font-weight:600; color:#ea580c;" id="porsi_pct_dpp_BMP">0%</td>
+                            <td style="padding:4px;"><input type="number" id="porsi_ppn_BMP" min="0" step="1"
+                                    style="width:110px;" oninput="updatePorsiHitung()"></td>
+                            <td style="padding:4px; text-align:center; font-weight:600; color:#ea580c;" id="porsi_pct_ppn_BMP">0%</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div id="porsi-summary" style="font-size:0.78rem; margin-top:8px; color:var(--text-secondary);"></div>
+            </div>
             <div style="display:flex; gap:10px; margin-top: 20px;">
                 <button class="btn-simpan" style="background-color: #f59e0b; flex: 2;" onclick="submitEdit()">💾 Simpan
                     Perubahan</button>
@@ -173,6 +214,10 @@
         let aktifEntitas = localStorage.getItem('lastEntitas') || 'BBS';
         let currentUser = {};
         let targetEditFaktur = '';
+        // PORSI JO: DPP/PPN total faktur yang sedang diedit (basis perhitungan persen)
+        let editDppTotal = 0;
+        let editPpnTotal = 0;
+        const PORSI_MEMBERS = ['BBS', 'BMP'];
 
         // STATE UNTUK SERVER-SIDE
         let currentPage = 1;
@@ -196,6 +241,25 @@
             document.getElementById('sidebar-container').innerHTML = html;
             const sidebarSelect = document.getElementById('global-entity-select');
             if (sidebarSelect) sidebarSelect.value = aktifEntitas;
+
+            // M3 FIX: fallback marking link tahun aktif & buka submenu.
+            // sidebar.js hanya menandai saat URL punya ?year=; saat tanpa param
+            // (default tahun berjalan) tidak ada link yang ditandai.
+            const markActiveVatout = () => {
+                let matched = null;
+                document.querySelectorAll('#sub-vatout a').forEach(l => {
+                    if (l.getAttribute('href') === '/dashboard-vatout?year=' + aktifYear) matched = l;
+                });
+                if (matched) {
+                    matched.classList.add('active');
+                    const nested = matched.closest('.sidebar-item-nested');
+                    if (nested) nested.classList.add('open');
+                    return true;
+                }
+                return false;
+            };
+            // Link tahun di-inject async oleh populateVatoutYears() — retry jika belum ada
+            if (!markActiveVatout()) setTimeout(markActiveVatout, 600);
         });
 
         // Update Title Header & Links
@@ -257,7 +321,8 @@
             updateMoM('mom-ppn', stats.cur_tax || 0, stats.prev_tax || 0, '');
 
             if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="11" class="text-center" style="padding:20px; color:#64748b;">Data tidak ditemukan.</td></tr>`;
+                // FIX: colspan disesuaikan dengan jumlah kolom tabel (14 kolom)
+                tbody.innerHTML = `<tr><td colspan="14" class="text-center" style="padding:20px; color:#64748b;">Data tidak ditemukan.</td></tr>`;
             }
 
             data.forEach((baris, index) => {
@@ -268,15 +333,10 @@
                 let curVO = baris.kode_vo || '';
                 let barisNo = offset + index + 1; // Penomoran Akurat
 
-                let btnView = `<button class="btn-tbl btn-tbl-view" title="Lihat" onclick="viewItems('${baris.no_faktur}')">Lihat</button>`;
-                let btnEdit = `<button class="btn-tbl btn-tbl-edit" title="Edit" onclick="handleAction('${baris.no_faktur}', 'EDIT', '${curBr}', '${curInv}', '${curTgl}', '${curVO}')">Edit</button>`;
-                let btnDel = `<button class="btn-tbl btn-tbl-del" title="Hapus" onclick="handleAction('${baris.no_faktur}', 'DELETE')">Hapus</button>`;
-                let btnPdf = baris.link_pdf_lokal ? `<a href="/${baris.link_pdf_lokal}" target="_blank" class="btn-tbl btn-tbl-pdf">PDF</a>` : `-`;
-
                 tr.innerHTML = `
                     <td class="text-center">${barisNo}</td>
-                    <td class="text-center" style="white-space:nowrap;">${btnView} ${btnEdit} ${btnDel}</td>
-                    <td class="text-center">${btnPdf}</td>
+                    <td class="text-center" style="white-space:nowrap;"></td>
+                    <td class="text-center"></td>
                     <td class="text-center">${baris.nama_cabang || baris.kode_cabang || '-'}</td>
                     <td class="text-center">${baris.no_invoice_internal || '-'}</td>
                     <td class="text-bold">${baris.nama_pembeli || '-'}</td>
@@ -287,10 +347,36 @@
                     <td class="text-center" style="color:#ea580c; font-weight:bold;">${baris.no_faktur || '-'}</td>
                     <td class="text-center">${baris.masa_pajak || '-'}</td>
                     <td class="text-center">${baris.tanggal_format || '-'}</td>
+                    <td class="text-right">${formatRupiah(baris.harga_jual)}</td>
                     <td class="text-right">${formatRupiah(baris.dpp)}</td>
                     <td class="text-right">${formatRupiah(baris.ppn)}</td>
                     <td class="text-center">${baris.diinput_oleh || '-'}</td>
                 `;
+
+                // BUG-2 FIX (port dari baseline vat_in): tombol aksi dibuat lewat DOM API,
+                // bukan interpolasi string onclick, agar aman dari XSS
+                const aksiCell = tr.children[1];
+                const btnView = document.createElement('button');
+                btnView.className = 'btn-tbl btn-tbl-view'; btnView.title = 'Lihat'; btnView.textContent = 'Lihat';
+                btnView.onclick = () => viewItems(baris.no_faktur, baris.dpp, baris.ppn);
+                const btnEdit = document.createElement('button');
+                btnEdit.className = 'btn-tbl btn-tbl-edit'; btnEdit.title = 'Edit'; btnEdit.textContent = 'Edit';
+                btnEdit.onclick = () => handleAction(baris.no_faktur, 'EDIT', curBr, curInv, curTgl, curVO, baris.dpp, baris.ppn);
+                const btnDel = document.createElement('button');
+                btnDel.className = 'btn-tbl btn-tbl-del'; btnDel.title = 'Hapus'; btnDel.textContent = 'Hapus';
+                btnDel.onclick = () => handleAction(baris.no_faktur, 'DELETE');
+                aksiCell.append(btnView, ' ', btnEdit, ' ', btnDel);
+
+                const pdfCell = tr.children[2];
+                if (baris.link_pdf_lokal) {
+                    const aPdf = document.createElement('a');
+                    aPdf.href = '/' + baris.link_pdf_lokal; aPdf.target = '_blank';
+                    aPdf.className = 'btn-tbl btn-tbl-pdf'; aPdf.textContent = 'PDF';
+                    pdfCell.appendChild(aPdf);
+                } else {
+                    pdfCell.textContent = '-';
+                }
+
                 tbody.appendChild(tr);
             });
 
@@ -341,7 +427,7 @@
         }
 
         // FUNGSI LAMA TIDAK ADA YANG DIUBAH
-        async function viewItems(noFaktur) {
+        async function viewItems(noFaktur, dppTotal = 0, ppnTotal = 0) {
             try {
                 const res = await fetch(`/api/items/vatout/${noFaktur}`);
                 const items = await res.json();
@@ -361,11 +447,29 @@
                     tableHtml += `</tbody><tfoot><tr style="background: var(--bg-tertiary);"><td colspan="3" class="text-right" style="font-weight:700; padding:10px;">TOTAL KESELURUHAN</td><td class="text-right" style="font-weight:700; font-size:1.05rem; color: #ea580c; padding:10px;">Rp ${totalSemua.toLocaleString('id-ID')}</td></tr></tfoot></table>`;
                     container.innerHTML = tableHtml;
                 }
+
+                // PORSI JO: tampilkan catatan internal porsi bila ada (anggota sudah disanitasi server A-Z0-9)
+                try {
+                    const resPorsi = await fetch('/api/porsi-vatout/' + encodeURIComponent(noFaktur));
+                    const porsiRows = await resPorsi.json();
+                    if (porsiRows && porsiRows.length > 0) {
+                        let porsiHtml = `<h4 style="margin:15px 0 8px; color:#ea580c;">Porsi Kepemilikan JO (Catatan Internal)</h4>
+                            <table class="modal-item-table"><thead><tr><th>Anggota</th><th class='text-right'>DPP Porsi</th><th class='text-center'>%</th><th class='text-right'>PPN Porsi</th><th class='text-center'>%</th></tr></thead><tbody>`;
+                        porsiRows.forEach(p => {
+                            const pctD = dppTotal > 0 ? (Number(p.dpp_porsi || 0) / dppTotal * 100).toFixed(2) + '%' : '-';
+                            const pctP = ppnTotal > 0 ? (Number(p.ppn_porsi || 0) / ppnTotal * 100).toFixed(2) + '%' : '-';
+                            porsiHtml += `<tr><td><b>${p.anggota}</b></td><td class='text-right'>Rp ${Number(p.dpp_porsi || 0).toLocaleString('id-ID')}</td><td class='text-center'>${pctD}</td><td class='text-right'>Rp ${Number(p.ppn_porsi || 0).toLocaleString('id-ID')}</td><td class='text-center'>${pctP}</td></tr>`;
+                        });
+                        porsiHtml += `</tbody></table><p style="font-size:0.75rem; color:#64748b; margin-top:6px;">Faktur pajak tetap tercatat utuh atas nama Berca JO.</p>`;
+                        container.innerHTML += porsiHtml;
+                    }
+                } catch (e) { }
+
                 document.getElementById('modalViewItem').style.display = 'flex';
             } catch (err) { showToast('Terjadi kesalahan.', 'error'); }
         }
 
-        async function handleAction(noFaktur, actionType, curCabang = '', curInvoice = '', curTanggal = '', curVO = '') {
+        async function handleAction(noFaktur, actionType, curCabang = '', curInvoice = '', curTanggal = '', curVO = '', curDpp = 0, curPpn = 0) {
             const userRole = currentUser.role ? currentUser.role.toLowerCase() : '';
             const isSupervisor = ['supervisor', 'administrator'].includes(userRole);
 
@@ -400,6 +504,31 @@
                 // Load VO for the current branch
                 await autoLoadVOs(select.value, curVO);
 
+                // PORSI JO: hanya untuk entitas JO — muat porsi tersimpan & siapkan kalkulasi persen
+                const porsiGroup = document.getElementById('edit-group-porsi');
+                if (aktifEntitas === 'JO') {
+                    editDppTotal = Number(curDpp) || 0;
+                    editPpnTotal = Number(curPpn) || 0;
+                    PORSI_MEMBERS.forEach(m => {
+                        document.getElementById('porsi_dpp_' + m).value = '';
+                        document.getElementById('porsi_ppn_' + m).value = '';
+                    });
+                    try {
+                        const resPorsi = await fetch('/api/porsi-vatout/' + encodeURIComponent(noFaktur));
+                        const porsiRows = await resPorsi.json();
+                        (porsiRows || []).forEach(p => {
+                            const elD = document.getElementById('porsi_dpp_' + p.anggota);
+                            const elP = document.getElementById('porsi_ppn_' + p.anggota);
+                            if (elD && Number(p.dpp_porsi) > 0) elD.value = p.dpp_porsi;
+                            if (elP && Number(p.ppn_porsi) > 0) elP.value = p.ppn_porsi;
+                        });
+                    } catch (e) { }
+                    updatePorsiHitung();
+                    porsiGroup.style.display = 'block';
+                } else {
+                    porsiGroup.style.display = 'none';
+                }
+
                 document.getElementById('modalEditData').style.display = 'flex';
             }
         }
@@ -429,6 +558,30 @@
             }
         }
 
+        function updatePorsiHitung() {
+            let sumDpp = 0, sumPpn = 0;
+            PORSI_MEMBERS.forEach(m => {
+                const dpp = Number(document.getElementById('porsi_dpp_' + m).value) || 0;
+                const ppn = Number(document.getElementById('porsi_ppn_' + m).value) || 0;
+                sumDpp += dpp; sumPpn += ppn;
+                const pctD = editDppTotal > 0 ? (dpp / editDppTotal * 100).toFixed(2) : '0';
+                const pctP = editPpnTotal > 0 ? (ppn / editPpnTotal * 100).toFixed(2) : '0';
+                document.getElementById('porsi_pct_dpp_' + m).textContent = pctD + '%';
+                document.getElementById('porsi_pct_ppn_' + m).textContent = pctP + '%';
+            });
+            const elSum = document.getElementById('porsi-summary');
+            const okDpp = Math.abs(sumDpp - editDppTotal) < 1;
+            const okPpn = Math.abs(sumPpn - editPpnTotal) < 1;
+            elSum.textContent = 'Total porsi: DPP ' + formatRupiah(sumDpp) + ' dari ' + formatRupiah(editDppTotal)
+                + ' | PPN ' + formatRupiah(sumPpn) + ' dari ' + formatRupiah(editPpnTotal);
+            if (okDpp && okPpn) {
+                elSum.style.color = '#16a34a';
+            } else {
+                elSum.style.color = '#d97706';
+                elSum.textContent += ' — belum sama dengan faktur, tetap boleh disimpan (peringatan saja).';
+            }
+        }
+
         function submitEdit() {
             const isSupervisor = ['supervisor', 'administrator'].includes(currentUser.role.toLowerCase());
             const branch = document.getElementById('edit_branch').value;
@@ -437,7 +590,22 @@
             const vo = document.getElementById('edit_vo').value;
 
             if (!branch) return showToast('Branch wajib diisi!', 'warning');
-            socket.emit('request-action-faktur', { action: 'EDIT', mod: 'vatout', faktur: targetEditFaktur, id_user: currentUser.id, username: currentUser.username, role: currentUser.role, newData: { branch, invoice, tanggal, vo } });
+
+            // PORSI JO: kumpulkan porsi dari modal (hanya entitas JO)
+            let porsi = undefined;
+            if (aktifEntitas === 'JO') {
+                porsi = PORSI_MEMBERS.map(m => ({
+                    anggota: m,
+                    dpp: Number(document.getElementById('porsi_dpp_' + m).value) || 0,
+                    ppn: Number(document.getElementById('porsi_ppn_' + m).value) || 0
+                }));
+                const sumDpp = porsi.reduce((s, p) => s + p.dpp, 0);
+                if (Math.abs(sumDpp - editDppTotal) >= 1) {
+                    showToast('Perhatian: total porsi DPP belum sama dengan DPP faktur.', 'warning');
+                }
+            }
+
+            socket.emit('request-action-faktur', { action: 'EDIT', mod: 'vatout', faktur: targetEditFaktur, id_user: currentUser.id, username: currentUser.username, role: currentUser.role, newData: { branch, invoice, tanggal, vo, porsi } });
             document.getElementById('modalEditData').style.display = 'none';
             if (!isSupervisor) showToast('Permintaan Edit diajukan ke Panel Approval.', 'info');
         }
@@ -451,7 +619,7 @@
             var pct = ((diff / previous) * 100).toFixed(1);
             if (diff > 0) { el.className = 'stat-mom up'; el.innerHTML = '&#9650; +' + pct + '% vs bulan lalu'; }
             else if (diff < 0) { el.className = 'stat-mom down'; el.innerHTML = '&#9660; ' + pct + '% vs bulan lalu'; }
-            else { el.className = 'stat-mom neutral'; el.textContent = '&#9644; Sama dengan bulan lalu'; }
+            else { el.className = 'stat-mom neutral'; el.innerHTML = '&#9644; Sama dengan bulan lalu'; } // FIX: textContent tidak mendekode entitas HTML
         }
 
         // Jalankan Pertama Kali

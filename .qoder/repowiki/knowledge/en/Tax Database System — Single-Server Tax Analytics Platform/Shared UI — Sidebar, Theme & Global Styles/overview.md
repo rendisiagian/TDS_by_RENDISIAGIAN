@@ -1,0 +1,1 @@
+Provides the application-wide sidebar navigation with dynamic year-based sub-menus, dark/light theme switching, and the shared CSS design system used across all pages of the Tax Database System.

@@ -10,7 +10,16 @@
 - [pagination.js](file://pagination.js)
 - [export.js](file://export.js)
 - [app.js](file://app.js)
+- [toast.js](file://toast.js)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Added comprehensive Toast Notification System section documenting the modern non-blocking notification framework
+- Enhanced Mobile User Experience section with responsive sidebar navigation and touch-friendly controls
+- Updated Architecture Overview to include toast system integration
+- Added new diagrams for toast notification flow and mobile sidebar interaction
+- Expanded troubleshooting guide with toast-related issues
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -25,15 +34,16 @@
 10. [Appendices](#appendices)
 
 ## Introduction
-This document explains the user interface and experience components of the Tax Database System. It covers the main dashboard layout, navigation sidebar functionality, and theme management system. It also documents responsive design patterns, dark/light mode implementation, styling architecture, and user experience optimizations. Guidance is included for UI customization, theme modification, and best practices for accessibility and performance.
+This document explains the user interface and experience components of the Tax Database System. It covers the main dashboard layout, navigation sidebar functionality, theme management system, and the comprehensive toast notification system. It also documents responsive design patterns, dark/light mode implementation, styling architecture, and enhanced mobile user experience optimizations. Guidance is included for UI customization, theme modification, and best practices for accessibility and performance.
 
 ## Project Structure
 The UI is composed of:
 - A central dashboard page that renders summaries and recent activity
-- A dynamic sidebar with collapsible menus and entity switching
+- A dynamic sidebar with collapsible menus, entity switching, and mobile hamburger menu
 - A shared stylesheet implementing a modern professional design system with light/dark themes
-- Utilities for pagination and export
+- Utilities for pagination, export, and toast notifications
 - A theme manager that persists user preference
+- A comprehensive toast notification system replacing native browser alerts
 
 ```mermaid
 graph TB
@@ -45,6 +55,7 @@ THM["theme.js"]
 SBJ["sidebar.js"]
 PAG["pagination.js"]
 EXP["export.js"]
+TST["toast.js"]
 end
 subgraph "Server"
 APP["app.js"]
@@ -54,9 +65,11 @@ DU --> STY
 DU --> SBJ
 DU --> PAG
 DU --> EXP
+DU --> TST
 DU --> SBH
 SBH --> THM
 SBH --> SBJ
+SBH --> TST
 APP --> SBH
 ```
 
@@ -68,6 +81,7 @@ APP --> SBH
 - [sidebar.js](file://sidebar.js)
 - [pagination.js](file://pagination.js)
 - [export.js](file://export.js)
+- [toast.js](file://toast.js)
 - [app.js](file://app.js)
 
 **Section sources**
@@ -78,14 +92,16 @@ APP --> SBH
 - [sidebar.js](file://sidebar.js)
 - [pagination.js](file://pagination.js)
 - [export.js](file://export.js)
+- [toast.js](file://toast.js)
 - [app.js](file://app.js)
 
 ## Core Components
 - Dashboard layout: Hero greeting, alerts, module summary cards, and recent transactions grid
-- Navigation sidebar: Collapsible groups, nested submenus, active state highlighting, and entity selector
+- Navigation sidebar: Collapsible groups, nested submenus, active state highlighting, entity selector, and mobile hamburger menu
 - Theme system: CSS custom properties with light/dark variants and runtime toggle
+- **Toast notification system**: Modern non-blocking notifications with success, error, warning, and info types
 - Styling architecture: Design tokens (colors, spacing, shadows, transitions), reusable components, and responsive breakpoints
-- UX utilities: Pagination controls, export menu, and smooth animations/transitions
+- UX utilities: Pagination controls, export menu, loading states, and smooth animations/transitions
 
 **Section sources**
 - [dashboard_utama.html](file://dashboard_utama.html)
@@ -95,13 +111,16 @@ APP --> SBH
 - [sidebar.js](file://sidebar.js)
 - [pagination.js](file://pagination.js)
 - [export.js](file://export.js)
+- [toast.js](file://toast.js)
 
 ## Architecture Overview
 The UI architecture centers on a single-page-like experience:
 - The dashboard page loads styles and scripts, initializes theme, and mounts the sidebar asynchronously
 - The sidebar is injected via server-rendered HTML and enhanced by client-side JavaScript
 - Theme persistence is handled via localStorage and applied to the root element
+- Toast notifications are dynamically created and managed with automatic cleanup
 - Responsive behavior is controlled by CSS media queries and layout utilities
+- Mobile interactions use touch-friendly controls with backdrop overlays
 
 ```mermaid
 sequenceDiagram
@@ -110,6 +129,7 @@ participant Dashboard as "dashboard_utama.html"
 participant Theme as "theme.js"
 participant SidebarHTML as "sidebar.html"
 participant SidebarJS as "sidebar.js"
+participant ToastJS as "toast.js"
 participant Styles as "style.css"
 Browser->>Dashboard : Load page
 Dashboard->>Theme : Initialize theme from localStorage
@@ -118,8 +138,10 @@ Dashboard->>Styles : Apply design system and theme
 Dashboard->>SidebarHTML : Fetch sidebar content
 SidebarHTML-->>Dashboard : Render sidebar markup
 Dashboard->>SidebarJS : Initialize dynamic behavior
+Dashboard->>ToastJS : Initialize toast system
 SidebarJS->>SidebarJS : Sync entity dropdown<br/>Populate VAT OUT years<br/>Open active groups
 SidebarJS-->>Dashboard : Active states applied
+ToastJS-->>Dashboard : Toast container ready
 ```
 
 **Diagram sources**
@@ -127,6 +149,7 @@ SidebarJS-->>Dashboard : Active states applied
 - [theme.js](file://theme.js)
 - [sidebar.html](file://sidebar.html)
 - [sidebar.js](file://sidebar.js)
+- [toast.js](file://toast.js)
 - [style.css](file://style.css)
 
 ## Detailed Component Analysis
@@ -157,16 +180,54 @@ The sidebar provides:
 - Nested submenus (e.g., VAT OUT with yearly dashboards)
 - Active link detection and automatic expansion
 - Dark mode toggle button integrated into the sidebar
+- **Mobile hamburger menu** with touch-friendly controls and backdrop overlay
 
 Dynamic behavior:
 - Entity dropdown synchronization from localStorage
 - VAT OUT submenu populated via API with MutationObserver-driven initialization
 - Automatic open/close of groups and submenus based on active page
+- **Mobile sidebar toggle** with smooth slide-in/out animations
+
+**Updated** Enhanced with mobile-responsive hamburger menu and touch-friendly controls for better mobile user experience.
 
 **Section sources**
 - [sidebar.html](file://sidebar.html)
 - [sidebar.js](file://sidebar.js)
 - [theme.js](file://theme.js)
+- [toast.js](file://toast.js)
+
+### Toast Notification System
+**New** The comprehensive toast notification system replaces native browser alerts with modern, non-blocking notifications:
+
+**Core Features:**
+- **Four notification types**: success (✅), error (❌), warning (⚠️), and info (ℹ️)
+- **Non-blocking interface**: Users can continue working while notifications display
+- **Auto-dismissal**: Configurable duration with hover-to-pause functionality
+- **Visual feedback**: Animated progress bars, icons, and smooth transitions
+- **Manual control**: Close buttons and click-outside dismissal
+- **Keyboard support**: Escape key closes confirmation dialogs
+
+**API Functions:**
+- `showToast(message, type, duration)`: Display toast notifications
+- `showConfirm(message, onConfirm, options)`: Non-blocking confirmation dialogs
+- `showLoading(containerId, text)` / `hideLoading(containerId)`: Loading state management
+
+**Visual Design:**
+- Fixed positioning in top-right corner (desktop) or full-width (mobile)
+- Type-specific color coding with left border accents
+- Smooth slide-in/slide-out animations
+- Backdrop blur effects for confirmation dialogs
+- Responsive design adapting to screen sizes
+
+**Integration:**
+- Automatically creates toast container when needed
+- Manages multiple concurrent notifications
+- Handles memory cleanup and DOM element removal
+- Supports custom durations and callback functions
+
+**Section sources**
+- [toast.js](file://toast.js)
+- [style.css](file://style.css)
 
 ### Theme Management System
 The theme system uses:
@@ -197,8 +258,11 @@ Component primitives:
 - Sticky headers, hover effects, and zebra striping
 - Scrollbar styling and print-friendly overrides
 
+**Updated** Added comprehensive toast notification styles with four type variants, confirmation dialog styling, and mobile-responsive layouts.
+
 Responsive breakpoints:
 - 1024px and 768px adjust sidebar width, grid layouts, and spacing
+- **Mobile-specific enhancements**: Hamburger menu visibility, sidebar slide-in behavior, and touch-friendly sizing
 
 **Section sources**
 - [style.css](file://style.css)
@@ -217,6 +281,32 @@ Export:
 - [pagination.js](file://pagination.js)
 - [export.js](file://export.js)
 
+### Mobile User Experience Enhancements
+**New** Comprehensive mobile-responsive design with touch-friendly controls:
+
+**Hamburger Menu System:**
+- Fixed-position hamburger button visible only on mobile devices
+- Touch-optimized SVG icon with hover effects
+- Smooth slide-in/out sidebar animation with backdrop overlay
+- Click-outside-to-close functionality for improved usability
+
+**Responsive Layout Adaptations:**
+- Single-column grid layouts on mobile devices
+- Optimized table rendering with reduced font sizes
+- Touch-friendly button sizing and spacing
+- Full-width toast notifications on small screens
+
+**Interactive Elements:**
+- All interactive elements optimized for touch targets (minimum 44px)
+- Smooth transitions and animations using GPU acceleration
+- Proper viewport handling for mobile browsers
+- Backdrop blur effects for modal overlays
+
+**Section sources**
+- [toast.js](file://toast.js)
+- [style.css](file://style.css)
+- [sidebar.html](file://sidebar.html)
+
 ### Sidebar Interaction Flow
 ```mermaid
 flowchart TD
@@ -233,6 +323,30 @@ OpenSubmenu --> Done(["Ready"])
 
 **Diagram sources**
 - [sidebar.js](file://sidebar.js)
+
+### Toast Notification Flow
+```mermaid
+sequenceDiagram
+participant User as "User Action"
+participant ToastJS as "toast.js"
+participant Container as "toast-container"
+participant Toast as "Toast Element"
+participant Timer as "Auto-dismiss Timer"
+User->>ToastJS : showToast(message, type, duration)
+ToastJS->>Container : ensureContainer()
+ToastJS->>Toast : Create toast element
+ToastJS->>Timer : Set auto-dismiss timer
+Toast-->>User : Display notification
+User->>Toast : Hover over toast
+Toast->>Timer : Pause timer
+User->>Toast : Mouse leave
+Toast->>Timer : Resume timer
+Timer-->>Toast : Auto-dismiss after duration
+Toast->>Container : Remove toast element
+```
+
+**Diagram sources**
+- [toast.js](file://toast.js)
 
 ### Theme Toggle Flow
 ```mermaid
@@ -255,6 +369,7 @@ ThemeJS->>Button : Update icon and text
 ## Dependency Analysis
 - The dashboard depends on the theme manager for initial theme and on the sidebar for navigation
 - The sidebar relies on the theme manager for the dark mode toggle and on sidebar.js for dynamic behavior
+- **The toast system is independently loaded and provides global notification functionality**
 - The sidebar is injected by the server and customized based on user roles
 - Pagination and export utilities are standalone helpers consumed by pages
 
@@ -264,9 +379,11 @@ DU["dashboard_utama.html"] --> THM["theme.js"]
 DU --> SBJ["sidebar.js"]
 DU --> PAG["pagination.js"]
 DU --> EXP["export.js"]
+DU --> TST["toast.js"]
 DU --> STY["style.css"]
 SBH["sidebar.html"] --> THM
 SBH --> SBJ
+SBH --> TST
 APP["app.js"] --> SBH
 ```
 
@@ -275,6 +392,7 @@ APP["app.js"] --> SBH
 - [sidebar.html](file://sidebar.html)
 - [sidebar.js](file://sidebar.js)
 - [theme.js](file://theme.js)
+- [toast.js](file://toast.js)
 - [style.css](file://style.css)
 - [pagination.js](file://pagination.js)
 - [export.js](file://export.js)
@@ -286,6 +404,7 @@ APP["app.js"] --> SBH
 - [sidebar.html](file://sidebar.html)
 - [sidebar.js](file://sidebar.js)
 - [theme.js](file://theme.js)
+- [toast.js](file://toast.js)
 - [style.css](file://style.css)
 - [pagination.js](file://pagination.js)
 - [export.js](file://export.js)
@@ -295,6 +414,8 @@ APP["app.js"] --> SBH
 - Media queries minimize layout thrashing by adjusting only affected components
 - Lazy population of dynamic submenus reduces initial payload
 - Smooth transitions and transforms leverage GPU acceleration
+- **Toast notifications use efficient DOM manipulation with automatic cleanup**
+- **Mobile optimizations include reduced animations and optimized touch interactions**
 - Consider deferring non-critical scripts and using intersection observers for lazy loading of heavy widgets
 
 ## Troubleshooting Guide
@@ -304,15 +425,19 @@ Common issues and resolutions:
 - Theme not persisting: Verify localStorage access and that the data-theme attribute updates on toggle
 - Pagination controls not working: Check container ID and callback registration; confirm state initialization
 - Export fails silently: Ensure the export menu is appended to the DOM and that the table exists
+- **Toast notifications not appearing: Verify toast.js is loaded before usage; check for console errors related to DOM manipulation**
+- **Mobile sidebar not responding: Ensure hamburger button is visible and __toggleMobileSidebar function is accessible**
+- **Confirmation dialogs not closing: Check event listeners and keyboard escape key handling**
 
 **Section sources**
 - [sidebar.js](file://sidebar.js)
 - [theme.js](file://theme.js)
+- [toast.js](file://toast.js)
 - [pagination.js](file://pagination.js)
 - [export.js](file://export.js)
 
 ## Conclusion
-The Tax Database System delivers a cohesive, accessible, and performant user experience through a modular UI built on a robust design system. The dashboard consolidates key insights, the sidebar enables efficient navigation, and the theme system supports user preferences. With responsive patterns, smooth interactions, and extensible utilities, the platform is well-positioned for further customization and growth.
+The Tax Database System delivers a cohesive, accessible, and performant user experience through a modular UI built on a robust design system. The dashboard consolidates key insights, the sidebar enables efficient navigation with enhanced mobile support, the theme system supports user preferences, and the comprehensive toast notification system provides modern, non-blocking user feedback. With responsive patterns, smooth interactions, and extensible utilities, the platform is well-positioned for further customization and growth.
 
 ## Appendices
 
@@ -321,14 +446,50 @@ The Tax Database System delivers a cohesive, accessible, and performant user exp
 - Extend semantic color usage for new statuses or modules
 - Add new transition durations or shadow presets for component variations
 - Introduce new responsive breakpoints as needed
+- **Customize toast notification styles by modifying the toast-* class definitions**
+- **Add new toast types by extending the ICONS object and adding corresponding CSS classes**
 
 ### Accessibility Best Practices
 - Maintain sufficient color contrast in both light and dark modes
 - Provide keyboard navigation support for sidebar groups and menus
 - Use ARIA attributes for expanded/collapsed states where appropriate
 - Ensure focus indicators are visible and consistent across themes
+- **Ensure toast notifications are announced by screen readers with proper ARIA labels**
+- **Provide keyboard shortcuts for dismissing notifications and confirmation dialogs**
 
-### User Workflow Optimization
-- Keep active states synchronized automatically using the existing detection logic
-- Minimize layout shifts by preallocating space for loading skeletons
-- Use subtle animations to indicate state changes without overwhelming users
+### Mobile Optimization Guidelines
+- Optimize touch target sizes for all interactive elements
+- Implement swipe gestures where appropriate for navigation
+- Use viewport meta tags for proper mobile rendering
+- Test on various device sizes and orientations
+- **Ensure hamburger menu works reliably across different mobile browsers**
+- **Optimize toast notification positioning for different screen sizes**
+
+### Toast Notification Usage Examples
+**Basic usage:**
+```javascript
+showToast('Operation completed successfully!', 'success');
+showToast('An error occurred during processing', 'error');
+showToast('Please review the highlighted fields', 'warning');
+showToast('Information about your account', 'info');
+```
+
+**Advanced usage:**
+```javascript
+// Custom duration
+showToast('Long operation in progress...', 'info', 10000);
+
+// Confirmation dialog
+showConfirm('Are you sure you want to delete this item?', function() {
+    // Delete action here
+}, { title: 'Delete Confirmation', danger: true });
+
+// Loading states
+showLoading('data-container', 'Loading data...');
+// ... perform operations ...
+hideLoading('data-container');
+```
+
+**Section sources**
+- [toast.js](file://toast.js)
+- [style.css](file://style.css)

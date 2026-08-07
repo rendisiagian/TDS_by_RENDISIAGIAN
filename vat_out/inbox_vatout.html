@@ -32,7 +32,7 @@
                 <div class="card">
                     <div class="card-header-padding"
                         style="display:flex; justify-content:space-between; align-items:center;">
-                        <h3 class="title-primary" style="border-left-color: #ea580c; margin: 0;">Dokumen Menunggu Verifikasi</h3>
+                        <h3 class="title-primary" style="border-left-color: #ea580c; margin: 0;">Dokumen Perlu Verifikasi</h3>
 
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">🗑️ Hapus
@@ -178,7 +178,8 @@
         let loadedBranches = [];
 
         const urlParams = new URLSearchParams(window.location.search);
-        const aktifYear = urlParams.get('year') || '2025';
+        // FIX: fallback tahun berjalan dinamis (sebelumnya hardcoded '2025' yang sudah kadaluarsa)
+        const aktifYear = urlParams.get('year') || new Date().getFullYear().toString();
 
         let uploadStats = { isActive: false, totalFiles: 0, chunksTotal: 0, chunksDone: 0, sukses: 0, duplikat: 0, gagal: 0 };
 
@@ -246,10 +247,11 @@
             const tbody = document.getElementById('tabel-inbox');
             tbody.innerHTML = '';
 
-            const filteredData = data.filter(row => row.entitas === aktifEntitas);
+            // FIX: filter entitas client-side dihapus — server sudah memfilter via ?entitas=,
+            // filter ulang di sini membuat jumlah baris tidak sinkron dengan total pagination
             const offset = (currentPage - 1) * currentLimit;
 
-            filteredData.forEach((row, index) => {
+            data.forEach((row, index) => {
                 const tr = document.createElement('tr');
                 let parsed = {};
                 try { parsed = JSON.parse(row.data_ekstraksi); } catch (e) { }
@@ -287,9 +289,10 @@
         }
 
         function hapusInbox(id) {
-            if (confirm("Yakin ingin menghapus antrean Faktur Keluaran ini beserta file PDF fisiknya?")) {
+            // FIX: gunakan showConfirm dari toast.js (baseline), bukan confirm() native
+            showConfirm("Yakin ingin menghapus antrean Faktur Keluaran ini beserta file PDF fisiknya?", function() {
                 socket.emit('hapus-inbox-vatout', id);
-            }
+            }, { title: 'Hapus Antrean', danger: true });
         }
 
         socket.on('upload-batch-selesai', (res) => {

@@ -1,5 +1,0 @@
-- **Ingestion Layer**: Client-side PDF text extraction using `pdf.js` in `inbox_prepaid.html`, sending batched payloads via Socket.IO (`upload-pdf-prepaid-batch`) to `app.js` for regex-based parsing and staging in the `inbox_prepaid` SQLite table.
-- **Verification & Reconciliation**: A manual review workflow in `inbox_prepaid.html` allows users to link staged documents to internal branches and VAT Out invoices before committing to the `data_prepaid` table via `simpan-final-prepaid`.
-- **Data Persistence**: Uses a two-stage storage model (`inbox_prepaid` for unverified, `data_prepaid` for verified) with PDF archiving in `arsip_prepaid/`.
-- **Reporting & Dashboard**: `dashboard_prepaid.html` provides server-side paginated views and real-time statistics via `/api/data-prepaid`, while `summary_prepaid.html` offers aggregated comparisons of tax periods.
-- **Integration**: Real-time updates are broadcast via Socket.IO events (`update-tabel-prepaid`, `data-baru-prepaid`) to maintain UI consistency across clients.

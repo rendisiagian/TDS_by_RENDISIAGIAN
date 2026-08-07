@@ -954,7 +954,7 @@
             document.getElementById('modalCariAdvance').style.display = 'flex';
 
             try {
-                const res = await fetch('/api/search-advance-ledger?client=' + encodeURIComponent(clientName));
+                const res = await fetch('/api/search-advance-ledger?client=' + encodeURIComponent(clientName) + '&entitas=' + aktifEntitas);
                 const data = await res.json();
                 
                 if(!data || data.length === 0) {

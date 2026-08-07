@@ -552,7 +552,9 @@
                         <div class="loading-overlay" id="loading-keluaran">
                             <div class="spinner"></div>
                         </div>
-                        <h3 class="out">📈 Rincian Pendapatan (Faktur Keluaran)</h3>
+                        <h3 class="out" id="judul-keluaran">📈 Rincian Pendapatan (Faktur Keluaran)</h3>
+                        <div id="porsi-info-keluaran"
+                            style="font-size:0.78rem; color:var(--text-secondary); margin:-6px 0 8px;"></div>
                         <div style="overflow: auto; max-height: 420px; flex: 1;">
                             <table class="modern-table">
                                 <thead>
@@ -561,6 +563,7 @@
                                         <th>No. Faktur</th>
                                         <th>Klien</th>
                                         <th style="text-align: right;">DPP</th>
+                                        <th id="th-ppn-keluaran" style="text-align: right; display:none;">PPN</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tbody-keluaran">
@@ -759,21 +762,43 @@
                 budget = parseFloat(vo?.contract_income || 0);
             }
 
+            // PORSI JO: untuk project JO, dpp/ppn dari server sudah berupa porsi anggota
+            const porsiAnggota = lastFetchedData.porsi_anggota || null;
+            const thPpnKeluaran = document.getElementById('th-ppn-keluaran');
+            if (thPpnKeluaran) thPpnKeluaran.style.display = porsiAnggota ? '' : 'none';
+            const judulKeluaran = document.getElementById('judul-keluaran');
+            if (judulKeluaran) {
+                judulKeluaran.textContent = porsiAnggota
+                    ? `📈 Rincian Pendapatan (Faktur Keluaran) — Porsi ${porsiAnggota} dari Berca JO`
+                    : '📈 Rincian Pendapatan (Faktur Keluaran)';
+            }
+            const colSpanOut = porsiAnggota ? 5 : 4;
+
             let dataKeluaran = lastFetchedData.keluaran || [];
             if (yearFilter !== 'all') dataKeluaran = dataKeluaran.filter(f => f.tanggal && f.tanggal.startsWith(yearFilter));
             if (voId !== 'all') dataKeluaran = dataKeluaran.filter(f => f.kode_vo == voId);
 
             let totalDppOut = 0;
+            let totalPpnOut = 0;
             let htmlOut = '';
             if (dataKeluaran.length === 0) {
-                htmlOut = '<tr><td colspan="4"><div class="empty-state"><span>📭</span>Tidak ada faktur keluaran untuk filter ini.</div></td></tr>';
+                htmlOut = `<tr><td colspan="${colSpanOut}"><div class="empty-state"><span>📭</span>Tidak ada faktur keluaran untuk filter ini.</div></td></tr>`;
             } else {
                 dataKeluaran.forEach(f => {
                     totalDppOut += parseFloat(f.dpp || 0);
-                    htmlOut += `<tr><td>${f.tanggal || '-'}</td><td>${f.no_faktur || '-'}</td><td>${f.client || '-'}</td><td class="amount-cell text-success">${formatRp(f.dpp)}</td></tr>`;
+                    totalPpnOut += parseFloat(f.ppn || 0);
+                    const tdPpn = porsiAnggota ? `<td class="amount-cell" style="color:var(--text-secondary);">${formatRp(f.ppn)}</td>` : '';
+                    htmlOut += `<tr><td>${f.tanggal || '-'}</td><td>${f.no_faktur || '-'}</td><td>${f.client || '-'}</td><td class="amount-cell text-success">${formatRp(f.dpp)}</td>${tdPpn}</tr>`;
                 });
             }
             document.getElementById('tbody-keluaran').innerHTML = htmlOut;
+
+            const infoPorsi = document.getElementById('porsi-info-keluaran');
+            if (infoPorsi) {
+                infoPorsi.textContent = porsiAnggota
+                    ? `Angka di bawah adalah porsi ${porsiAnggota} dari faktur Berca JO (diisi lewat tombol Edit pada register faktur). Total PPN porsi: ${formatRp(totalPpnOut)} — baris bernilai Rp 0 berarti porsinya belum diisi.`
+                    : '';
+            }
 
             let dataMasukan = lastFetchedData.masukan || [];
             if (yearFilter !== 'all') dataMasukan = dataMasukan.filter(f => f.tanggal && f.tanggal.startsWith(yearFilter));

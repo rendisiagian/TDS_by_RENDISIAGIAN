@@ -59,16 +59,25 @@
                     <div id="sub-vatin" class="sidebar-sub-menu">
                         <a href="/dashboard-vatin" class="sidebar-link sub-link">📊 Dashboard</a>
                         <a href="/summary-vatin" class="sidebar-link sub-link">📊 Laporan Rekapitulasi</a>
-                        <a href="/audit-vatin" class="sidebar-link sub-link">📜 Log Audit (History)</a>
+                        <a href="/audit-vatin" class="sidebar-link sub-link">🛡️ Audit Integritas Faktur</a>
                     </div>
                 </div>
-                <a href="/dashboard-payable" class="sidebar-link">Tax Payable</a>
+                <div class="sidebar-item-nested">
+                    <span class="sidebar-link collapsible-sub" onclick="toggleSubMenu('sub-payable')">
+                        Tax Payable <span class="chevron">▼</span>
+                    </span>
+                    <div id="sub-payable" class="sidebar-sub-menu">
+                        <a href="/dashboard-payable" class="sidebar-link sub-link">📊 Dashboard</a>
+                        <a href="/inbox-payable" class="sidebar-link sub-link" style="color:#ea580c; font-weight:600;">📥 Antrean Verifikasi</a>
+                    </div>
+                </div>
                 <div class="sidebar-item-nested">
                     <span class="sidebar-link collapsible-sub" onclick="toggleSubMenu('sub-prepaid')">
                         Prepaid Tax <span class="chevron">▼</span>
                     </span>
                     <div id="sub-prepaid" class="sidebar-sub-menu">
                         <a href="/dashboard-prepaid" class="sidebar-link sub-link">📊 Dashboard</a>
+                        <a href="/inbox-prepaid" class="sidebar-link sub-link" style="color:#ea580c; font-weight:600;">📥 Antrean Verifikasi</a>
                         <a href="/summary-prepaid" class="sidebar-link sub-link">📊 Summary Masa Pajak</a>
                     </div>
                 </div>

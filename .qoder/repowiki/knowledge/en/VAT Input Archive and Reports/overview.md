@@ -1,1 +1,0 @@
-Stores archived VAT input PDF documents and generated HTML summary reports.

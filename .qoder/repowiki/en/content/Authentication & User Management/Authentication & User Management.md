@@ -14,10 +14,15 @@
 - [dashboard_utama.html](file://dashboard_utama.html)
 - [export.js](file://export.js)
 - [pagination.js](file://pagination.js)
-- [fix_masa_pajak.js](file://fix_masa_pajak.js)
-- [test_query.js](file://test_query.js)
 - [package.json](file://package.json)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Updated login error handling section to reflect simplified URL-based error parameters instead of inline JavaScript alerts
+- Enhanced session management section with password hash validation and default password detection features
+- Updated troubleshooting guide with new error parameter codes
+- Revised authentication workflow diagrams to show URL-based error handling
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -49,8 +54,6 @@ AuditLogs["audit_logs.html"] --> App
 Dashboard["dashboard_utama.html"] --> App
 Export["export.js"] --> App
 Pagination["pagination.js"] --> App
-FixMasaPajak["fix_masa_pajak.js"] --> App
-TestQuery["test_query.js"] --> App
 ```
 
 **Diagram sources**
@@ -66,8 +69,6 @@ TestQuery["test_query.js"] --> App
 - [dashboard_utama.html](file://dashboard_utama.html)
 - [export.js](file://export.js)
 - [pagination.js](file://pagination.js)
-- [fix_masa_pajak.js](file://fix_masa_pajak.js)
-- [test_query.js](file://test_query.js)
 
 **Section sources**
 - [login.html](file://login.html)
@@ -82,14 +83,12 @@ TestQuery["test_query.js"] --> App
 - [dashboard_utama.html](file://dashboard_utama.html)
 - [export.js](file://export.js)
 - [pagination.js](file://pagination.js)
-- [fix_masa_pajak.js](file://fix_masa_pajak.js)
-- [test_query.js](file://test_query.js)
 
 ## Core Components
-- Authentication Forms: login page with credential submission and redirect logic.
+- Authentication Forms: login page with credential submission and redirect logic using URL-based error parameters.
 - User Management Dashboard: administrative interface for managing users.
 - Profile Management: personal profile editing and update flows.
-- Session Management: client-side session state handling and navigation logic.
+- Session Management: client-side session state handling with password hash validation and default password detection.
 - Role-Based Access Control: role definitions and UI-driven access control enforcement.
 - Security Measures: password hashing with bcryptjs and secure credential handling.
 - UI Utilities: sidebar navigation, theming, and shared styles.
@@ -101,7 +100,7 @@ Key implementation references:
 - Profile editing interface: [profile.html](file://profile.html)
 - Sidebar navigation: [sidebar.html](file://sidebar.html), [sidebar.js](file://sidebar.js)
 - Theming and styles: [theme.js](file://theme.js), [style.css](file://style.css)
-- Supporting scripts: [export.js](file://export.js), [pagination.js](file://pagination.js), [fix_masa_pajak.js](file://fix_masa_pajak.js), [test_query.js](file://test_query.js)
+- Supporting scripts: [export.js](file://export.js), [pagination.js](file://pagination.js)
 
 **Section sources**
 - [login.html](file://login.html)
@@ -114,8 +113,6 @@ Key implementation references:
 - [style.css](file://style.css)
 - [export.js](file://export.js)
 - [pagination.js](file://pagination.js)
-- [fix_masa_pajak.js](file://fix_masa_pajak.js)
-- [test_query.js](file://test_query.js)
 
 ## Architecture Overview
 The system follows a client-side architecture with a central application module coordinating UI transitions, session state, and access control. Authentication triggers a redirect to the main dashboard upon successful login. Role-based access controls are enforced via UI visibility and navigation logic. Administrative features are gated behind roles and validated before enabling actions.
@@ -186,7 +183,9 @@ Enforcement:
 - [sidebar.html](file://sidebar.html)
 
 ### Login Workflow
-The login process validates credentials and establishes a client-side session. On success, the user is redirected to the main dashboard. On failure, appropriate feedback is shown.
+The login process validates credentials and establishes a client-side session. On success, the user is redirected to the main dashboard. On failure, appropriate feedback is shown through URL-based error parameters.
+
+**Updated** Simplified error handling now uses URL parameters instead of inline JavaScript alerts for better security and maintainability.
 
 ```mermaid
 sequenceDiagram
@@ -200,6 +199,7 @@ APP->>APP : "Authenticate against backend"
 APP-->>LG : "Success or error response"
 APP->>APP : "Set session state"
 APP-->>U : "Redirect to dashboard_utama.html"
+Note over APP,LG : Error handling via URL parameters (?error=1, ?error=2, ?error=3)
 ```
 
 **Diagram sources**
@@ -233,8 +233,12 @@ Redirect --> End(["Session Ended"])
 ### Session Management
 - Session establishment occurs after successful authentication.
 - Session state is maintained client-side and used to enforce access control.
+- **Enhanced** Password hash validation ensures session integrity by storing and validating password hashes.
+- **Enhanced** Default password detection identifies users still using default credentials for security prompts.
 - Session timeout behavior is configurable; on timeout, the user is redirected to the login page.
 - Navigation and UI elements reflect current session state and role.
+
+**Updated** Session management now includes password hash validation and default password detection for enhanced security monitoring.
 
 **Section sources**
 - [app.js](file://app.js)
@@ -242,16 +246,19 @@ Redirect --> End(["Session Ended"])
 - [sidebar.js](file://sidebar.js)
 
 ### Password Security and Hashing
-- Password hashing is performed server-side using bcryptjs.
+- Password hashing is performed server-side using bcryptjs with 12 salt rounds for enhanced security.
 - Client-side does not handle password hashing; credentials are transmitted securely to the backend.
 - Secure credential handling practices are enforced during login and profile updates.
+- **Enhanced** Default password detection compares current password hash against known default hash to identify insecure accounts.
+
+**Updated** Enhanced security measures include default password detection and improved bcrypt configuration.
 
 **Section sources**
 - [app.js](file://app.js)
 
 ### User Registration and Profile Management
 - Registration: Administrators can add new users with assigned roles and initial settings.
-- Profile Editing: Users can update personal information; administrators can manage others’ profiles.
+- Profile Editing: Users can update personal information; administrators can manage others' profiles.
 - Validation: Form inputs are validated before submission; errors are surfaced to the user.
 - Persistence: Backend APIs handle storage and retrieval of user data.
 
@@ -270,15 +277,15 @@ Redirect --> End(["Session Ended"])
 - [manage_users.html](file://manage_users.html)
 - [audit_logs.html](file://audit_logs.html)
 - [export.js](file://export.js)
-- [fix_masa_pajak.js](file://fix_masa_pajak.js)
-- [test_query.js](file://test_query.js)
 
 ### UI Components
-- Authentication Forms: Login form with validation and error messaging.
+- Authentication Forms: Login form with validation and error messaging using URL-based error parameters.
 - User Management Dashboard: Lists users, actions for managing profiles, and filters.
 - Profile Editor: Fields for updating personal details with save/cancel actions.
 - Navigation Sidebar: Role-aware menu items and links to dashboards and admin panels.
 - Theming and Styles: Consistent styling and theme switching support.
+
+**Updated** Authentication forms now use URL-based error parameters for more robust error handling.
 
 **Section sources**
 - [login.html](file://login.html)
@@ -290,7 +297,7 @@ Redirect --> End(["Session Ended"])
 - [style.css](file://style.css)
 
 ## Dependency Analysis
-External dependencies are declared in the project’s package manifest. These libraries support networking, real-time communication, and development tooling.
+External dependencies are declared in the project's package manifest. These libraries support networking, real-time communication, and development tooling.
 
 ```mermaid
 graph TB
@@ -316,6 +323,7 @@ Common issues and resolutions:
   - Verify network connectivity and backend availability.
   - Check browser console for errors and CORS-related messages.
   - Confirm credentials and role assignment in the backend.
+  - **Updated** Check URL parameters for error codes: `?error=1` (invalid credentials), `?error=2` (rate limiting), `?error=3` (missing fields).
 - Session expires unexpectedly:
   - Adjust session timeout configuration on the server.
   - Ensure client-side session persistence is enabled.
@@ -328,6 +336,11 @@ Common issues and resolutions:
 - UI navigation issues:
   - Reinitialize sidebar and theme modules.
   - Clear browser cache and reload the page.
+- **New** Default password warnings:
+  - Users with default passwords receive security prompts.
+  - Change default password immediately upon first login.
+
+**Updated** Added troubleshooting guidance for URL-based error parameters and default password detection.
 
 **Section sources**
 - [app.js](file://app.js)
@@ -335,4 +348,4 @@ Common issues and resolutions:
 - [theme.js](file://theme.js)
 
 ## Conclusion
-The authentication and user management system integrates a clear RBAC model with practical UI components for login, user administration, and profile management. Client-side session handling enforces access control, while security measures such as bcryptjs hashing protect credentials. Administrators can efficiently manage users and maintain system integrity, supported by audit logging and reporting capabilities. Following the troubleshooting steps and best practices ensures reliable operation across roles and use cases.
+The authentication and user management system integrates a clear RBAC model with practical UI components for login, user administration, and profile management. Client-side session handling enforces access control, while security measures such as bcryptjs hashing protect credentials. The system has been enhanced with simplified URL-based error handling and improved session management including password hash validation and default password detection. Administrators can efficiently manage users and maintain system integrity, supported by audit logging and reporting capabilities. Following the troubleshooting steps and best practices ensures reliable operation across roles and use cases.

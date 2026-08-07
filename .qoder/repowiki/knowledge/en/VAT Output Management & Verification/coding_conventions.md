@@ -1,3 +1,0 @@
-- Views implement self-contained client-side logic by embedding all JavaScript controllers, event listeners, and API interaction handlers directly within the HTML file.
-- Financial values are consistently formatted using Indonesian locale standards (Rp prefix, dot separators) via helper functions like formatRupiah before DOM insertion.
-- API interactions for data retrieval and submission rely on the native fetch API for REST endpoints and socket.io for real-time operational events.

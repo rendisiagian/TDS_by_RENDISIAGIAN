@@ -33,12 +33,12 @@
 
             <div class="container">
                 <div class="stats-grid" id="stats-cards" data-testid="stats-cards">
-                    <div class="stat-card accent-green" data-testid="stat-total-doc">
+                    <div class="stat-card accent-blue" data-testid="stat-total-doc">
                         <span class="stat-label">Total Dokumen BPPU</span>
                         <span class="stat-value" id="stat-total">0</span>
                         <div class="stat-mom neutral" id="mom-total">-- vs bulan lalu</div>
                     </div>
-                    <div class="stat-card accent-purple" data-testid="stat-total-ppn">
+                    <div class="stat-card accent-green" data-testid="stat-total-ppn">
                         <span class="stat-label">Total PPh Potongan</span>
                         <span class="stat-value" id="stat-ppn">Rp 0</span>
                         <div class="stat-mom neutral" id="mom-ppn">-- vs bulan lalu</div>
@@ -48,7 +48,7 @@
                         <span class="stat-value" id="stat-dpp">Rp 0</span>
                     </div>
                     <div class="stat-card accent-orange" data-testid="stat-pending">
-                        <span class="stat-label">Menunggu Verifikasi</span>
+                        <span class="stat-label">Perlu Verifikasi</span>
                         <span class="stat-value" id="stat-pending">0</span>
                         <span class="stat-sub">dokumen dalam antrean</span>
                     </div>
@@ -139,6 +139,11 @@
             document.querySelectorAll('.sidebar-link').forEach(link => {
                 if (link.getAttribute('href') === currentPath) link.classList.add('active');
             });
+            // FIX: buka submenu parent dari link yang aktif (Tax Payable kini berupa submenu)
+            document.querySelectorAll('.sidebar-link.active').forEach(link => {
+                const nested = link.closest('.sidebar-item-nested');
+                if (nested) nested.classList.add('open');
+            });
             const sidebarSelect = document.getElementById('global-entity-select');
             if (sidebarSelect) sidebarSelect.value = aktifEntitas;
         });
@@ -205,14 +210,10 @@
                 let curInv = baris.no_invoice_internal || '';
                 let barisNo = offset + index + 1; 
 
-                let btnEdit = `<button class="btn-tbl btn-tbl-edit" title="Edit" onclick="handleAction('${baris.no_bppu}', 'EDIT', '${curBr}', '${curInv}')">Edit</button>`;
-                let btnDel  = `<button class="btn-tbl btn-tbl-del" title="Hapus" onclick="handleAction('${baris.no_bppu}', 'DELETE')">Hapus</button>`;
-                let btnPdf = baris.link_pdf_lokal ? `<a href="/${baris.link_pdf_lokal}" target="_blank" class="btn-tbl btn-tbl-pdf">PDF</a>` : `-`;
-
                 tr.innerHTML = `
                     <td class="text-center">${barisNo}</td>
-                    <td class="text-center" style="white-space:nowrap;">${btnEdit} ${btnDel}</td>
-                    <td class="text-center">${btnPdf}</td>
+                    <td class="text-center" style="white-space:nowrap;"></td>
+                    <td class="text-center"></td>
                     <td class="text-center">${baris.nama_cabang || baris.kode_cabang || '-'}</td>
                     <td class="text-center">${baris.masa_pajak || '-'}</td>
                     <td class="text-bold">${baris.nama_dipotong || '-'}</td>
@@ -223,6 +224,28 @@
                     <td class="text-center">${baris.no_invoice_internal || '-'}</td>
                     <td class="text-center">${baris.diinput_oleh || '-'}</td>
                 `;
+
+                // BUG-2 FIX (port dari baseline vat_in): tombol aksi dibuat lewat DOM API,
+                // bukan interpolasi string onclick, agar aman dari XSS
+                const aksiCell = tr.children[1];
+                const btnEdit = document.createElement('button');
+                btnEdit.className = 'btn-tbl btn-tbl-edit'; btnEdit.title = 'Edit'; btnEdit.textContent = 'Edit';
+                btnEdit.onclick = () => handleAction(baris.no_bppu, 'EDIT', curBr, curInv);
+                const btnDel = document.createElement('button');
+                btnDel.className = 'btn-tbl btn-tbl-del'; btnDel.title = 'Hapus'; btnDel.textContent = 'Hapus';
+                btnDel.onclick = () => handleAction(baris.no_bppu, 'DELETE');
+                aksiCell.append(btnEdit, ' ', btnDel);
+
+                const pdfCell = tr.children[2];
+                if (baris.link_pdf_lokal) {
+                    const aPdf = document.createElement('a');
+                    aPdf.href = '/' + baris.link_pdf_lokal; aPdf.target = '_blank';
+                    aPdf.className = 'btn-tbl btn-tbl-pdf'; aPdf.textContent = 'PDF';
+                    pdfCell.appendChild(aPdf);
+                } else {
+                    pdfCell.textContent = '-';
+                }
+
                 tbody.appendChild(tr);
             });
             
@@ -312,7 +335,7 @@
             var pct = ((diff / previous) * 100).toFixed(1);
             if (diff > 0) { el.className = 'stat-mom up'; el.innerHTML = '&#9650; +' + pct + '% vs bulan lalu'; }
             else if (diff < 0) { el.className = 'stat-mom down'; el.innerHTML = '&#9660; ' + pct + '% vs bulan lalu'; }
-            else { el.className = 'stat-mom neutral'; el.textContent = '&#9644; Sama dengan bulan lalu'; }
+            else { el.className = 'stat-mom neutral'; el.innerHTML = '&#9644; Sama dengan bulan lalu'; } // FIX: textContent tidak mendekode entitas HTML
         }
 
         // Jalankan Pertama Kali

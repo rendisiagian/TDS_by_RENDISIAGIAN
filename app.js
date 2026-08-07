@@ -356,6 +356,9 @@ db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS master_client (npwp TEXT PRIMARY KEY, nama TEXT, alamat TEXT, format_tipe TEXT, tanggal_terakhir DATE)`);
     db.run(`CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, username TEXT, action TEXT, module TEXT, details TEXT, waktu DATETIME DEFAULT CURRENT_TIMESTAMP)`);
     db.run(`CREATE TABLE IF NOT EXISTS master_vo (id INTEGER PRIMARY KEY AUTOINCREMENT, kode_cabang TEXT, nama_vo TEXT, contract_income REAL DEFAULT 0)`);
+    // CATATAN INTERNAL JO: porsi DPP/PPN per anggota (BBS/BMP) atas faktur Berca JO.
+    // Faktur tetap utuh atas nama JO; tabel ini hanya untuk pelaporan internal (Tax Project Report).
+    db.run(`CREATE TABLE IF NOT EXISTS porsi_vatout (no_faktur TEXT, anggota TEXT, dpp_porsi REAL DEFAULT 0, ppn_porsi REAL DEFAULT 0, PRIMARY KEY (no_faktur, anggota))`);
 
     const ensureColumn = (table, columnDef) => {
         db.run(`ALTER TABLE ${table} ADD COLUMN ${columnDef}`, () => { });
@@ -831,25 +834,66 @@ app.get('/api/vo/:kode_cabang', cekAuth, (req, res) => {
 app.get('/api/project-summary/:id', cekAuth, (req, res) => {
     const projectId = req.params.id;
 
-    // Query faktur keluaran terkait project (menggunakan kode_cabang yang merepresentasikan branch/project)
-    db.all(`SELECT d.tanggal_faktur as tanggal, d.no_faktur as no_faktur, d.nama_pembeli as client, d.dpp, d.ppn, d.kode_vo FROM data_vatout d WHERE d.kode_cabang = ? OR d.project_id = ?`, [projectId, projectId], (err, keluaran) => {
-        if (err) {
-            console.error('Error querying data_vatout:', err);
-            return res.status(500).json({ error: 'Database error' });
-        }
+    // Project milik JO (mis. 20305G=BBS, 250310=BMP): pendapatannya diambil dari
+    // catatan internal porsi atas faktur Berca JO, bukan dari kode_cabang faktur
+    // (faktur JO sah tersimpan dengan kode_cabang 'Berca JO').
+    db.get(`SELECT entitas, nama_cabang FROM master_cabang WHERE kode_cabang = ?`, [projectId], (errProj, proj) => {
+        const isJOProject = !!(proj && proj.entitas === 'JO' && proj.nama_cabang);
 
-        // Query faktur masukan
-        db.all(`SELECT d.tanggal_faktur as tanggal, d.no_faktur as no_faktur, d.nama_penjual as supplier, d.dpp, d.ppn FROM data_vatin d WHERE d.kode_cabang = ? OR d.project_id = ?`, [projectId, projectId], (err, masukan) => {
+        const sqlKeluaranJO = `SELECT d.tanggal_faktur as tanggal, d.no_faktur as no_faktur, d.nama_pembeli as client,
+                                      COALESCE(p.dpp_porsi, 0) as dpp, COALESCE(p.ppn_porsi, 0) as ppn,
+                                      d.dpp as dpp_full, d.ppn as ppn_full
+                               FROM data_vatout d
+                               LEFT JOIN porsi_vatout p ON p.no_faktur = d.no_faktur AND p.anggota = ?
+                               WHERE d.entitas = 'JO' ORDER BY d.tanggal_faktur ASC`;
+        const queryKeluaran = isJOProject
+            ? (cb) => db.all(sqlKeluaranJO, [proj.nama_cabang], cb)
+            : (cb) => db.all(`SELECT d.tanggal_faktur as tanggal, d.no_faktur as no_faktur, d.nama_pembeli as client, d.dpp, d.ppn, d.kode_vo FROM data_vatout d WHERE d.kode_cabang = ? OR d.project_id = ?`, [projectId, projectId], cb);
+
+        queryKeluaran((err, keluaran) => {
             if (err) {
-                console.error('Error querying data_vatin:', err);
+                console.error('Error querying data_vatout:', err);
                 return res.status(500).json({ error: 'Database error' });
             }
 
-            res.json({
-                keluaran: keluaran || [],
-                masukan: masukan || []
+            // Query faktur masukan
+            db.all(`SELECT d.tanggal_faktur as tanggal, d.no_faktur as no_faktur, d.nama_penjual as supplier, d.dpp, d.ppn FROM data_vatin d WHERE d.kode_cabang = ? OR d.project_id = ?`, [projectId, projectId], (err, masukan) => {
+                if (err) {
+                    console.error('Error querying data_vatin:', err);
+                    return res.status(500).json({ error: 'Database error' });
+                }
+
+                res.json({
+                    keluaran: keluaran || [],
+                    masukan: masukan || [],
+                    porsi_anggota: isJOProject ? proj.nama_cabang : null
+                });
             });
         });
+    });
+});
+
+// Simpan catatan internal porsi JO: replace seluruh baris porsi untuk satu faktur
+function simpanPorsiVatout(noFaktur, porsiList, done) {
+    db.serialize(() => {
+        db.run(`DELETE FROM porsi_vatout WHERE no_faktur = ?`, [noFaktur]);
+        (Array.isArray(porsiList) ? porsiList : []).forEach(p => {
+            const anggota = String(p.anggota || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
+            const dpp = Number(p.dpp) || 0;
+            const ppn = Number(p.ppn) || 0;
+            if (!anggota || (dpp <= 0 && ppn <= 0)) return;
+            db.run(`INSERT OR REPLACE INTO porsi_vatout (no_faktur, anggota, dpp_porsi, ppn_porsi) VALUES (?, ?, ?, ?)`,
+                [noFaktur, anggota, dpp, ppn]);
+        });
+        if (typeof done === 'function') done();
+    });
+}
+
+// API: Baca catatan porsi internal suatu faktur keluaran (untuk modal Edit/Lihat)
+app.get('/api/porsi-vatout/:faktur', cekAuth, (req, res) => {
+    db.all(`SELECT anggota, dpp_porsi, ppn_porsi FROM porsi_vatout WHERE no_faktur = ? ORDER BY anggota`, [req.params.faktur], (err, rows) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        res.json(rows || []);
     });
 });
 
@@ -888,14 +932,19 @@ app.get('/api/prepaid-comparison/:noBppu', cekAuth, (req, res) => {
                 return res.json({ prepaid, vatout: null });
             }
 
-            // Agregasi nilai PPN dari semua faktur yang ditemukan
+            // Agregasi nilai PPN, DPP tercetak, dan Harga Jual dari semua faktur yang ditemukan
             const aggregated = rows.reduce((acc, r) => {
                 acc.ppn += (r.ppn || 0);
+                acc.dpp += (r.dpp || 0);
+                acc.hargaJual += (r.harga_jual || 0);
                 return acc;
-            }, { ppn: 0 });
+            }, { ppn: 0, dpp: 0, hargaJual: 0 });
 
-            // Hitung DPP Sesungguhnya (Actual DPP) melalui reverse calculation
-            // DPP Sesungguhnya = Total PPN / 11% (0.11)
+            // Basis rekonsiliasi BPPU: DPP di BPPU dicatat setara PPN / 11% efektif.
+            // Tarif efektif 11% dari Harga Jual stabil di kedua rezim (2024: PPN = 11% x DPP;
+            // 2025+: PPN = 12% x (11/12 x Harga Jual)), termasuk faktur Uang Muka/Pelunasan
+            // yang DPP-nya hanya sebagian dari Harga Jual. Jangan pernah menurunkan DPP dari
+            // Harga Jual x 11/12 karena pola itu tidak berlaku untuk faktur UM/Pelunasan.
             const estimatedDpp = Math.round(aggregated.ppn / 0.11);
 
             // Kirim balik sebagai objek vatout tunggal agar UI tetap kompatibel
@@ -904,10 +953,61 @@ app.get('/api/prepaid-comparison/:noBppu', cekAuth, (req, res) => {
                 vatout: {
                     dpp: estimatedDpp,
                     ppn: aggregated.ppn,
+                    dpp_faktur: Math.round(aggregated.dpp),
+                    harga_jual: Math.round(aggregated.hargaJual),
                     is_aggregated: rows.length > 1,
                     count: rows.length
                 }
             });
+        });
+    });
+});
+
+// API: Compare Prepaid Tax vs VAT OUT secara massal (satu request untuk seluruh BPPU per entitas)
+// FIX: menggantikan pola N+1 fetch per baris di dashboard prepaid
+app.get('/api/prepaid-comparison-bulk', cekAuth, (req, res) => {
+    const entitas = req.query.entitas || 'BBS';
+    db.all(`SELECT * FROM data_prepaid WHERE entitas = ?`, [entitas], (err, prepaids) => {
+        if (err) return res.status(500).json({ error: err.message });
+        db.all(`SELECT no_faktur, no_invoice_internal, ppn, dpp, harga_jual FROM data_vatout WHERE entitas = ?`, [entitas], (err2, vatouts) => {
+            if (err2) return res.status(500).json({ error: err2.message });
+
+            // Index faktur keluaran berdasarkan referensi internal & nomor faktur
+            const byRef = new Map(), byFaktur = new Map();
+            (vatouts || []).forEach(v => {
+                const ref = (v.no_invoice_internal || '').trim();
+                if (ref) { if (!byRef.has(ref)) byRef.set(ref, []); byRef.get(ref).push(v); }
+                const nf = (v.no_faktur || '').trim();
+                if (nf) { if (!byFaktur.has(nf)) byFaktur.set(nf, []); byFaktur.get(nf).push(v); }
+            });
+
+            const result = {};
+            (prepaids || []).forEach(p => {
+                const invoiceRef = (p.no_invoice_internal || '').trim();
+                if (!invoiceRef || invoiceRef === '-') { result[p.no_bppu] = null; return; }
+                const refs = invoiceRef.split(',').map(s => s.trim()).filter(Boolean);
+                const matched = new Map();
+                refs.forEach(rf => {
+                    (byRef.get(rf) || []).forEach(v => matched.set(v.no_faktur, v));
+                    (byFaktur.get(rf) || []).forEach(v => matched.set(v.no_faktur, v));
+                });
+                if (matched.size === 0) { result[p.no_bppu] = null; return; }
+
+                // Logika sama dengan endpoint tunggal: basis rekonsiliasi = PPN / 11% efektif
+                // (stabil untuk rezim 2024 maupun 2025+ dan faktur UM/Pelunasan).
+                // DPP tercetak & Harga Jual ikut dikirim untuk transparansi tampilan.
+                let totalPpn = 0, totalDpp = 0, totalHJ = 0;
+                matched.forEach(v => { totalPpn += (v.ppn || 0); totalDpp += (v.dpp || 0); totalHJ += (v.harga_jual || 0); });
+                result[p.no_bppu] = {
+                    dpp: Math.round(totalPpn / 0.11),
+                    ppn: totalPpn,
+                    dpp_faktur: Math.round(totalDpp),
+                    harga_jual: Math.round(totalHJ),
+                    is_aggregated: matched.size > 1,
+                    count: matched.size
+                };
+            });
+            res.json(result);
         });
     });
 });
@@ -1054,6 +1154,15 @@ modules.forEach(mod => {
                         } else {
                             baseSql += ` AND ${actualCol} <= ?`;
                             params.push(val);
+                        }
+                    } else if (col === 'masa_pajak_faktur' && mod.id === 'prepaid') {
+                        // FIX: kolom turunan dari JOIN vatout (SELECT alias) tidak lolos regex alias.col,
+                        // jadi dipetakan manual ke ekspresi SQL yang sama dengan kolom tampilannya
+                        if (val === '__IS_NULL__') {
+                            baseSql += ` AND (v.tanggal_faktur IS NULL OR v.tanggal_faktur = '' OR v.tanggal_faktur = '-')`;
+                        } else {
+                            baseSql += ` AND strftime('%m-%Y', v.tanggal_faktur) LIKE ?`;
+                            params.push(`%${val}%`);
                         }
                     } else if (/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/.test(col)) {
                         // Prevent SQL Injection by validating col name format
@@ -1213,8 +1322,10 @@ modules.forEach(mod => {
             try {
                 const searchParams = JSON.parse(decodeURIComponent(req.query.search));
                 const ALLOWED_SEARCH_KEYS = ['noFaktur', 'namaPembeli', 'npwpPembeli', 'namaVendor', 'npwpVendor',
-                    'tanggalFaktur', 'referensi', 'namaPembeli', 'namaDipotong', 'namaPemotong',
-                    'noBppu', 'masaPajak', 'nomorDokumen', 'kotaPenerbit', 'penandatangan'];
+                    'tanggalFaktur', 'referensi', 'namaDipotong', 'namaPemotong',
+                    'noBppu', 'masaPajak', 'nomorDokumen', 'kotaPenerbit', 'penandatangan',
+                    // FIX: key numerik/tanggal yang dikirim filter frontend (sebelumnya mati karena tidak masuk whitelist)
+                    'dpp', 'ppn', 'pph', 'tanggalDokumen'];
                 for (let key in searchParams) {
                     const val = searchParams[key];
                     if (!val) continue;
@@ -1719,8 +1830,10 @@ app.get('/api/client-advance-summary', cekAuth, (req, res) => {
 app.get('/api/search-advance-ledger', cekAuth, (req, res) => {
     const clientUpper = (req.query.client || '').toUpperCase();
     if (!clientUpper) return res.json([]);
+    // FIX: filter entitas (sebelumnya data advance lintas entitas bocor ke pencarian)
+    const entitas = req.query.entitas || 'BBS';
 
-    db.all(`SELECT * FROM data_client_ledger WHERE is_advance = 1`, [], (err, advanceRows) => {
+    db.all(`SELECT * FROM data_client_ledger WHERE is_advance = 1 AND entitas = ?`, [entitas], (err, advanceRows) => {
         if (!advanceRows) return res.json([]);
         let clientAdvances = advanceRows.filter(r => {
             const nama = (r.nama_client || '').toUpperCase();
@@ -1728,7 +1841,7 @@ app.get('/api/search-advance-ledger', cekAuth, (req, res) => {
         });
         if (clientAdvances.length === 0) return res.json([]);
 
-        db.all(`SELECT ref_advance, advance FROM data_client_ledger WHERE ref_advance != '' AND ref_advance IS NOT NULL`, [], (err, childRows) => {
+        db.all(`SELECT ref_advance, advance FROM data_client_ledger WHERE ref_advance != '' AND ref_advance IS NOT NULL AND entitas = ?`, [entitas], (err, childRows) => {
             let relations = childRows || [];
             clientAdvances = clientAdvances.map(adv => {
                 let totalDeductions = relations.filter(r => r.ref_advance === adv.inv_no)
@@ -1764,6 +1877,15 @@ io.use((socket, next) => {
 
 io.on('connection', (socket) => {
 
+    // FIX: bersihkan file PDF arsip saat data dihapus agar tidak menjadi file yatim.
+    // path dibangun dari basename + folder arsip modul (anti path traversal).
+    const hapusArsipFisik = (targetMod, linkPdf) => {
+        if (!linkPdf) return;
+        const modInfo = modules.find(m => m.id === targetMod);
+        if (!modInfo) return;
+        fsPromises.unlink(path.join(__dirname, modInfo.archive, path.basename(linkPdf))).catch(() => {});
+    };
+
     const getRole = (socket) => (socket.user?.role || '').toLowerCase();
     const isAdministrator = (socket) => ['administrator', 'superadmin'].includes(getRole(socket));
     const isSupervisorOrAbove = (socket) => ['supervisor', 'administrator', 'superadmin'].includes(getRole(socket));
@@ -1792,13 +1914,20 @@ io.on('connection', (socket) => {
 
         if (d.action === 'DELETE') {
             if (isSupervisor) {
-                db.serialize(() => {
-                    db.run(`DELETE FROM data_${d.mod} WHERE ${pkColumn} = ?`, [d.faktur]);
-                    if (!isBPPU) {
-                        db.run(`DELETE FROM item_${d.mod} WHERE no_faktur = ?`, [d.faktur]);
-                    }
-                    insertAuditLog(socket.user.id, socket.user.username, 'HAPUS', d.mod.toUpperCase(), `Supervisor menghapus data ${d.mod}: ${d.faktur}`);
-                    io.emit(`data-baru-${d.mod}`);
+                // FIX: ambil path arsip PDF sebelum baris dihapus agar file fisiknya ikut dibersihkan
+                db.get(`SELECT link_pdf_lokal FROM data_${d.mod} WHERE ${pkColumn} = ?`, [d.faktur], (errFile, fileRow) => {
+                    db.serialize(() => {
+                        db.run(`DELETE FROM data_${d.mod} WHERE ${pkColumn} = ?`, [d.faktur]);
+                        if (!isBPPU) {
+                            db.run(`DELETE FROM item_${d.mod} WHERE no_faktur = ?`, [d.faktur]);
+                        }
+                        if (d.mod === 'vatout') {
+                            db.run(`DELETE FROM porsi_vatout WHERE no_faktur = ?`, [d.faktur]);
+                        }
+                        insertAuditLog(socket.user.id, socket.user.username, 'HAPUS', d.mod.toUpperCase(), `Supervisor menghapus data ${d.mod}: ${d.faktur}`);
+                        io.emit(`data-baru-${d.mod}`);
+                    });
+                    hapusArsipFisik(d.mod, fileRow ? fileRow.link_pdf_lokal : null);
                 });
             } else {
                 db.run(`INSERT INTO user_requests (user_id, username, jenis_request, nilai_baru) VALUES (?, ?, ?, ?)`,
@@ -1812,34 +1941,52 @@ io.on('connection', (socket) => {
                         [d.newData.branch, d.newData.invoice, d.faktur], () => { io.emit(`data-baru-${d.mod}`); });
                 } else {
                     let sql = `UPDATE data_${d.mod} SET kode_cabang = ?, no_invoice_internal = ?, tgl_tukar_faktur = ?`;
-                    let params = [d.newData.branch, d.newData.invoice, d.newData.tanggal];
+                    // FIX: tanggal SELALU ditulis agar pengguna bisa sengaja mengosongkan Tanggal Tukar.
+                    // Nilai kosong/'-' dipetakan ke NULL supaya tampilan tabel konsisten '-'.
+                    let params = [d.newData.branch, d.newData.invoice, (d.newData.tanggal && d.newData.tanggal !== '-') ? d.newData.tanggal : null];
                     if(d.mod === 'vatout' && d.newData.vo) {
                         sql += `, kode_vo = ?`;
                         params.push(d.newData.vo);
                     }
                     sql += ` WHERE no_faktur = ?`;
                     params.push(d.faktur);
-                    db.run(sql, params, () => { io.emit(`data-baru-${d.mod}`); });
+                    db.run(sql, params, () => {
+                        // Porsi JO (catatan internal) disimpan terpisah dari faktur
+                        if (d.mod === 'vatout' && d.newData && Array.isArray(d.newData.porsi)) {
+                            simpanPorsiVatout(d.faktur, d.newData.porsi, () => io.emit(`data-baru-${d.mod}`));
+                        } else {
+                            io.emit(`data-baru-${d.mod}`);
+                        }
+                    });
                 }
             } else {
                 db.get(`SELECT kode_cabang, no_invoice_internal${!isBPPU ? ', tgl_tukar_faktur' : ''}${d.mod === 'vatout' ? ', kode_vo' : ''} FROM data_${d.mod} WHERE ${pkColumn} = ?`, [d.faktur], (err, original) => {
-                    let requestValue = JSON.stringify({
-                        faktur: d.faktur,
-                        old: original ? {
-                            branch: original.kode_cabang,
-                            invoice: original.no_invoice_internal,
-                            tanggal: !isBPPU ? original.tgl_tukar_faktur : '-',
-                            vo: d.mod === 'vatout' ? original.kode_vo : null
-                        } : null,
-                        new: {
-                            branch: d.newData.branch,
-                            invoice: d.newData.invoice,
-                            tanggal: d.newData.tanggal,
-                            vo: d.newData.vo
-                        }
-                    });
-                    db.run(`INSERT INTO user_requests (user_id, username, jenis_request, nilai_baru) VALUES (?, ?, ?, ?)`,
-                        [d.id_user, d.username, `EDIT_${d.mod.toUpperCase()}`, requestValue], () => io.emit('request-updated'));
+                    const kirimRequest = (porsiLama) => {
+                        let requestValue = JSON.stringify({
+                            faktur: d.faktur,
+                            old: original ? {
+                                branch: original.kode_cabang,
+                                invoice: original.no_invoice_internal,
+                                tanggal: !isBPPU ? original.tgl_tukar_faktur : '-',
+                                vo: d.mod === 'vatout' ? original.kode_vo : null,
+                                porsi: porsiLama
+                            } : null,
+                            new: {
+                                branch: d.newData.branch,
+                                invoice: d.newData.invoice,
+                                tanggal: d.newData.tanggal,
+                                vo: d.newData.vo,
+                                porsi: (d.mod === 'vatout' && Array.isArray(d.newData.porsi)) ? d.newData.porsi : undefined
+                            }
+                        });
+                        db.run(`INSERT INTO user_requests (user_id, username, jenis_request, nilai_baru) VALUES (?, ?, ?, ?)`,
+                            [d.id_user, d.username, `EDIT_${d.mod.toUpperCase()}`, requestValue], () => io.emit('request-updated'));
+                    };
+                    if (d.mod === 'vatout' && d.newData && Array.isArray(d.newData.porsi)) {
+                        db.all(`SELECT anggota, dpp_porsi, ppn_porsi FROM porsi_vatout WHERE no_faktur = ?`, [d.faktur], (errP, rowsP) => kirimRequest(rowsP || []));
+                    } else {
+                        kirimRequest(null);
+                    }
                 });
             }
         }
@@ -2063,7 +2210,8 @@ io.on('connection', (socket) => {
                     namaPembeli: mPem?.[1].trim(), alamatPembeli: mAlmPem ? mAlmPem[1].replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : "-", npwpPembeli: mNpwpPem?.[1].trim(),
                     tanggalFaktur: mTgl ? formatTanggal(mTgl[2]) : "-", kotaPenerbit: mTgl ? mTgl[1].trim() : "-", format_tipe: isLegacy ? 'LEGACY' : 'MODERN',
                     referensi: isLegacy ? (teks.match(/(INVOICE\s*NO\.\s*:[\s\S]*?)(?=\s*PEMBERITAHUAN)/i)?.[1].trim().replace(/\s+/g, ' ') || "-") : (teks.match(/\(Referensi[\s:,]+([^)]+)\)/i)?.[1].trim() || "-"),
-                    penandatangan: isLegacy ? (teks.match(/\d{4}[\s\n,]+([A-Z][A-Z\s\.]+?)(?=[\s\n]+INVOICE\s*NO\.)/i)?.[1].trim() || "-") : (teks.match(/Ditandatangani secara elektronik[\s\S]*?\n([^\n]+)\s*\n/i)?.[1].trim() || "-"),
+                    // FIX: regex mengandung newline literal (syntax error). Dikembalikan sebagai escape \n sesuai maksud aslinya.
+                    penandatangan: isLegacy ? (teks.match(/\d{4}[\s\n]+([A-Z][A-Z\s\.]+?)(?=[\n]+INVOICE\s*NO\.)/i)?.[1].trim() || "-") : (teks.match(/Ditandatangani secara elektronik[\s\S]*?\n([^\n]+)\s*\n/i)?.[1].trim() || "-"),
                     hargaJual: bersihkanAngka(mHargaJual?.[1]), dpp: bersihkanAngka(mDPP?.[1]), ppn: bersihkanAngka(mPPN?.[1]),
                     diskon: bersihkanAngka(mDiskon?.[1]), uangMuka: bersihkanAngka(mDP?.[1]),
                     items: parseItems(teks), link_pdf_lokal: namaFileLokal, entitas: entitas
@@ -2694,9 +2842,15 @@ io.on('connection', (socket) => {
                     let isBPPU = (targetMod === 'payable' || targetMod === 'prepaid');
                     let colKey = isBPPU ? 'no_bppu' : 'no_faktur';
 
+                    // FIX: ambil path arsip PDF sebelum baris dihapus agar file fisiknya ikut dibersihkan
+                    db.get(`SELECT link_pdf_lokal FROM data_${targetMod} WHERE ${colKey} = ?`, [req.nilai_baru], (errFile, fileRow) => {
                     db.run(`DELETE FROM data_${targetMod} WHERE ${colKey} = ?`, [req.nilai_baru], () => {
+                        hapusArsipFisik(targetMod, fileRow ? fileRow.link_pdf_lokal : null);
                         if (!isBPPU) {
                             db.run(`DELETE FROM item_${targetMod} WHERE no_faktur = ?`, [req.nilai_baru], () => {
+                                if (targetMod === 'vatout') {
+                                    db.run(`DELETE FROM porsi_vatout WHERE no_faktur = ?`, [req.nilai_baru]);
+                                }
                                 db.run(`UPDATE user_requests SET status = 'Disetujui' WHERE id = ?`, [d.req_id], () => {
                                     io.emit('request-updated'); io.emit(`data-baru-${targetMod}`);
                                 });
@@ -2706,6 +2860,7 @@ io.on('connection', (socket) => {
                                 io.emit('request-updated'); io.emit(`data-baru-${targetMod}`);
                             });
                         }
+                    });
                     });
                 }
                 else if (req.jenis_request.startsWith('EDIT_')) {
@@ -2717,7 +2872,13 @@ io.on('connection', (socket) => {
                         return;
                     }
                     let isBPPU = (targetMod === 'payable' || targetMod === 'prepaid');
-                    let val = JSON.parse(req.nilai_baru);
+                    // FIX: JSON.parse tanpa pengaman bisa menghentikan proses server jika payload korup
+                    let val;
+                    try {
+                        val = JSON.parse(req.nilai_baru);
+                    } catch (e) {
+                        return socket.emit('error-action', { message: `Gagal memproses request #${d.req_id}: format data pengajuan tidak valid.` });
+                    }
                     
                     // Handle both old format (flat) and new format (nested old/new)
                     let v = val.new || val;
@@ -2731,7 +2892,9 @@ io.on('connection', (socket) => {
                             });
                     } else {
                         let sql = `UPDATE data_${targetMod} SET kode_cabang = ?, no_invoice_internal = ?, tgl_tukar_faktur = ?`;
-                        let params = [v.branch, v.invoice, v.tanggal];
+                        // FIX: tanggal SELALU ditulis agar pengguna bisa sengaja mengosongkan Tanggal Tukar.
+                        // Nilai kosong/'-' dipetakan ke NULL supaya tampilan tabel konsisten '-'.
+                        let params = [v.branch, v.invoice, (v.tanggal && v.tanggal !== '-') ? v.tanggal : null];
                         if(targetMod === 'vatout' && v.vo) {
                             sql += `, kode_vo = ?`;
                             params.push(v.vo);
@@ -2739,9 +2902,17 @@ io.on('connection', (socket) => {
                         sql += ` WHERE no_faktur = ?`;
                         params.push(v.faktur);
                         db.run(sql, params, () => {
-                            db.run(`UPDATE user_requests SET status = 'Disetujui' WHERE id = ?`, [d.req_id], () => {
-                                io.emit('request-updated'); io.emit(`data-baru-${targetMod}`);
-                            });
+                            const finalize = () => {
+                                db.run(`UPDATE user_requests SET status = 'Disetujui' WHERE id = ?`, [d.req_id], () => {
+                                    io.emit('request-updated'); io.emit(`data-baru-${targetMod}`);
+                                });
+                            };
+                            // Terapkan porsi JO bila disertakan dalam request edit vatout
+                            if (targetMod === 'vatout' && Array.isArray(v.porsi)) {
+                                simpanPorsiVatout(v.faktur, v.porsi, finalize);
+                            } else {
+                                finalize();
+                            }
                         });
                     }
                 }

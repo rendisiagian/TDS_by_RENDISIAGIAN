@@ -1,0 +1,1 @@
+Node.js/Express server entry point that bootstraps the tax management application with SQLite, session auth, WebSocket, and routing, plus client-side CSV/Excel export and server-side pagination utilities.

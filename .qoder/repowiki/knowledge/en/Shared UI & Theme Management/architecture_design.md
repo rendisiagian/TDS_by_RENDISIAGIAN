@@ -1,3 +1,0 @@
-- **Styling Layer**: `style.css` implements a comprehensive design system using CSS variables for theming (light/dark), layout components (sidebar, header, cards), and utility classes.
-- **Behavioral Layer**: `theme.js` manages theme persistence via `localStorage`, handles user profile fetching, and exposes global functions for sidebar accordion interactions (`toggleSidebarGroup`, `toggleSubMenu`).
-- **Dynamic Navigation**: `sidebar.js` uses a `MutationObserver` to detect DOM changes, synchronizing entity selection from `localStorage` and dynamically populating VAT-out year links via API calls.

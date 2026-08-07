@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: core_app
+title: Core Express Application & Client Utilities
+scope:
+    - app.js
+    - export.js
+    - pagination.js
+source_files: []
+depends_on: []
+related_to: []

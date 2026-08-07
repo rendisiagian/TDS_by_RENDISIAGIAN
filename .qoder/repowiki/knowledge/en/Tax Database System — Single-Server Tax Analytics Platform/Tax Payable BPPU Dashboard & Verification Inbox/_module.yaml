@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: taxpayable_bppu
+title: Tax Payable BPPU Dashboard & Verification Inbox
+scope:
+    - taxpayable_bppu/dashboard_payable.html
+    - taxpayable_bppu/inbox_payable.html
+source_files: []
+depends_on: []
+related_to: []

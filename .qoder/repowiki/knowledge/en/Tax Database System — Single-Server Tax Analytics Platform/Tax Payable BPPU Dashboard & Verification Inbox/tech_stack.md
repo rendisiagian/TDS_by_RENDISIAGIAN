@@ -1,0 +1,1 @@
+Vanilla HTML/JS with Socket.IO for real-time messaging, pdf.js 2.16.105 for client-side PDF text extraction, and xlsx library for export functionality. Shared UI utilities are provided by custom `/theme.js`, `/toast.js`, `/pagination.js`, `/utils.js`, and `/sidebar.js` scripts served from the app root.

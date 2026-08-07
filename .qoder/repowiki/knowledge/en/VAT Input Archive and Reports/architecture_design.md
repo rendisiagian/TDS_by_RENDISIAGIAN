@@ -1,1 +1,0 @@
-This module consists solely of static data files (PDFs) and pre-generated HTML reports with no executable code, internal layering, or software architecture.

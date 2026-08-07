@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bank Data Tax Payable | Tax Upload and Database</title>
+    <title>Antrean Verifikasi Tax Payable | Tax Database System</title>
     <script src="/theme.js"></script>
     <script src="/toast.js"></script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -28,7 +28,7 @@
             <div class="container">
                 <div class="card">
                     <div class="card-header-padding" style="display:flex; justify-content:space-between; align-items:center;">
-                        <h3 class="title-primary" style="border-left-color: #059669; margin: 0;">Dokumen Menunggu Verifikasi</h3>
+                        <h3 class="title-primary" style="border-left-color: #059669; margin: 0;">Dokumen Perlu Verifikasi</h3>
                         
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <button id="btnHapusFilter" class="btn-clear-filter" onclick="resetSemuaFilter()">🗑️ Hapus Filter</button>
@@ -131,6 +131,12 @@
             document.getElementById('sidebar-container').innerHTML = html; 
             const sidebarSelect = document.getElementById('global-entity-select');
             if (sidebarSelect) sidebarSelect.value = aktifEntitas;
+            // Tandai menu aktif & buka submenu Tax Payable
+            document.querySelectorAll('.sidebar-link').forEach(l => {
+                if (l.getAttribute('href') === '/inbox-payable') l.classList.add('active');
+            });
+            const subPayable = document.getElementById('sub-payable');
+            if (subPayable) subPayable.classList.add('open');
         });
 
         fetch('/api/me').then(res => res.json()).then(user => { if(user.nama) currentUserName = user.nama; });
@@ -169,10 +175,8 @@
             tbody.innerHTML = '';
 
 
-            // Logika Penyaringan Data berdasarkan Entitas Aktif
-            const filteredData = data.filter(row => row.entitas === aktifEntitas);
-
-            filteredData.forEach((row, index) => {
+            // Filter entitas sudah diterapkan di server (param ?entitas=), tidak perlu filter ulang di client
+            data.forEach((row, index) => {
                 const tr = document.createElement('tr');
                 let parsed = {};
                 try { parsed = JSON.parse(row.data_ekstraksi); } catch(e) {}
@@ -198,9 +202,9 @@
         }
 
         function hapusInbox(id) {
-            if(confirm("Yakin ingin menghapus antrean Bukti Potong Payable ini beserta file PDF fisiknya?")) {
+            showConfirm("Yakin ingin menghapus antrean Bukti Potong Payable ini beserta file PDF fisiknya?", function() {
                 socket.emit('hapus-inbox-payable', id);
-            }
+            }, { title: 'Hapus Antrean', danger: true });
         }
         
         socket.on('upload-batch-selesai', (res) => {
@@ -287,10 +291,11 @@
             const cbContainer = document.getElementById('checkbox-vatin-container');
             cbContainer.innerHTML = '<span style="color:#64748b; font-size:0.8rem;">Mencari referensi...</span>';
             try {
-                const vatinRes = await fetch('/api/data-vatin?entitas=' + rowData.entitas + '&limit=all');
+                // PERF FIX: batasi jumlah data yang diambil (hindari limit=all pada tabel besar)
+                const vatinRes = await fetch('/api/data-vatin?entitas=' + rowData.entitas + '&limit=500');
                 const vatinJson = await vatinRes.json();
                 // FIX (C5): Response adalah object { data: [...] }, bukan array langsung
-                const vatinData = vatinJson.data || [];
+                const vatinData = Array.isArray(vatinJson.data) ? vatinJson.data : [];
                 
                 const matchedVatin = vatinData.filter(v => {
                     const npwpCocok = parsed.npwpLawan && v.npwp_penjual && v.npwp_penjual.includes(parsed.npwpLawan);

@@ -1,5 +1,0 @@
-- **Presentation Layer**: Composed of three static HTML views (`dashboard_vatout.html`, `inbox_vatout.html`, `summary_vatout.html`) that serve as the primary user interfaces for register management, verification queues, and analytics.
-- **Client-Side Logic**: Each view contains embedded JavaScript acting as a local controller, handling state management, DOM manipulation, and direct API communication via `fetch` and `socket.io`.
-- **Data Ingestion Pipeline**: The `inbox_vatout.html` module implements a client-side PDF parsing workflow using `pdf.js` to extract text from uploaded documents before transmitting structured data to the backend for validation.
-- **Real-time Communication**: Utilizes `socket.io` for bidirectional event handling, specifically for batch upload progress tracking (`upload-pdf-vatout-batch`) and immediate UI updates upon data verification (`update-tabel-vatout`).
-- **Archival Storage**: The `arsip_vatout/` directory serves as the physical storage layer for finalized PDF invoices, organized with a naming convention that includes invoice IDs and entity names.

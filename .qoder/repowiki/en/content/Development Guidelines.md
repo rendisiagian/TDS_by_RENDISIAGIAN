@@ -11,9 +11,17 @@
 - [sidebar.js](file://sidebar.js)
 - [export.js](file://export.js)
 - [pagination.js](file://pagination.js)
-- [fix_masa_pajak.js](file://fix_masa_pajak.js)
 - [start.bat](file://start.bat)
+- [migrate_vatout.js](file://migrate_vatout.js)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Removed references to dropped temporary development scripts `fix_masa_pajak.js` and `test_query.js`
+- Updated debugging section to reflect built-in migration and verification endpoints
+- Enhanced troubleshooting procedures with current diagnostic utilities
+- Updated security configuration to show blocked files list without temporary scripts
+- Refined development practices to emphasize built-in functionality over external scripts
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -85,6 +93,7 @@ WS --> DB
 - Real-time ingestion pipeline using Socket.io for batch PDF uploads.
 - Data extraction helpers for parsing invoice texts and deduplicating VAT IN records.
 - Frontend utilities for server-side pagination, export to CSV/XLSX, and dynamic sidebar generation.
+- Built-in migration and verification endpoints replacing temporary development scripts.
 
 **Section sources**
 - [app.js](file://app.js)
@@ -309,14 +318,16 @@ Recommendations:
 
 ## Testing and Quality Assurance
 Current state:
-- Manual verification checkpoints documented in the project’s TODO list.
+- Manual verification checkpoints documented in the project's TODO list.
 - Planned audit endpoints for VAT IN integrity checks.
+- Built-in migration verification endpoints replacing external test scripts.
 
 Recommended practices:
 - Implement unit tests for data extraction and deduplication helpers.
 - Add integration tests for Socket.io ingestion flows and API endpoints.
 - Establish automated linting and static analysis for JavaScript and Node.js code.
 - Create regression tests for pagination and export utilities.
+- Use built-in verification endpoints for data integrity validation instead of external test scripts.
 
 **Section sources**
 - [TODO.md](file://TODO.md)
@@ -367,6 +378,7 @@ Serve --> Users["Internal Users Access"]
   - Adding optional columns via ALTER TABLE with defaults.
   - Migrating existing data on startup with safe fallbacks.
   - Keeping UI labels and statuses consistent across modules.
+- Replace temporary development scripts with built-in API endpoints for better maintainability.
 
 **Section sources**
 - [app.js](file://app.js)
@@ -380,12 +392,21 @@ Common areas to inspect:
 
 Diagnostic utilities:
 - Audit logs endpoint for immutable activity tracking.
-- Migration verification endpoints for VAT IN status and masa_pajak synchronization.
-- Dedicated maintenance script to fix masa_pajak for replacement invoices.
+- Migration verification endpoints for VAT IN status and masa_pajak synchronization (`/api/verify-vatin-migration`, `/api/migrate-vatin-status`, `/api/migrate-vatout-status`).
+- Built-in data integrity checks replacing temporary development scripts like `fix_masa_pajak.js` and `test_query.js`.
+- Security configuration blocks access to sensitive files including `.env`, backend scripts, and configuration files.
+
+Security Configuration:
+- Blocked files list includes `.env`, `app.js`, `package.json`, and `package-lock.json` to prevent direct access.
+- Temporary development scripts are no longer referenced in security configurations.
+
+Migration and Maintenance:
+- Use built-in API endpoints for data migration instead of external scripts.
+- Leverage verification endpoints to validate data integrity post-migration.
+- Monitor audit logs for all administrative actions and data modifications.
 
 **Section sources**
 - [app.js](file://app.js)
-- [fix_masa_pajak.js](file://fix_masa_pajak.js)
 
 ## Conclusion
-These guidelines consolidate the current architecture, workflows, and best practices for TDS development. By adhering to the outlined standards—security-first design, modular extensions, rigorous testing, and robust deployment—you can ensure a scalable, maintainable, and compliant tax database system tailored for internal corporate use.
+These guidelines consolidate the current architecture, workflows, and best practices for TDS development. By adhering to the outlined standards—security-first design, modular extensions, rigorous testing, and robust deployment—you can ensure a scalable, maintainable, and compliant tax database system tailored for internal corporate use. The removal of temporary development scripts in favor of built-in functionality demonstrates the system's evolution toward a more robust and maintainable architecture.
