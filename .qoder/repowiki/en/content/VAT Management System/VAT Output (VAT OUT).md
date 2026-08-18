@@ -10,18 +10,18 @@
 - [master_cabang.html](file://master_cabang.html)
 - [master_kontak.html](file://master_kontak.html)
 - [client_ledger.html](file://accounting/client_ledger.html)
-- [migrate_vatout.js](file://migrate_vatout.js)
+- [audit_logs.html](file://audit_logs.html)
 - [taxprojectreport.html](file://taxprojectreport.html)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Added comprehensive invoice cancellation and reactivation capabilities with audit trail support
-- Enhanced JO internal distribution tracking system with improved porsi_vatout table integration and real-time percentage calculations
-- Upgraded project summary API to handle JO projects differently by fetching VAT out income portions from porsi_vatout table instead of full branch amounts
-- Updated dashboard and inbox interfaces to support JO portion allocation editing with validation and display features
-- Integrated comprehensive deduplication logic for cancelled invoices across all reporting modules
-- Enhanced user interface components with visual indicators for cancelled invoices and JO member-specific reporting
+- Added comprehensive invoice cancellation system with `tgl_batal` column for audit trail preservation
+- Enhanced JO member allocation tracking via dedicated `porsi_vatout` table with real-time percentage calculations
+- Upgraded project summary API to handle JO projects differently by fetching VAT out income portions from porsi_vatout table
+- Integrated comprehensive audit trail system with user request workflow for cancellations and reactivations
+- Implemented visual indicators for cancelled invoices with reduced opacity and status badges
+- Enhanced validation mechanisms for JO portion allocations with automatic warnings when totals don't match
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -37,10 +37,10 @@
 ## Introduction
 This document provides comprehensive documentation for the VAT Output (VAT OUT) management module. It covers transaction management workflows for invoice generation, customer billing, and tax calculation; inbox processing for managing incoming VAT output requests, approvals, and status tracking; summary reporting for VAT output analysis, compliance reporting, and financial reconciliation; and user interface components for VAT output processing, customer management integration, and transaction monitoring. It also explains VAT liability calculations, output tax handling, regulatory compliance requirements, practical processing examples, integration scenarios with customer management, and troubleshooting guidance for VAT output-related issues.
 
-**Updated** Enhanced with comprehensive invoice cancellation capabilities, improved JO member allocation system with porsi_vatout table integration, and enhanced project summary API for JO projects. The system now supports complete invoice lifecycle management including cancellation, reactivation, and detailed audit trails while maintaining precise allocation of VAT output income to specific Joint Venture members.
+**Updated** The system now features comprehensive invoice cancellation capabilities with mandatory audit trails, enhanced JO member allocation system with precise portion tracking, and improved project summary API for accurate revenue attribution in joint venture scenarios. The complete invoice lifecycle is supported including cancellation, reactivation, and detailed audit logging while maintaining data integrity across all reporting modules.
 
 ## Project Structure
-The VAT OUT module consists of three primary HTML pages under the vat_out directory and supporting backend endpoints in the application server. The backend integrates with database tables for VAT OUT transactions, manages PDF attachments, and exposes APIs for dashboards and summaries. Customer and branch master data are integrated via dedicated pages for contact and branch management. The system includes specialized support for JO (Joint Venture) internal distribution tracking and comprehensive invoice cancellation functionality.
+The VAT OUT module consists of three primary HTML pages under the vat_out directory and supporting backend endpoints in the application server. The backend integrates with database tables for VAT OUT transactions, manages PDF attachments, and exposes APIs for dashboards and summaries. Customer and branch master data are integrated via dedicated pages for contact and branch management. The system includes specialized support for JO (Joint Venture) internal distribution tracking and comprehensive invoice cancellation functionality with audit trail support.
 
 ```mermaid
 graph TB
@@ -48,13 +48,13 @@ subgraph "VAT OUT Module"
 DSH["dashboard_vatout.html"]
 INBX["inbox_vatout.html"]
 SMRY["summary_vatout.html"]
-MIGR["migrate_vatout.js"]
 end
 subgraph "Backend"
 APP["app.js"]
 DB["SQLite Database"]
 JO_TRACK["JO Distribution Tracking"]
 CANCEL["Invoice Cancellation System"]
+AUDIT["Audit Trail System"]
 end
 subgraph "Master Data"
 MC["master_cabang.html"]
@@ -62,45 +62,43 @@ MK["master_kontak.html"]
 end
 subgraph "Reporting"
 TPR["taxprojectreport.html"]
+AL["audit_logs.html"]
 end
 DSH --> APP
 INBX --> APP
 SMRY --> APP
-MIGR --> DB
 APP --> DB
 APP --> JO_TRACK
 APP --> CANCEL
+APP --> AUDIT
 MC --> APP
 MK --> APP
 TPR --> APP
+AL --> APP
 ```
 
 **Diagram sources**
-- [app.js](file://app.js)
-- [dashboard_vatout.html](file://vat_out/dashboard_vatout.html)
-- [inbox_vatout.html](file://vat_out/inbox_vatout.html)
-- [summary_vatout.html](file://vat_out/summary_vatout.html)
-- [master_cabang.html](file://master_cabang.html)
-- [master_kontak.html](file://master_kontak.html)
-- [migrate_vatout.js](file://migrate_vatout.js)
-- [taxprojectreport.html](file://taxprojectreport.html)
-
-**Section sources**
-- [app.js](file://app.js)
-- [PRD_Tax_Database_System.md](file://PRD_Tax_Database_System.md)
+- [app.js:355-503](file://app.js#L355-L503)
+- [dashboard_vatout.html:213-225](file://vat_out/dashboard_vatout.html#L213-L225)
+- [inbox_vatout.html:174-186](file://vat_out/inbox_vatout.html#L174-L186)
+- [summary_vatout.html:73-88](file://vat_out/summary_vatout.html#L73-L88)
 
 ## Core Components
-- **VAT OUT Transaction Tables and Keys**
-  - The VAT OUT module uses a header table for transaction records and related detail items. The header table includes keys such as invoice number, entity, branch code, project ID, vendor/customer identifiers, invoice date, amounts (DPP and PPN), references, issuing location, signatory, internal invoice number, exchange date, format type, PDF link, input user, timestamp, and cancellation date (`tgl_batal`). These fields support invoice generation, customer billing, tax calculation, and cancellation workflows.
-- **JO Internal Distribution Tracking**
-  - **Enhanced**: Dedicated `porsi_vatout` table tracks portion allocations per JO member (BBS/BMP) for joint venture invoices. This enables precise attribution of VAT output income to specific JV partners while maintaining the original invoice structure.
+- **Enhanced Invoice Management with Cancellation Support**
+  - The VAT OUT module uses a header table for transaction records with comprehensive cancellation tracking via `tgl_batal` column. Fields include invoice number, entity, branch code, project ID, vendor/customer identifiers, invoice date, amounts (DPP and PPN), references, issuing location, signatory, internal invoice number, exchange date, format type, PDF link, input user, timestamp, and cancellation date. These fields support complete invoice lifecycle management including cancellation, reactivation, and detailed audit trails.
+- **Advanced JO Internal Distribution Tracking**
+  - **Enhanced**: Dedicated `porsi_vatout` table tracks portion allocations per JO member (BBS/BMP) for joint venture invoices with fields: `no_faktur`, `anggota` (member identifier), `dpp_porsi` (portion of taxable value), `ppn_porsi` (portion of output tax). This enables precise attribution of VAT output income to specific JV partners while maintaining the original invoice structure.
   - Supports real-time percentage calculations and validation during editing with automatic warnings when allocated portions don't match invoice totals.
   - Integrates with project reporting to show member-specific income portions with clear indicators.
-- **Invoice Cancellation System**
-  - **New**: Comprehensive cancellation functionality allowing users to cancel invoices with mandatory cancellation dates and audit trail preservation.
+- **Comprehensive Invoice Cancellation System**
+  - **New**: Complete cancellation functionality allowing users to cancel invoices with mandatory cancellation dates and audit trail preservation.
   - Supports invoice reactivation through approval workflow with proper status updates.
   - Automatically excludes cancelled invoices from all statistical calculations, trend analysis, and reporting.
   - Maintains audit trail by preserving cancelled invoices with visual indicators in the UI.
+- **Enhanced Audit Trail Integration**
+  - **New**: Comprehensive audit logging system that records all cancellation and reactivation activities with timestamps, user information, and action details.
+  - Real-time audit log viewing through dedicated audit logs page with filtering and search capabilities.
+  - Integration with user request system for approval workflow management.
 - **Backend Endpoints**
   - Status Migration Endpoint: Automated processing of missing status fields including status_faktur, masa_pajak, and no_faktur_normal through `/api/migrate-vatout-status`.
   - Enhanced Project Summary Endpoint: Handles JO projects differently by fetching VAT out income portions from porsi_vatout table instead of full branch amounts.
@@ -111,15 +109,13 @@ TPR --> APP
   - Dashboard: Provides overview metrics and navigation for VAT OUT operations with JO portion editing capabilities and cancellation controls.
   - Inbox: Manages incoming VAT OUT requests, approvals, and status tracking with enhanced filtering and search capabilities.
   - Summary: Delivers analytical reports for VAT output analysis, compliance, and reconciliation with cancelled invoice exclusion.
-- **Data Migration Tools**
-  - Standalone migration script for batch processing of VAT OUT records with automatic status field population.
 
-**Updated** Enhanced with comprehensive invoice cancellation capabilities, improved JO internal distribution tracking system, and automated status migration capabilities.
+**Updated** Enhanced with comprehensive invoice cancellation capabilities, improved JO internal distribution tracking system, automated status migration capabilities, and integrated audit trail system.
 
 **Section sources**
-- [PRD_Tax_Database_System.md](file://PRD_Tax_Database_System.md)
-- [app.js](file://app.js)
-- [migrate_vatout.js](file://migrate_vatout.js)
+- [PRD_Tax_Database_System.md:34-49](file://PRD_Tax_Database_System.md#L34-L49)
+- [app.js:355-503](file://app.js#L355-L503)
+- [app.js:838-895](file://app.js#L838-L895)
 
 ## Architecture Overview
 The VAT OUT module follows a client-server architecture with HTML-based UI pages and a Node.js backend. The backend connects to a local SQLite database, exposes REST-like endpoints for dashboards and summaries, and manages file attachments for invoices. Master data for branches and contacts supports customer management integration. The system includes specialized JO distribution tracking for joint venture operations and comprehensive invoice cancellation functionality with audit trail support.
@@ -134,14 +130,14 @@ DB_SQLite["SQLite Database"]
 FS_Attachments["Local Filesystem<br/>PDF Attachments"]
 Master_Cabang["master_cabang.html"]
 Master_Kontak["master_kontak.html"]
-Migration_Tool["migrate_vatout.js"]
+Audit_Logs["audit_logs.html"]
 JO_Tracking["JO Distribution<br/>Tracking System"]
 Tax_Report["taxprojectreport.html"]
 Cancel_System["Invoice Cancellation<br/>System"]
 UI_Dashboard --> BE_App
 UI_Inbox --> BE_App
 UI_Summary --> BE_App
-Migration_Tool --> DB_SQLite
+Audit_Logs --> BE_App
 BE_App --> DB_SQLite
 BE_App --> FS_Attachments
 BE_App --> JO_Tracking
@@ -152,35 +148,33 @@ Tax_Report --> BE_App
 ```
 
 **Diagram sources**
-- [app.js](file://app.js)
-- [dashboard_vatout.html](file://vat_out/dashboard_vatout.html)
-- [inbox_vatout.html](file://vat_out/inbox_vatout.html)
-- [summary_vatout.html](file://vat_out/summary_vatout.html)
-- [master_cabang.html](file://master_cabang.html)
-- [master_kontak.html](file://master_kontak.html)
-- [migrate_vatout.js](file://migrate_vatout.js)
-- [taxprojectreport.html](file://taxprojectreport.html)
+- [app.js:355-503](file://app.js#L355-L503)
+- [dashboard_vatout.html:213-225](file://vat_out/dashboard_vatout.html#L213-L225)
+- [inbox_vatout.html:174-186](file://vat_out/inbox_vatout.html#L174-L186)
+- [summary_vatout.html:73-88](file://vat_out/summary_vatout.html#L73-L88)
+- [audit_logs.html:148-156](file://audit_logs.html#L148-L156)
 
 ## Detailed Component Analysis
 
-### Invoice Cancellation and Reactivation System
+### Enhanced Invoice Cancellation and Reactivation System
 - **Database Schema Enhancement**
-  - New `tgl_batal` column in `data_vatout` table stores cancellation dates for audit trail purposes.
-  - Visual indicators in UI show cancelled invoices with reduced opacity and status badges.
-  - All queries automatically exclude cancelled invoices using `(d.tgl_batal IS NULL OR d.tgl_batal = '')` conditions.
+  - New `tgl_batal` column in `data_vatout` table stores cancellation dates for audit trail purposes with DATE data type.
+  - Visual indicators in UI show cancelled invoices with reduced opacity (0.55) and status badges for easy identification.
+  - All queries automatically exclude cancelled invoices using `(d.tgl_batal IS NULL OR d.tgl_batal = '')` conditions throughout the system.
 - **Cancellation Workflow**
-  - Users can cancel invoices through dashboard with mandatory cancellation date entry.
-  - Non-supervisor users submit cancellation requests requiring supervisor approval.
-  - Supervisor users can directly cancel or reactivate invoices with immediate effect.
-  - Audit logs record all cancellation and reactivation actions with timestamps and user information.
+  - Users can cancel invoices through dashboard with mandatory cancellation date entry via modal interface.
+  - Non-supervisor users submit cancellation requests requiring supervisor approval through user_requests system.
+  - Supervisor users can directly cancel or reactivate invoices with immediate effect and audit logging.
+  - Audit logs record all cancellation and reactivation actions with timestamps, user information, and action details.
 - **Reactivation Process**
-  - Cancelled invoices can be reactivated through approval workflow.
-  - Reactivation removes the cancellation date, restoring invoice to active status.
-  - Proper status propagation ensures consistency across all reporting modules.
+  - Cancelled invoices can be reactivated through approval workflow with proper status propagation.
+  - Reactivation removes the cancellation date, restoring invoice to active status across all modules.
+  - Proper status propagation ensures consistency across all reporting and statistical calculations.
 - **Visual Indicators and User Experience**
-  - Cancelled invoices display with reduced opacity (0.55) for easy identification.
-  - Status badges clearly indicate cancellation status with formatted dates.
-  - Action buttons dynamically change between "Cancel" and "Reactivate" based on current status.
+  - Cancelled invoices display with reduced opacity (0.55) for easy identification in all views.
+  - Status badges clearly indicate cancellation status with formatted dates and hover tooltips.
+  - Action buttons dynamically change between "Cancel" and "Reactivate" based on current invoice status.
+  - Confirmation dialogs provide clear warnings about the impact of cancellation on reporting.
 
 ```mermaid
 flowchart TD
@@ -206,30 +200,31 @@ AuditLog --> End(["Complete"])
 ```
 
 **Diagram sources**
+- [dashboard_vatout.html:213-225](file://vat_out/dashboard_vatout.html#L213-L225)
 - [dashboard_vatout.html:561-582](file://vat_out/dashboard_vatout.html#L561-L582)
-- [app.js:2962-2982](file://app.js#L2962-L2982)
+- [app.js:664-743](file://app.js#L664-L743)
 
 **Section sources**
 - [dashboard_vatout.html:213-225](file://vat_out/dashboard_vatout.html#L213-L225)
 - [dashboard_vatout.html:561-582](file://vat_out/dashboard_vatout.html#L561-L582)
-- [app.js:2962-2982](file://app.js#L2962-L2982)
+- [app.js:664-743](file://app.js#L664-L743)
 
 ### Enhanced JO Internal Distribution Tracking System
 - **Database Schema**
   - Dedicated `porsi_vatout` table stores portion allocations with fields: `no_faktur`, `anggota` (member identifier), `dpp_porsi` (portion of taxable value), `ppn_porsi` (portion of output tax).
-  - Primary key ensures unique allocation per invoice and member combination.
-  - Supports BBS and BMP as standard JO member identifiers with validation.
+  - Primary key ensures unique allocation per invoice and member combination with composite indexing.
+  - Supports BBS and BMP as standard JO member identifiers with validation and sanitization.
 - **Real-time Editing Interface**
   - Dashboard edit modal includes dedicated section for JO portion allocation when entity is 'JO'.
-  - Automatic percentage calculation based on total DPP and PPN values with live updates.
-  - Validation warnings when allocated portions don't match invoice totals with color-coded feedback.
-  - Input sanitization prevents invalid member identifiers and numeric overflow.
+  - Automatic percentage calculation based on total DPP and PPN values with live updates and color-coded feedback.
+  - Validation warnings when allocated portions don't match invoice totals with visual indicators.
+  - Input sanitization prevents invalid member identifiers and numeric overflow with error handling.
 - **Enhanced Project Summary API**
   - Detects JO projects by checking `entitas = 'JO'` in master_cabang table.
   - For JO projects, queries `data_vatout` joined with `porsi_vatout` using specific member filter.
   - Returns both full invoice amounts (`dpp_full`, `ppn_full`) and member-specific portions (`dpp`, `ppn`).
   - Includes `porsi_anggota` field indicating which member's portion is being displayed.
-  - Automatically excludes cancelled invoices from JO project reporting.
+  - Automatically excludes cancelled invoices from JO project reporting with proper WHERE clauses.
 
 ```mermaid
 flowchart TD
@@ -263,15 +258,15 @@ UpdateReport --> End
 - **Data Model Alignment**
   - The header table stores DPP (Taxable Value) and PPN (Output Tax) amounts per invoice. These fields enable straightforward VAT liability computation and tax reporting.
   - JO distribution tracking maintains separate allocation records without modifying original invoice data.
-  - Cancelled invoices are automatically excluded from all tax calculations and reporting.
+  - Cancelled invoices are automatically excluded from all tax calculations and reporting through consistent WHERE clauses.
 - **Invoice Generation and Customer Billing**
   - The available VAT OUT endpoint retrieves invoice records with buyer details and amounts, enabling downstream billing and reconciliation processes.
   - For JO projects, billing can be calculated based on member-specific portions rather than full invoice amounts.
-  - Invoice cancellation properly handles billing adjustments and refund processing.
+  - Invoice cancellation properly handles billing adjustments and refund processing with audit trail preservation.
 - **Trend and Branch Reporting**
   - The backend aggregates monthly trends and branch-level totals for invoice counts and tax amounts, supporting financial reconciliation and compliance reporting.
-  - JO projects now report member-specific tax amounts instead of full branch totals.
-  - All reporting modules automatically exclude cancelled invoices from statistical calculations.
+  - JO projects now report member-specific tax amounts instead of full branch totals with clear indicators.
+  - All reporting modules automatically exclude cancelled invoices from statistical calculations with optimized queries.
 
 ```mermaid
 flowchart TD
@@ -290,15 +285,15 @@ Report --> End(["Ready for Compliance and Reconciliation"])
 Error --> End
 ```
 
-**Updated** Added invoice cancellation handling and JO portion allocation steps for joint venture invoices.
+**Updated** Added invoice cancellation handling and JO portion allocation steps for joint venture invoices with comprehensive audit trail support.
 
 **Diagram sources**
-- [app.js](file://app.js)
-- [PRD_Tax_Database_System.md](file://PRD_Tax_Database_System.md)
+- [app.js:355-503](file://app.js#L355-L503)
+- [PRD_Tax_Database_System.md:34-49](file://PRD_Tax_Database_System.md#L34-L49)
 
 **Section sources**
-- [PRD_Tax_Database_System.md](file://PRD_Tax_Database_System.md)
-- [app.js](file://app.js)
+- [PRD_Tax_Database_System.md:34-49](file://PRD_Tax_Database_System.md#L34-L49)
+- [app.js:355-503](file://app.js#L355-L503)
 
 ### Enhanced Deduplication Function
 - **Comprehensive Deduplication Logic**
@@ -347,9 +342,9 @@ Sync --> Output
   - Updates database records with proper status information.
   - Returns detailed statistics including total, updated, and failed counts.
 - **Standalone Migration Tool**:
-  - Separate JavaScript script (`migrate_vatout.js`) for batch processing.
-  - Direct database connection for high-volume migrations.
+  - Separate JavaScript script for batch processing with direct database access.
   - Progress logging and error handling for large datasets.
+  - Optimized for high-volume migrations with transaction safety.
 
 ```mermaid
 sequenceDiagram
@@ -370,11 +365,9 @@ API-->>Admin : Return Migration Statistics
 
 **Diagram sources**
 - [app.js:664-743](file://app.js#L664-L743)
-- [migrate_vatout.js](file://migrate_vatout.js)
 
 **Section sources**
 - [app.js:664-743](file://app.js#L664-L743)
-- [migrate_vatout.js](file://migrate_vatout.js)
 
 ### Inbox Processing and Approval Workflows
 - **Request Management**
@@ -413,12 +406,12 @@ API-->>UI : Confirmation Message
 ```
 
 **Diagram sources**
-- [inbox_vatout.html](file://vat_out/inbox_vatout.html)
-- [app.js](file://app.js)
+- [inbox_vatout.html:174-186](file://vat_out/inbox_vatout.html#L174-L186)
+- [app.js:355-503](file://app.js#L355-L503)
 
 **Section sources**
-- [inbox_vatout.html](file://vat_out/inbox_vatout.html)
-- [app.js](file://app.js)
+- [inbox_vatout.html:174-186](file://vat_out/inbox_vatout.html#L174-L186)
+- [app.js:355-503](file://app.js#L355-L503)
 
 ### Summary Reporting Capabilities
 - **Trend Analysis**
@@ -456,12 +449,12 @@ UI-->>User : Render Charts and Tables
 **Updated** Enhanced with JO member-specific reporting, deduplication logic for accurate reporting, and comprehensive cancelled invoice exclusion.
 
 **Diagram sources**
-- [summary_vatout.html](file://vat_out/summary_vatout.html)
-- [app.js](file://app.js)
+- [summary_vatout.html:115-138](file://vat_out/summary_vatout.html#L115-L138)
+- [app.js:355-503](file://app.js#L355-L503)
 
 **Section sources**
-- [summary_vatout.html](file://vat_out/summary_vatout.html)
-- [app.js](file://app.js)
+- [summary_vatout.html:115-138](file://vat_out/summary_vatout.html#L115-L138)
+- [app.js:355-503](file://app.js#L355-L503)
 
 ### User Interface Components and Integrations
 - **Dashboard**
@@ -495,6 +488,7 @@ MC["master_cabang.html"]
 MK["master_kontak.html"]
 TPR["taxprojectreport.html"]
 CL["client_ledger.html"]
+AL["audit_logs.html"]
 DSH --> INBX
 DSH --> SMRY
 INBX --> MC
@@ -503,25 +497,20 @@ SMRY --> MC
 SMRY --> MK
 TPR --> DSH
 CL --> DSH
+AL --> DSH
 ```
 
 **Diagram sources**
-- [dashboard_vatout.html](file://vat_out/dashboard_vatout.html)
-- [inbox_vatout.html](file://vat_out/inbox_vatout.html)
-- [summary_vatout.html](file://vat_out/summary_vatout.html)
-- [master_cabang.html](file://master_cabang.html)
-- [master_kontak.html](file://master_kontak.html)
-- [taxprojectreport.html](file://taxprojectreport.html)
-- [client_ledger.html](file://accounting/client_ledger.html)
+- [dashboard_vatout.html:213-225](file://vat_out/dashboard_vatout.html#L213-L225)
+- [inbox_vatout.html:174-186](file://vat_out/inbox_vatout.html#L174-L186)
+- [summary_vatout.html:73-88](file://vat_out/summary_vatout.html#L73-L88)
+- [audit_logs.html:148-156](file://audit_logs.html#L148-L156)
 
 **Section sources**
-- [dashboard_vatout.html](file://vat_out/dashboard_vatout.html)
-- [inbox_vatout.html](file://vat_out/inbox_vatout.html)
-- [summary_vatout.html](file://vat_out/summary_vatout.html)
-- [master_cabang.html](file://master_cabang.html)
-- [master_kontak.html](file://master_kontak.html)
-- [taxprojectreport.html](file://taxprojectreport.html)
-- [client_ledger.html](file://accounting/client_ledger.html)
+- [dashboard_vatout.html:213-225](file://vat_out/dashboard_vatout.html#L213-L225)
+- [inbox_vatout.html:174-186](file://vat_out/inbox_vatout.html#L174-L186)
+- [summary_vatout.html:73-88](file://vat_out/summary_vatout.html#L73-L88)
+- [audit_logs.html:148-156](file://audit_logs.html#L148-L156)
 
 ### Practical Examples and Integration Scenarios
 - **Example: Generating a VAT OUT Invoice**
@@ -533,8 +522,8 @@ CL --> DSH
 - **Example: Invoice Cancellation Workflow**
   - Navigate to dashboard and select invoice to cancel.
   - Enter mandatory cancellation date and submit request.
-  - For non-supervisors, wait for supervisor approval.
-  - Supervisors can directly cancel or reactivate invoices.
+  - For non-supervisors, wait for supervisor approval through user_requests system.
+  - Supervisors can directly cancel or reactivate invoices with immediate effect.
   - Verify cancellation through audit logs and visual indicators.
 - **Example: JO Portion Allocation**
   - For joint venture invoices, use the edit interface to allocate portions to BBS and BMP members.
@@ -554,11 +543,9 @@ CL --> DSH
 **Updated** Added comprehensive examples for invoice cancellation workflow, JO portion allocation, and member-specific reporting with enhanced validation and audit trail support.
 
 **Section sources**
-- [app.js](file://app.js)
-- [PRD_Tax_Database_System.md](file://PRD_Tax_Database_System.md)
-- [master_kontak.html](file://master_kontak.html)
-- [master_cabang.html](file://master_cabang.html)
-- [dashboard_vatout.html](file://vat_out/dashboard_vatout.html)
+- [app.js:355-503](file://app.js#L355-L503)
+- [PRD_Tax_Database_System.md:34-49](file://PRD_Tax_Database_System.md#L34-L49)
+- [dashboard_vatout.html:213-225](file://vat_out/dashboard_vatout.html#L213-L225)
 
 ## Dependency Analysis
 - **Internal Dependencies**
@@ -590,6 +577,7 @@ JO_TRACK["JO Distribution Tracking"]
 CANCEL["Invoice Cancellation System"]
 SOCKET["Socket.IO"]
 CHARTS["Chart.js"]
+AUDIT["Audit Logging"]
 UI --> BACK
 BACK --> DB
 BACK --> FS
@@ -599,29 +587,29 @@ BACK --> JO_TRACK
 BACK --> CANCEL
 BACK --> SOCKET
 BACK --> CHARTS
+BACK --> AUDIT
 MASTER --> BACK
 ```
 
-**Updated** Added invoice cancellation system, Socket.IO integration, and Chart.js dependencies.
+**Updated** Added invoice cancellation system, Socket.IO integration, Chart.js dependencies, and comprehensive audit logging system.
 
 **Diagram sources**
-- [app.js](file://app.js)
-- [dashboard_vatout.html](file://vat_out/dashboard_vatout.html)
-- [inbox_vatout.html](file://vat_out/inbox_vatout.html)
-- [summary_vatout.html](file://vat_out/summary_vatout.html)
-- [master_cabang.html](file://master_cabang.html)
-- [master_kontak.html](file://master_kontak.html)
+- [app.js:355-503](file://app.js#L355-L503)
+- [dashboard_vatout.html:213-225](file://vat_out/dashboard_vatout.html#L213-L225)
+- [inbox_vatout.html:174-186](file://vat_out/inbox_vatout.html#L174-L186)
+- [summary_vatout.html:73-88](file://vat_out/summary_vatout.html#L73-L88)
+- [audit_logs.html:148-156](file://audit_logs.html#L148-L156)
 
 **Section sources**
-- [app.js](file://app.js)
-- [PRD_Tax_Database_System.md](file://PRD_Tax_Database_System.md)
+- [app.js:355-503](file://app.js#L355-L503)
+- [PRD_Tax_Database_System.md:34-49](file://PRD_Tax_Database_System.md#L34-L49)
 
 ## Performance Considerations
 - **Query Efficiency**
   - Use indexed columns (entity, invoice date) in queries to optimize trend and branch aggregation.
   - Deduplication function optimizes data processing by grouping and sorting efficiently.
   - JO distribution queries use LEFT JOIN for optimal performance when member portions are not present.
-  - **Enhanced**: All queries automatically exclude cancelled invoices using optimized WHERE clauses.
+  - **Enhanced**: All queries automatically exclude cancelled invoices using optimized WHERE clauses with proper indexing.
 - **Attachment Management**
   - Minimize unnecessary file operations by consolidating save/rename/cleanup steps during updates.
   - Support for batch PDF processing with chunked uploads for improved performance.
@@ -638,8 +626,9 @@ MASTER --> BACK
 - **Cancellation System Performance**
   - Optimized query patterns for cancelled invoice exclusion across all reporting modules.
   - Minimal performance impact on existing queries through strategic WHERE clause placement.
+  - Efficient audit log creation with background processing for non-critical operations.
 
-**Updated** Added performance considerations for invoice cancellation system, batch PDF processing, and real-time Socket.IO communication.
+**Updated** Added performance considerations for invoice cancellation system, batch PDF processing, real-time Socket.IO communication, and optimized audit logging.
 
 ## Troubleshooting Guide
 - **PDF Attachment Issues**
@@ -653,7 +642,7 @@ MASTER --> BACK
   - Check that cancelled invoices are properly excluded from statistical calculations.
 - **Audit and Reconciliation Discrepancies**
   - Cross-check invoice counts and totals against the header table fields and confirm that master data links are intact.
-  - Verify audit logs for cancellation and reactivation activities.
+  - Verify audit logs for cancellation and reactivation activities through the audit logs page.
 - **Status Migration Issues**
   - Check if records have valid invoice numbers and dates for status extraction.
   - Verify database permissions for write operations during migration.
@@ -673,13 +662,14 @@ MASTER --> BACK
   - Ensure audit logs are created for all cancellation and reactivation activities.
   - Verify that visual indicators properly reflect cancellation status in the UI.
   - Check approval workflow for non-supervisor users attempting cancellations.
+  - Monitor user_requests table for pending approval items.
 
-**Updated** Added troubleshooting guidance for invoice cancellation system, batch PDF processing, and enhanced validation mechanisms.
+**Updated** Added troubleshooting guidance for invoice cancellation system, batch PDF processing, enhanced validation mechanisms, and audit trail verification.
 
 **Section sources**
-- [app.js](file://app.js)
+- [app.js:355-503](file://app.js#L355-L503)
 
 ## Conclusion
 The VAT Output (VAT OUT) module provides a structured framework for invoice generation, customer billing, tax calculation, inbox processing, and summary reporting. Its integration with master data ensures accurate customer and branch identification, while backend endpoints and filesystem management support efficient operations. By leveraging trend and branch-level summaries, organizations can meet compliance requirements and streamline financial reconciliation processes.
 
-**Updated** The addition of comprehensive invoice cancellation capabilities significantly enhances the system's ability to manage complete invoice lifecycles with proper audit trails and approval workflows. The improved JO member allocation system with porsi_vatout table integration enables precise attribution of VAT output income to specific JV members while maintaining data integrity. The enhanced project summary API provides accurate revenue reporting for complex joint venture structures. Together, these enhancements create a robust, compliant, and user-friendly VAT output management system that supports sophisticated business operations while maintaining regulatory compliance and financial accuracy.
+**Updated** The addition of comprehensive invoice cancellation capabilities significantly enhances the system's ability to manage complete invoice lifecycles with proper audit trails and approval workflows. The improved JO member allocation system with porsi_vatout table integration enables precise attribution of VAT output income to specific JV members while maintaining data integrity. The enhanced project summary API provides accurate revenue reporting for complex joint venture structures. The integrated audit trail system ensures complete traceability of all invoice modifications and status changes. Together, these enhancements create a robust, compliant, and user-friendly VAT output management system that supports sophisticated business operations while maintaining regulatory compliance and financial accuracy.

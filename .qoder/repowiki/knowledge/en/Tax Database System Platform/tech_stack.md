@@ -1,1 +1,0 @@
-Node.js + Express 5, SQLite3, Socket.IO 4, express-session with bcryptjs, helmet, express-rate-limit, dotenv; pure client-side JavaScript with shared CSS/JS utilities and no frontend framework.

@@ -1,1 +1,0 @@
-Vanilla HTML/JS front-end consuming REST endpoints (`/api/*`) and Socket.IO events; pdf.js 2.16.105 for client-side PDF text extraction; Chart.js 4.4.1 for trend and distribution charts; Flatpickr for date-range filtering; XLSX library for client-side export.

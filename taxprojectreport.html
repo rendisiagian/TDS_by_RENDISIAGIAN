@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
     <script src="/sidebar.js"></script>
+    <script src="/pagination.js"></script>
 
     <!-- Google Fonts for Modern Typography -->
     <link
@@ -249,18 +250,12 @@
         /* Tables Layout */
         .tables-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr;
             gap: 24px;
             margin-top: 32px;
             opacity: 0;
             transform: translateY(20px);
             transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s;
-        }
-
-        @media (max-width: 1100px) {
-            .tables-grid {
-                grid-template-columns: 1fr;
-            }
         }
 
         .tables-grid.visible {
@@ -504,7 +499,7 @@
                     </div>
 
                     <div class="stat-card bg-revenue">
-                        <h5>Total Tagihan (DPP Keluaran)</h5>
+                        <h5>Total Tagihan (Harga Jual Keluaran)</h5>
                         <h2 id="val-revenue"><span class="currency">Rp</span> 0</h2>
                         <div class="progress-container">
                             <div class="progress-bar" id="bar-billed"></div>
@@ -555,20 +550,26 @@
                         <h3 class="out" id="judul-keluaran">📈 Rincian Pendapatan (Faktur Keluaran)</h3>
                         <div id="porsi-info-keluaran"
                             style="font-size:0.78rem; color:var(--text-secondary); margin:-6px 0 8px;"></div>
-                        <div style="overflow: auto; max-height: 420px; flex: 1;">
+                        <div style="display:flex; align-items:center; margin:0 0 10px;">
+                            <input type="text" id="search-keluaran" placeholder="🔍 Cari tanggal / no. faktur / klien..."
+                                oninput="handleSearch('out', this.value)"
+                                style="width:100%; max-width:340px; padding:9px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--surface-100); color:var(--text-900); font-size:0.85rem;">
+                        </div>
+                        <div style="overflow: auto;">
                             <table class="modern-table">
                                 <thead>
                                     <tr>
                                         <th>Tanggal</th>
                                         <th>No. Faktur</th>
                                         <th>Klien</th>
+                                        <th style="text-align: right;">Harga Jual</th>
                                         <th style="text-align: right;">DPP</th>
                                         <th id="th-ppn-keluaran" style="text-align: right; display:none;">PPN</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tbody-keluaran">
                                     <tr>
-                                        <td colspan="4">
+                                        <td colspan="5">
                                             <div class="empty-state"><span>📊</span>Pilih project untuk melihat data
                                                 tagihan.</div>
                                         </td>
@@ -576,6 +577,7 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div id="pager-keluaran" style="margin-top:12px;"></div>
                     </div>
 
                     <!-- Table Masukan -->
@@ -584,19 +586,25 @@
                             <div class="spinner"></div>
                         </div>
                         <h3 class="in">📉 Rincian Biaya (Faktur Masukan)</h3>
-                        <div style="overflow: auto; max-height: 420px; flex: 1;">
+                        <div style="display:flex; align-items:center; margin:0 0 10px;">
+                            <input type="text" id="search-masukan" placeholder="🔍 Cari tanggal / no. faktur / supplier..."
+                                oninput="handleSearch('in', this.value)"
+                                style="width:100%; max-width:340px; padding:9px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--surface-100); color:var(--text-900); font-size:0.85rem;">
+                        </div>
+                        <div style="overflow: auto;">
                             <table class="modern-table">
                                 <thead>
                                     <tr>
                                         <th>Tanggal</th>
                                         <th>No. Faktur</th>
                                         <th>Supplier</th>
+                                        <th style="text-align: right;">Harga Jual</th>
                                         <th style="text-align: right;">DPP</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tbody-masukan">
                                     <tr>
-                                        <td colspan="4">
+                                        <td colspan="5">
                                             <div class="empty-state"><span>🛒</span>Pilih project untuk melihat data
                                                 pengeluaran.</div>
                                         </td>
@@ -604,6 +612,7 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div id="pager-masukan" style="margin-top:12px;"></div>
                     </div>
 
                 </div>
@@ -632,6 +641,8 @@
 
         let lastFetchedData = { keluaran: [], masukan: [] };
         let activeVOs = [];
+        let curVOTab = 'all';
+        let qOut = '', qIn = '';
 
         document.addEventListener('DOMContentLoaded', () => {
             fetch('/sidebar.html')
@@ -722,6 +733,11 @@
                 .then(res => res.json())
                 .then(data => {
                     lastFetchedData = data;
+                    qOut = ''; qIn = '';
+                    const so = document.getElementById('search-keluaran'); if (so) so.value = '';
+                    const si = document.getElementById('search-masukan'); if (si) si.value = '';
+                    window.__pgState['pager-keluaran'].page = 1;
+                    window.__pgState['pager-masukan'].page = 1;
                     switchVOTab('all');
                 })
                 .catch(err => {
@@ -738,14 +754,15 @@
                 return;
             }
             container.style.display = 'flex';
-            let html = `<div class="vo-tab active" id="tab-all" onclick="switchVOTab('all')">📋 Semua Bagian</div>`;
+            let html = `<div class="vo-tab active" id="tab-all" onclick="selectVOTab('all')">📋 Semua Bagian</div>`;
             activeVOs.forEach(v => {
-                html += `<div class="vo-tab" id="tab-${v.id}" onclick="switchVOTab('${v.id}')">📦 ${v.nama_vo}</div>`;
+                html += `<div class="vo-tab" id="tab-${v.id}" onclick="selectVOTab('${v.id}')">📦 ${v.nama_vo}</div>`;
             });
             container.innerHTML = html;
         }
 
         function switchVOTab(voId) {
+            curVOTab = voId;
             document.querySelectorAll('.vo-tab').forEach(t => t.classList.remove('active'));
             const activeTab = document.getElementById(voId === 'all' ? 'tab-all' : `tab-${voId}`);
             if (activeTab) activeTab.classList.add('active');
@@ -772,26 +789,43 @@
                     ? `📈 Rincian Pendapatan (Faktur Keluaran) — Porsi ${porsiAnggota} dari Berca JO`
                     : '📈 Rincian Pendapatan (Faktur Keluaran)';
             }
-            const colSpanOut = porsiAnggota ? 5 : 4;
+            const colSpanOut = porsiAnggota ? 6 : 5;
 
             let dataKeluaran = lastFetchedData.keluaran || [];
             if (yearFilter !== 'all') dataKeluaran = dataKeluaran.filter(f => f.tanggal && f.tanggal.startsWith(yearFilter));
             if (voId !== 'all') dataKeluaran = dataKeluaran.filter(f => f.kode_vo == voId);
 
-            let totalDppOut = 0;
-            let totalPpnOut = 0;
+            // JO: Harga Jual porsi (split proporsional); non-JO: harga jual penuh dari register
+            const hjOutRow = (f) => porsiAnggota ? (parseFloat(f.harga_jual_porsi) || 0) : (parseFloat(f.harga_jual) || 0);
+
+            // Total dihitung dari SELURUH data terfilter tahun/VO (bukan halaman/pencarian)
+            let totalDppOut = 0, totalPpnOut = 0, totalHjOut = 0;
+            dataKeluaran.forEach(f => {
+                totalDppOut += parseFloat(f.dpp || 0);
+                totalPpnOut += parseFloat(f.ppn || 0);
+                totalHjOut += hjOutRow(f);
+            });
+
+            const sOut = qOut.trim().toLowerCase();
+            const viewOut = sOut ? dataKeluaran.filter(f => ((f.tanggal || '') + ' ' + (f.no_faktur || '') + ' ' + (f.client || '')).toLowerCase().includes(sOut)) : dataKeluaran;
+
+            const stOut = window.__pgState['pager-keluaran'];
+            const limOut = stOut.limit === 'all' ? Math.max(viewOut.length, 1) : stOut.limit;
+            const totPageOut = Math.max(Math.ceil(viewOut.length / limOut), 1);
+            if (stOut.page > totPageOut) stOut.page = totPageOut;
+            const pageRowsOut = viewOut.slice((stOut.page - 1) * limOut, stOut.page * limOut);
+
             let htmlOut = '';
-            if (dataKeluaran.length === 0) {
-                htmlOut = `<tr><td colspan="${colSpanOut}"><div class="empty-state"><span>📭</span>Tidak ada faktur keluaran untuk filter ini.</div></td></tr>`;
+            if (pageRowsOut.length === 0) {
+                htmlOut = `<tr><td colspan="${colSpanOut}"><div class="empty-state"><span>📭</span>${sOut ? 'Tidak ada hasil yang cocok dengan pencarian.' : 'Tidak ada faktur keluaran untuk filter ini.'}</div></td></tr>`;
             } else {
-                dataKeluaran.forEach(f => {
-                    totalDppOut += parseFloat(f.dpp || 0);
-                    totalPpnOut += parseFloat(f.ppn || 0);
+                pageRowsOut.forEach(f => {
                     const tdPpn = porsiAnggota ? `<td class="amount-cell" style="color:var(--text-secondary);">${formatRp(f.ppn)}</td>` : '';
-                    htmlOut += `<tr><td>${f.tanggal || '-'}</td><td>${f.no_faktur || '-'}</td><td>${f.client || '-'}</td><td class="amount-cell text-success">${formatRp(f.dpp)}</td>${tdPpn}</tr>`;
+                    htmlOut += `<tr><td>${f.tanggal || '-'}</td><td>${f.no_faktur || '-'}</td><td>${f.client || '-'}</td><td class="amount-cell">${formatRp(hjOutRow(f))}</td><td class="amount-cell text-success">${formatRp(f.dpp)}</td>${tdPpn}</tr>`;
                 });
             }
             document.getElementById('tbody-keluaran').innerHTML = htmlOut;
+            renderPagination('pager-keluaran', viewOut.length, stOut.page, limOut);
 
             const infoPorsi = document.getElementById('porsi-info-keluaran');
             if (infoPorsi) {
@@ -804,23 +838,34 @@
             if (yearFilter !== 'all') dataMasukan = dataMasukan.filter(f => f.tanggal && f.tanggal.startsWith(yearFilter));
 
             let totalDppIn = 0;
+            dataMasukan.forEach(f => { totalDppIn += parseFloat(f.dpp || 0); });
+
+            const sIn = qIn.trim().toLowerCase();
+            const viewIn = sIn ? dataMasukan.filter(f => ((f.tanggal || '') + ' ' + (f.no_faktur || '') + ' ' + (f.supplier || '')).toLowerCase().includes(sIn)) : dataMasukan;
+
+            const stIn = window.__pgState['pager-masukan'];
+            const limIn = stIn.limit === 'all' ? Math.max(viewIn.length, 1) : stIn.limit;
+            const totPageIn = Math.max(Math.ceil(viewIn.length / limIn), 1);
+            if (stIn.page > totPageIn) stIn.page = totPageIn;
+            const pageRowsIn = viewIn.slice((stIn.page - 1) * limIn, stIn.page * limIn);
+
             let htmlIn = '';
-            if (dataMasukan.length === 0) {
-                htmlIn = '<tr><td colspan="4"><div class="empty-state"><span>📭</span>Tidak ada faktur masukan untuk filter ini.</div></td></tr>';
+            if (pageRowsIn.length === 0) {
+                htmlIn = `<tr><td colspan="5"><div class="empty-state"><span>📭</span>${sIn ? 'Tidak ada hasil yang cocok dengan pencarian.' : 'Tidak ada faktur masukan untuk filter ini.'}</div></td></tr>`;
             } else {
-                dataMasukan.forEach(f => {
-                    totalDppIn += parseFloat(f.dpp || 0);
-                    htmlIn += `<tr><td>${f.tanggal || '-'}</td><td>${f.no_faktur || '-'}</td><td>${f.supplier || '-'}</td><td class="amount-cell text-danger">${formatRp(f.dpp)}</td></tr>`;
+                pageRowsIn.forEach(f => {
+                    htmlIn += `<tr><td>${f.tanggal || '-'}</td><td>${f.no_faktur || '-'}</td><td>${f.supplier || '-'}</td><td class="amount-cell">${formatRp(f.harga_jual)}</td><td class="amount-cell text-danger">${formatRp(f.dpp)}</td></tr>`;
                 });
             }
             document.getElementById('tbody-masukan').innerHTML = htmlIn;
+            renderPagination('pager-masukan', viewIn.length, stIn.page, limIn);
 
             const margin = totalDppOut - totalDppIn;
-            let billedPct = budget > 0 ? (totalDppOut / budget) * 100 : 0;
-            let costPct = totalDppOut > 0 ? (totalDppIn / totalDppOut) * 100 : 0;
+            let billedPct = budget > 0 ? (totalHjOut / budget) * 100 : 0;
+            let costPct = totalHjOut > 0 ? (totalDppIn / totalHjOut) * 100 : 0;
 
             document.getElementById('val-budget').textContent = formatRp(budget);
-            document.getElementById('val-revenue').textContent = formatRp(totalDppOut);
+            document.getElementById('val-revenue').textContent = formatRp(totalHjOut);
             document.getElementById('val-cost').textContent = formatRp(totalDppIn);
             document.getElementById('val-margin').textContent = formatRp(margin);
 
@@ -843,6 +888,23 @@
             document.getElementById('loading-keluaran').classList.remove('active');
             document.getElementById('loading-masukan').classList.remove('active');
         }
+
+        // PENCARIAN: simpan kata kunci, reset halaman, render ulang dengan tab aktif
+        function handleSearch(which, val) {
+            if (which === 'out') { qOut = val; window.__pgState['pager-keluaran'].page = 1; }
+            else { qIn = val; window.__pgState['pager-masukan'].page = 1; }
+            switchVOTab(curVOTab);
+        }
+
+        // Klik tab VO: reset halaman kedua tabel dulu, baru render
+        function selectVOTab(voId) {
+            window.__pgState['pager-keluaran'].page = 1;
+            window.__pgState['pager-masukan'].page = 1;
+            switchVOTab(voId);
+        }
+
+        initPagination('pager-keluaran', () => switchVOTab(curVOTab), 10);
+        initPagination('pager-masukan', () => switchVOTab(curVOTab), 10);
     </script>
 </body>
 

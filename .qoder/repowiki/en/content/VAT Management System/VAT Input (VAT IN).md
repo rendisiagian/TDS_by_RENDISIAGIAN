@@ -13,11 +13,11 @@
 
 ## Update Summary
 **Changes Made**
-- Added comprehensive invoice cancellation system with `tgl_batal` column support
-- Implemented supervisor approval workflows for invoice cancellation and reactivation
-- Enhanced dashboard interfaces with cancellation/reaction functionality and visual status indicators
-- Updated audit trail to track cancellation activities and maintain audit integrity
-- Modified reporting logic to exclude cancelled invoices from calculations
+- Enhanced invoice cancellation system with comprehensive supervisor approval workflow
+- Improved deduplication logic for replacement invoices considering cancellation status
+- Consistent cancellation filtering across all reporting modules using `tgl_batal` column
+- Updated audit trail functionality to track cancellation activities and maintain audit integrity
+- Enhanced user interface components with visual indicators for cancelled invoices
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -32,7 +32,7 @@
 10. [Appendices](#appendices)
 
 ## Introduction
-This document describes the VAT Input (VAT IN) management module of the Tax Database System (TDS). It covers the transaction lifecycle from invoice entry and validation to approval, including the new comprehensive invoice cancellation system with supervisor approval workflows. The module provides audit trail capabilities, compliance reporting, and enhanced user interface components for complete invoice lifecycle management.
+This document describes the VAT Input (VAT IN) management module of the Tax Database System (TDS). It covers the complete transaction lifecycle from invoice entry and validation to approval, including the comprehensive invoice cancellation system with supervisor approval workflows. The module provides robust audit trail capabilities, compliance reporting with consistent cancellation filtering, and enhanced user interface components for complete invoice lifecycle management.
 
 ## Project Structure
 The VAT IN module consists of three primary pages with enhanced cancellation functionality:
@@ -74,15 +74,15 @@ D --> E
   - Displays registered invoices with filtering, pagination, and actions (view items, edit, delete, cancel/reactivate).
   - Supports batch upload of PDFs via WebSocket, extracting text and items.
   - Provides export/print capabilities and real-time updates via Socket.IO.
-  - **New**: Invoice cancellation/reaction workflow with supervisor approval.
+  - **New**: Comprehensive invoice cancellation/reaction workflow with supervisor approval and visual status indicators.
 - **Audit Page**
   - Detects integrity anomalies: orphaned replacement invoices and mismatched tax periods between normal and replacement invoices.
   - Summarizes findings and lists samples for review.
-  - **Enhanced**: Tracks cancellation-related anomalies and maintains audit integrity.
+  - **Enhanced**: Tracks cancellation-related anomalies and maintains complete audit integrity.
 - **Summary Page**
   - Presents comparative tax trends grouped by period based on invoice exchange date versus invoice date.
   - Renders interactive charts and supports CSV export.
-  - **Updated**: Excludes cancelled invoices from all calculations and reports.
+  - **Updated**: Excludes cancelled invoices from all calculations and reports using consistent `tgl_batal` filtering.
 
 **Section sources**
 - [dashboard_vatin.html:95-99](file://vat_in/dashboard_vatin.html#L95-L99)
@@ -311,7 +311,7 @@ UI-->>U : Render charts + table + export
 **Section sources**
 - [PRD_Tax_Database_System.md:34-45](file://PRD_Tax_Database_System.md#L34-L45)
 - [PRD_Tax_Database_System.md:121-137](file://PRD_Tax_Database_System.md#L121-L137)
-- [app.js:321-339](file://app.js#L321-L339)
+- [app.js:321-339](file://app.js#L321-339)
 
 ## Dependency Analysis
 - **Frontend Dependencies**

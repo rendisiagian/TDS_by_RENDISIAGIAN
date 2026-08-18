@@ -147,7 +147,7 @@
     </div>
 
     <div id="modalEditData" class="modal-overlay">
-        <div class="modal-box" style="max-width: 500px;">
+        <div class="modal-box" style="max-width: 680px;">
             <h3 style="border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; color: #f59e0b;">✏️ Edit Relasi Internal
             </h3>
             <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 15px;">Faktur: <b id="edit-faktur-title"></b>
@@ -176,26 +176,29 @@
                             <th style="text-align:center; padding:4px;">%</th>
                             <th style="text-align:left; padding:4px;">PPN Porsi</th>
                             <th style="text-align:center; padding:4px;">%</th>
+                            <th style="text-align:right; padding:4px;">Harga Jual Porsi</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
                             <td style="padding:4px; font-weight:600;">BBS</td>
-                            <td style="padding:4px;"><input type="number" id="porsi_dpp_BBS" min="0" step="1"
-                                    style="width:130px;" oninput="updatePorsiHitung()"></td>
+                            <td style="padding:4px;"><input type="text" id="porsi_dpp_BBS" inputmode="decimal"
+                                    autocomplete="off" style="width:130px;" oninput="formatInputPorsi(this); updatePorsiHitung()"></td>
                             <td style="padding:4px; text-align:center; font-weight:600; color:#ea580c;" id="porsi_pct_dpp_BBS">0%</td>
-                            <td style="padding:4px;"><input type="number" id="porsi_ppn_BBS" min="0" step="1"
-                                    style="width:110px;" oninput="updatePorsiHitung()"></td>
+                            <td style="padding:4px;"><input type="text" id="porsi_ppn_BBS" inputmode="decimal"
+                                    autocomplete="off" style="width:110px;" oninput="formatInputPorsi(this); updatePorsiHitung()"></td>
                             <td style="padding:4px; text-align:center; font-weight:600; color:#ea580c;" id="porsi_pct_ppn_BBS">0%</td>
+                            <td style="padding:4px; text-align:right; font-weight:600; color:#0f766e;" id="porsi_hj_BBS">Rp 0</td>
                         </tr>
                         <tr>
                             <td style="padding:4px; font-weight:600;">BMP</td>
-                            <td style="padding:4px;"><input type="number" id="porsi_dpp_BMP" min="0" step="1"
-                                    style="width:130px;" oninput="updatePorsiHitung()"></td>
+                            <td style="padding:4px;"><input type="text" id="porsi_dpp_BMP" inputmode="decimal"
+                                    autocomplete="off" style="width:130px;" oninput="formatInputPorsi(this); updatePorsiHitung()"></td>
                             <td style="padding:4px; text-align:center; font-weight:600; color:#ea580c;" id="porsi_pct_dpp_BMP">0%</td>
-                            <td style="padding:4px;"><input type="number" id="porsi_ppn_BMP" min="0" step="1"
-                                    style="width:110px;" oninput="updatePorsiHitung()"></td>
+                            <td style="padding:4px;"><input type="text" id="porsi_ppn_BMP" inputmode="decimal"
+                                    autocomplete="off" style="width:110px;" oninput="formatInputPorsi(this); updatePorsiHitung()"></td>
                             <td style="padding:4px; text-align:center; font-weight:600; color:#ea580c;" id="porsi_pct_ppn_BMP">0%</td>
+                            <td style="padding:4px; text-align:right; font-weight:600; color:#0f766e;" id="porsi_hj_BMP">Rp 0</td>
                         </tr>
                     </tbody>
                 </table>
@@ -232,7 +235,46 @@
         // PORSI JO: DPP/PPN total faktur yang sedang diedit (basis perhitungan persen)
         let editDppTotal = 0;
         let editPpnTotal = 0;
+        let editHjTotal = 0;
         const PORSI_MEMBERS = ['BBS', 'BMP'];
+
+        // PORSI JO: input teks ber-separator ribuan (id-ID); presisi desimal tetap utuh saat parse/format
+        function parseAngkaPorsi(s) {
+            s = String(s == null ? '' : s).trim();
+            if (!s) return 0;
+            let intPart = '', decPart = '';
+            if (s.includes(',')) {
+                const p = s.split(',');
+                intPart = (p[0] || '').replace(/[^0-9]/g, '');
+                decPart = (p[1] || '').replace(/[^0-9]/g, '');
+            } else if (s.includes('.')) {
+                const p = s.split('.');
+                if (p.length > 2 || (p[1] || '').length === 3) { intPart = p.join('').replace(/[^0-9]/g, ''); }
+                else { intPart = (p[0] || '').replace(/[^0-9]/g, ''); decPart = (p[1] || '').replace(/[^0-9]/g, ''); }
+            } else {
+                intPart = s.replace(/[^0-9]/g, '');
+            }
+            const n = parseFloat((intPart || '0') + (decPart ? '.' + decPart : ''));
+            return isNaN(n) ? 0 : n;
+        }
+        function formatAngkaPorsi(n) {
+            if (!isFinite(n) || n <= 0) return '';
+            const p = String(n).split('.');
+            const intFmt = p[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+            return p[1] !== undefined ? intFmt + ',' + p[1] : intFmt;
+        }
+        function formatInputPorsi(el) {
+            const raw = el.value;
+            if (!raw.trim()) { return; }
+            const endsDecimal = /[,.]\s*$/.test(raw);
+            const fmt = formatAngkaPorsi(parseAngkaPorsi(raw));
+            el.value = fmt ? (endsDecimal ? fmt + ',' : fmt) : '';
+        }
+        // Tampilan Rupiah aman untuk nilai desimal (formatRupiah/bersihkanAngka merusak titik desimal number mentah)
+        function formatRpPorsi(n) {
+            const fmt = formatAngkaPorsi(Math.round((Number(n) || 0) * 100) / 100);
+            return fmt ? 'Rp ' + fmt : 'Rp 0';
+        }
 
         // STATE UNTUK SERVER-SIDE
         let currentPage = 1;
@@ -380,7 +422,7 @@
                 btnView.onclick = () => viewItems(baris.no_faktur, baris.dpp, baris.ppn);
                 const btnEdit = document.createElement('button');
                 btnEdit.className = 'btn-tbl btn-tbl-edit'; btnEdit.title = 'Edit'; btnEdit.textContent = 'Edit';
-                btnEdit.onclick = () => handleAction(baris.no_faktur, 'EDIT', curBr, curInv, curTgl, curVO, baris.dpp, baris.ppn);
+                btnEdit.onclick = () => handleAction(baris.no_faktur, 'EDIT', curBr, curInv, curTgl, curVO, baris.dpp, baris.ppn, baris.harga_jual);
                 const btnBatal = document.createElement('button');
                 if (baris.tgl_batal) {
                     btnBatal.className = 'btn-tbl btn-tbl-view'; btnBatal.title = 'Aktifkan kembali faktur ini'; btnBatal.textContent = 'Aktifkan';
@@ -496,7 +538,7 @@
             } catch (err) { showToast('Terjadi kesalahan.', 'error'); }
         }
 
-        async function handleAction(noFaktur, actionType, curCabang = '', curInvoice = '', curTanggal = '', curVO = '', curDpp = 0, curPpn = 0) {
+        async function handleAction(noFaktur, actionType, curCabang = '', curInvoice = '', curTanggal = '', curVO = '', curDpp = 0, curPpn = 0, curHargaJual = 0) {
             const userRole = currentUser.role ? currentUser.role.toLowerCase() : '';
             const isSupervisor = ['supervisor', 'administrator'].includes(userRole);
 
@@ -536,6 +578,7 @@
                 if (aktifEntitas === 'JO') {
                     editDppTotal = Number(curDpp) || 0;
                     editPpnTotal = Number(curPpn) || 0;
+                    editHjTotal = Number(curHargaJual) || 0;
                     PORSI_MEMBERS.forEach(m => {
                         document.getElementById('porsi_dpp_' + m).value = '';
                         document.getElementById('porsi_ppn_' + m).value = '';
@@ -546,8 +589,8 @@
                         (porsiRows || []).forEach(p => {
                             const elD = document.getElementById('porsi_dpp_' + p.anggota);
                             const elP = document.getElementById('porsi_ppn_' + p.anggota);
-                            if (elD && Number(p.dpp_porsi) > 0) elD.value = p.dpp_porsi;
-                            if (elP && Number(p.ppn_porsi) > 0) elP.value = p.ppn_porsi;
+                            if (elD && Number(p.dpp_porsi) > 0) elD.value = formatAngkaPorsi(Number(p.dpp_porsi));
+                            if (elP && Number(p.ppn_porsi) > 0) elP.value = formatAngkaPorsi(Number(p.ppn_porsi));
                         });
                     } catch (e) { }
                     updatePorsiHitung();
@@ -609,9 +652,13 @@
         function updatePorsiHitung() {
             let sumDpp = 0, sumPpn = 0;
             PORSI_MEMBERS.forEach(m => {
-                const dpp = Number(document.getElementById('porsi_dpp_' + m).value) || 0;
-                const ppn = Number(document.getElementById('porsi_ppn_' + m).value) || 0;
+                const dpp = parseAngkaPorsi(document.getElementById('porsi_dpp_' + m).value);
+                const ppn = parseAngkaPorsi(document.getElementById('porsi_ppn_' + m).value);
                 sumDpp += dpp; sumPpn += ppn;
+                // HJ porsi = split proporsional dari harga jual faktur (identik DPP×12/11 untuk skema 2025+)
+                const hj = editDppTotal > 0 ? editHjTotal * (dpp / editDppTotal) : 0;
+                const elHJ = document.getElementById('porsi_hj_' + m);
+                if (elHJ) elHJ.textContent = formatRpPorsi(hj);
                 const pctD = editDppTotal > 0 ? (dpp / editDppTotal * 100).toFixed(2) : '0';
                 const pctP = editPpnTotal > 0 ? (ppn / editPpnTotal * 100).toFixed(2) : '0';
                 document.getElementById('porsi_pct_dpp_' + m).textContent = pctD + '%';
@@ -620,8 +667,8 @@
             const elSum = document.getElementById('porsi-summary');
             const okDpp = Math.abs(sumDpp - editDppTotal) < 1;
             const okPpn = Math.abs(sumPpn - editPpnTotal) < 1;
-            elSum.textContent = 'Total porsi: DPP ' + formatRupiah(sumDpp) + ' dari ' + formatRupiah(editDppTotal)
-                + ' | PPN ' + formatRupiah(sumPpn) + ' dari ' + formatRupiah(editPpnTotal);
+            elSum.textContent = 'Total porsi: DPP ' + formatRpPorsi(sumDpp) + ' dari ' + formatRpPorsi(editDppTotal)
+                + ' | PPN ' + formatRpPorsi(sumPpn) + ' dari ' + formatRpPorsi(editPpnTotal);
             if (okDpp && okPpn) {
                 elSum.style.color = '#16a34a';
             } else {
@@ -644,8 +691,8 @@
             if (aktifEntitas === 'JO') {
                 porsi = PORSI_MEMBERS.map(m => ({
                     anggota: m,
-                    dpp: Number(document.getElementById('porsi_dpp_' + m).value) || 0,
-                    ppn: Number(document.getElementById('porsi_ppn_' + m).value) || 0
+                    dpp: parseAngkaPorsi(document.getElementById('porsi_dpp_' + m).value),
+                    ppn: parseAngkaPorsi(document.getElementById('porsi_ppn_' + m).value)
                 }));
                 const sumDpp = porsi.reduce((s, p) => s + p.dpp, 0);
                 if (Math.abs(sumDpp - editDppTotal) >= 1) {

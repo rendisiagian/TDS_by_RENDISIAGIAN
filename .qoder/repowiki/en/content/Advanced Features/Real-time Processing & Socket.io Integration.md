@@ -14,7 +14,9 @@
 **Changes Made**
 - Updated Socket.IO implementation with streamlined role-based access control and enhanced validation
 - **NEW**: Enhanced PDF archive cleanup system ensuring proper removal of physical PDF files when records are deleted
-- **NEW**: Enhanced Socket.io handlers now support BATAL (cancel) and AKTIFKAN (activate) events with role-based access controls and audit logging for invoice cancellation workflows
+- **ENHANCED**: Improved Socket.io handlers now support BATAL (cancel) and AKTIFKAN (activate) events with role-based access controls and audit logging for invoice cancellation workflows
+- **IMPROVED**: Enhanced supervisor approval workflow integration for cancellation requests with better real-time status updates
+- **ENHANCED**: Better real-time synchronization across all connected clients for cancellation status changes
 - Consolidated helper functions for improved security and maintainability
 - Enhanced security measures including session validation and role-based authorization
 - Streamlined batch upload workflows while maintaining real-time update capabilities
@@ -33,7 +35,7 @@
 10. [Appendices](#appendices)
 
 ## Introduction
-This document explains the real-time processing system built on Socket.io, focusing on batch PDF upload workflows, live data updates, and real-time synchronization between clients and the server. The system has been streamlined with improved role-based access control, enhanced security measures, and consolidated helper functions while maintaining robust real-time update capabilities for document processing workflows across multiple tax modules (VAT IN, VAT OUT, Prepaid Tax, Tax Payable). **The system now includes comprehensive PDF archive cleanup functionality to prevent orphaned files when records are deleted and enhanced invoice cancellation workflows with BATAL (cancel) and AKTIFKAN (activate) event support.**
+This document explains the real-time processing system built on Socket.io, focusing on batch PDF upload workflows, live data updates, and real-time synchronization between clients and the server. The system has been streamlined with improved role-based access control, enhanced security measures, and consolidated helper functions while maintaining robust real-time update capabilities for document processing workflows across multiple tax modules (VAT IN, VAT OUT, Prepaid Tax, Tax Payable). **The system now includes comprehensive PDF archive cleanup functionality to prevent orphaned files when records are deleted and enhanced invoice cancellation workflows with BATAL (cancel) and AKTIFKAN (activate) event support, featuring improved supervisor approval integration and better real-time updates across all connected clients.**
 
 ## Project Structure
 The real-time features are implemented primarily in the server-side application with module-specific client pages:
@@ -77,7 +79,7 @@ APP --> UTILS
 ## Core Components
 - Socket.io server initialization with enhanced buffer sizing for large PDF payloads
 - **Enhanced PDF archive cleanup system** that systematically removes physical PDF files when database records are deleted
-- **Enhanced invoice cancellation workflow** supporting BATAL (cancel) and AKTIFKAN (activate) events with role-based access controls
+- **Enhanced invoice cancellation workflow** supporting BATAL (cancel) and AKTIFKAN (activate) events with role-based access controls and improved supervisor approval integration
 - Streamlined batch upload handlers for all tax modules with improved validation
 - Real-time notifications for upload completion and module-wide data changes
 - Action request pipeline with enhanced supervisor checks and comprehensive audit logging
@@ -88,7 +90,7 @@ Key implementation anchors:
 - Server initialization and enhanced buffer size: [app.js](file://app.js)
 - **PDF archive cleanup function**: [hapusArsipFisik:1905-1910](file://app.js#L1905-L1910)
 - **BATAL/AKTIFKAN event handlers**: [request-action-faktur:2016-2035](file://app.js#L2016-L2035)
-- **Approval workflow for cancellations**: [proses-request handler:2962-2982](file://app.js#L2962-L2982)
+- **Enhanced approval workflow for cancellations**: [proses-request handler:2962-2982](file://app.js#L2962-L2982)
 - Streamlined batch upload events and completion notifications: [app.js](file://app.js)
 - Client-side batch upload triggers and progress handling: [vat_in/dashboard_vatin.html](file://vat_in/dashboard_vatin.html)
 - Action request handling and real-time emits: [app.js](file://app.js)
@@ -99,7 +101,7 @@ Key implementation anchors:
 - [utils.js](file://utils.js)
 
 ## Architecture Overview
-The real-time architecture centers on Socket.io for bidirectional communication with enhanced security and validation. Clients emit batch upload requests and action commands; the server validates, processes, persists data, broadcasts live updates, and **ensures proper cleanup of associated PDF archives**. Security and audit are enforced server-side with improved role-based access control. **The system now supports comprehensive invoice cancellation workflows with BATAL (cancel) and AKTIFKAN (activate) events, featuring role-based permissions and complete audit trails.**
+The real-time architecture centers on Socket.io for bidirectional communication with enhanced security and validation. Clients emit batch upload requests and action commands; the server validates, processes, persists data, broadcasts live updates, and **ensures proper cleanup of associated PDF archives**. Security and audit are enforced server-side with improved role-based access control. **The system now supports comprehensive invoice cancellation workflows with BATAL (cancel) and AKTIFKAN (activate) events, featuring enhanced supervisor approval integration, role-based permissions, complete audit trails, and better real-time updates across all connected clients.**
 
 ```mermaid
 sequenceDiagram
@@ -145,14 +147,15 @@ Operational highlights:
 - [app.js](file://app.js)
 
 ### Enhanced Invoice Cancellation Workflow (BATAL & AKTIFKAN)
-**Updated** The system now supports comprehensive invoice cancellation workflows with BATAL (cancel) and AKTIFKAN (activate) events, featuring role-based access controls and complete audit logging.
+**Updated** The system now supports comprehensive invoice cancellation workflows with BATAL (cancel) and AKTIFKAN (activate) events, featuring enhanced supervisor approval integration and better real-time updates across all connected clients.
 
 The cancellation workflow works as follows:
-- **Role-based Access Control**: Only supervisors and administrators can directly cancel invoices; regular users must submit requests for approval
+- **Role-based Access Control**: Only supervisors and administrators can directly cancel invoices; regular users must submit requests for approval through the enhanced approval panel
 - **Validation Requirements**: BATAL actions require a valid cancellation date; AKTIFKAN actions clear the cancellation date
 - **Module Restriction**: Cancellation is only supported for VAT IN and VAT OUT modules (not applicable to BPPU modules)
+- **Enhanced Approval Process**: Non-supervisor requests are automatically routed to the supervisor approval panel with detailed request information
 - **Audit Trail**: All cancellation activities are logged with user information, timestamps, and detailed descriptions
-- **Real-time Updates**: Changes are immediately broadcast to all connected clients via `data-baru-{mod}` events
+- **Real-time Updates**: Changes are immediately broadcast to all connected clients via `data-baru-{mod}` events with improved synchronization
 
 ```mermaid
 sequenceDiagram
@@ -166,11 +169,11 @@ Sock->>DB : "UPDATE data_{mod} SET tgl_batal = ?"
 DB-->>Sock : "OK"
 Sock->>DB : "INSERT audit_logs (BATAL)"
 DB-->>Sock : "OK"
-Sock-->>UI : "data-baru-{mod}"
+Sock-->>UI : "data-baru-{mod}<br/>(broadcast to all clients)"
 else Regular User
-Sock->>DB : "INSERT user_requests (Pending)"
+Sock->>DB : "INSERT user_requests (Pending)<br/>jenis_request : 'BATAL_VATIN'"
 DB-->>Sock : "OK"
-Sock-->>UI : "request-updated"
+Sock-->>UI : "request-updated<br/>(approval panel notification)"
 end
 ```
 
@@ -241,7 +244,8 @@ Sock-->>UI : "upload-batch-selesai"<br/>{ total, sukses, duplikat, gagal }
 ### Enhanced Real-time Data Updates and Synchronization
 - After successful edits/deletes or bulk actions, the server emits module-specific real-time events to synchronize client views
 - **With integrated PDF archive cleanup**, deletions now ensure both database records and physical files are removed
-- **Cancellation workflow updates** trigger immediate UI refreshes across all connected clients
+- **Enhanced cancellation workflow updates** trigger immediate UI refreshes across all connected clients with improved synchronization
+- **Better real-time status propagation** ensures all clients see cancellation status changes instantly
 - Clients listen for these events and refresh their UI accordingly with improved error handling
 
 ```mermaid
@@ -260,7 +264,7 @@ alt Cancel/Activate operation
 Sock->>DB : "Update tgl_batal field"
 DB-->>Sock : "OK"
 end
-Sock-->>Client : "data-baru-{mod}"
+Sock-->>Client : "data-baru-{mod}<br/>(broadcast to all connected clients)"
 Client->>Client : "Reload filtered data and metrics"
 ```
 
@@ -274,7 +278,8 @@ Client->>Client : "Reload filtered data and metrics"
 - Clients can request edits/deletes via a dedicated action event with enhanced validation
 - Supervisor/admin roles bypass direct changes; others trigger approval workflows
 - **Deletion requests now include automatic PDF archive cleanup** after approval
-- **Cancellation requests follow the same approval pattern** with BATAL_ and AKTIFKAN_ prefixes
+- **Enhanced cancellation requests follow the same approval pattern** with BATAL_ and AKTIFKAN_ prefixes and improved request tracking
+- **Better approval panel integration** provides supervisors with detailed cancellation request information
 - Audit logs are inserted for transparency with comprehensive tracking
 
 ```mermaid
@@ -282,11 +287,11 @@ flowchart TD
 Start(["Action Request Received"]) --> Validate["Validate module and parameters"]
 Validate --> IsSupervisor{"Is Supervisor/Admin?"}
 IsSupervisor --> |Yes| GetPdfPath["Get PDF path before delete"]
-IsSupervisor --> |No| InsertRequest["Insert user_requests for approval"]
+IsSupervisor --> |No| InsertRequest["Insert user_requests for approval<br/>jenis_request: 'BATAL_VATIN' or 'AKTIFKAN_VATIN'"]
 GetPdfPath --> ApplyChange["Apply change to DB"]
 ApplyChange --> CleanupFiles["hapusArsipFisik() - Remove PDF"]
 CleanupFiles --> EmitUpdate["Emit data-baru-{mod}"]
-InsertRequest --> EmitUpdated["Emit request-updated"]
+InsertRequest --> EmitUpdated["Emit request-updated<br/>(approval panel notification)"]
 EmitUpdate --> End(["Done"])
 EmitUpdated --> End
 ```
@@ -345,9 +350,11 @@ Utils --> Frontend["Frontend Applications"]
 - Large payload handling: Server buffer sizing accommodates substantial PDFs with improved memory management
 - **Efficient PDF cleanup**: File deletion is performed asynchronously to avoid blocking database operations
 - **Optimized cancellation workflow**: Direct supervisor actions bypass approval queue for better performance
+- **Enhanced approval processing**: Improved request handling reduces latency in the approval workflow
 - Chunked uploads: Client splits files into manageable chunks to reduce memory pressure and improve reliability
 - Debounced filtering and server-side pagination minimize UI lag and database load
 - Real-time emits are scoped to module-specific channels to avoid unnecessary broadcasts
+- **Better real-time synchronization**: Optimized broadcasting ensures efficient updates across all connected clients
 - Consolidated helper functions reduce code duplication and improve performance
 
 Recommendations:
@@ -357,6 +364,7 @@ Recommendations:
 - Leverage consolidated utility functions for consistent performance
 - **Monitor file system operations for cleanup efficiency**
 - **Track cancellation request approval times for workflow optimization**
+- **Monitor real-time connection performance for optimal user experience**
 
 **Section sources**
 - [app.js](file://app.js)
@@ -382,6 +390,7 @@ Common issues and resolutions:
   - Check that the module is VAT IN or VAT OUT (not BPPU modules)
   - For BATAL actions, ensure a valid cancellation date is provided
   - Verify user has appropriate role permissions (supervisor/administrator for direct action)
+  - Check that non-supervisor requests are properly routed to the approval panel
   - References: [app.js](file://app.js)
 
 - **Orphaned PDF files after deletion**
@@ -404,7 +413,14 @@ Common issues and resolutions:
   - Check the approval panel for pending requests
   - Verify supervisor/administrator is reviewing and approving/rejecting requests
   - Monitor audit logs for cancellation-related entries
+  - Ensure proper request format with jenis_request containing 'BATAL_' or 'AKTIFKAN_' prefix
   - References: [audit_logs.html](file://audit_logs.html), [app.js](file://app.js)
+
+- **Real-time synchronization issues**
+  - Verify that data-baru-{mod} events are being emitted after cancellation operations
+  - Check that all connected clients are properly listening for module-specific events
+  - Ensure network connectivity between clients and server
+  - References: [app.js](file://app.js)
 
 **Section sources**
 - [app.js](file://app.js)
@@ -414,7 +430,7 @@ Common issues and resolutions:
 - [audit_logs.html](file://audit_logs.html)
 
 ## Conclusion
-The real-time processing system leverages Socket.io to deliver responsive batch PDF ingestion, live synchronization, and secure action workflows across tax modules. **The enhanced invoice cancellation workflow with BATAL (cancel) and AKTIFKAN (activate) events provides comprehensive control over invoice status management with role-based permissions and complete audit trails.** The enhanced PDF archive cleanup system ensures data integrity by preventing orphaned files when records are deleted. The streamlined implementation with improved role-based access control, enhanced security measures, and consolidated helper functions ensures maintainability. With proper monitoring and scaling strategies, the system can handle increased loads while maintaining responsiveness and security.
+The real-time processing system leverages Socket.io to deliver responsive batch PDF ingestion, live synchronization, and secure action workflows across tax modules. **The enhanced invoice cancellation workflow with BATAL (cancel) and AKTIFKAN (activate) events provides comprehensive control over invoice status management with improved supervisor approval integration, role-based permissions, complete audit trails, and better real-time updates across all connected clients.** The enhanced PDF archive cleanup system ensures data integrity by preventing orphaned files when records are deleted. The streamlined implementation with improved role-based access control, enhanced security measures, and consolidated helper functions ensures maintainability. With proper monitoring and scaling strategies, the system can handle increased loads while maintaining responsiveness and security.
 
 ## Appendices
 
@@ -425,24 +441,26 @@ The real-time processing system leverages Socket.io to deliver responsive batch 
   - upload-pdf-prepaid-batch: { files[], entitas, username }
   - upload-pdf-payable-batch: { files[], entitas, username }
   - request-action-faktur: { mod, action, faktur, newData?, id_user?, username? }
-    - **New**: action can be 'BATAL' or 'AKTIFKAN' for invoice cancellation workflows
-    - **New**: newData.tanggalBatal required for BATAL actions
+    - **Enhanced**: action can be 'BATAL' or 'AKTIFKAN' for invoice cancellation workflows
+    - **Enhanced**: newData.tanggalBatal required for BATAL actions
+    - **Enhanced**: Proper role validation and approval routing for non-supervisor users
   - tambah-cabang, edit-cabang, hapus-cabang, tambah-kontak, edit-kontak, hapus-kontak (admin-only)
 
 - Server to Client
   - upload-batch-selesai: { modul, total, sukses, duplikat, gagal }
-  - data-baru-{mod}: broadcast for UI refresh
-  - request-updated: feedback for non-supervisor requests
+  - data-baru-{mod}: broadcast for UI refresh with enhanced synchronization
+  - request-updated: feedback for non-supervisor requests with improved approval panel integration
   - error-action, error-cabang, error-kontak: error responses
 
 Security and validation:
 - Dummy mode simulation for safe testing
 - Role-based access checks with enhanced validation
 - Module whitelist enforcement
-- **Enhanced invoice cancellation workflow with role-based permissions**
+- **Enhanced invoice cancellation workflow with role-based permissions and improved approval integration**
 - **Automatic PDF archive cleanup on record deletion**
 - **Comprehensive audit logging for all cancellation activities**
 - Session validation and authentication
+- **Better real-time synchronization across all connected clients**
 
 **Section sources**
 - [app.js](file://app.js)
@@ -452,7 +470,8 @@ Security and validation:
 - Broadcast scope: Limit emits to module-specific channels to reduce overhead
 - Database contention: Use transactions and batch writes for uploads; consider read replicas for reporting
 - **File system scalability**: Consider distributed file storage solutions for large-scale PDF archive management
-- **Cancellation workflow scalability**: Approval queues should be monitored and optimized for high-volume environments
+- **Enhanced cancellation workflow scalability**: Improved approval queues should be monitored and optimized for high-volume environments
+- **Real-time performance optimization**: Better event broadcasting ensures efficient updates across scaled client connections
 - Horizontal scaling: Distribute clients across nodes and route Socket.io connections via a load balancer supporting WebSocket passthrough
 - Consolidated utilities: Reduce code duplication and improve maintainability across scaled instances
 

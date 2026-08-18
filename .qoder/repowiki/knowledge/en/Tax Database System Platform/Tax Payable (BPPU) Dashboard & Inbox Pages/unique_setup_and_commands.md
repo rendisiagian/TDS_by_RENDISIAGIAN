@@ -1,1 +1,0 @@
-No build step — pages are served directly as static HTML. Requires the backend endpoints `/api/data-payable`, `/api/inbox-payable`, `/api/branches`, `/api/data-vatin`, `/api/me`, and Socket.IO event handlers for `request-action-faktur`, `upload-pdf-payable-batch`, `upload-batch-selesai`, `hapus-inbox-payable`, `simpan-final-payable`, and `data-baru-payable` to be running.

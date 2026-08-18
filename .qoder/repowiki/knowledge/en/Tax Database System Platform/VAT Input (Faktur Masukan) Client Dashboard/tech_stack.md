@@ -1,1 +1,0 @@
-Vanilla HTML/CSS/JS with pdf.js 2.16.105 for client-side PDF text extraction, SheetJS (xlsx) for Excel export, Chart.js 4.4.1 for trend charts, Flatpickr for date-range filters, and Socket.IO client for real-time upload progress and data refresh.

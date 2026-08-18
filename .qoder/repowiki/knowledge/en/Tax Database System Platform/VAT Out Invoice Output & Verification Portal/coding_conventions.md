@@ -1,6 +1,0 @@
-- Each page loads the shared sidebar by fetching `/sidebar.html` into `#sidebar-container`, then calls `fetch('/api/me')` to populate the header user name.
-- Entity switching is implemented via a global `window.gantiEntitas(entitas)` function that persists the choice in `localStorage.lastEntitas` and reloads the current page's data.
-- Server-side pagination and filtering use URL query parameters `page`, `limit`, and a JSON-encoded `search` object passed via `encodeURIComponent(JSON.stringify(...))`.
-- User-triggered mutations go through Socket.IO events rather than direct HTTP calls, using `socket.emit('<event>', payload)` with a consistent payload shape containing `action`, `mod`, `faktur`, `id_user`, `username`, and `role`.
-- Branch selection is coupled with an optional Variation Order (VO) dropdown loaded asynchronously from `/api/vo/{branchKode}`, shown only when at least one VO exists.
-- Status badges and numeric values are formatted consistently using the shared `formatRupiah()` utility and CSS classes such as `status-badge status-normal` / `status-pengganti`.

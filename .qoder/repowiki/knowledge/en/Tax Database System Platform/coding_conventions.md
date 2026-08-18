@@ -1,6 +1,0 @@
-- Each tax module follows a fixed three-page pattern: `<module>_dashboard.html`, `<module>_inbox.html`, and either `<module>_summary.html` or `<module>_audit_<module>.html`.
-- PDF documents are stored in per-module `arsip_<name>/` directories with prefixed filenames (`PRE_`, `PAY_`, or vendor-number based) and served via `express.static` mounted at `/arsip_<module>`.
-- All SQL queries go through the Promise-wrapped `dbGet`/`dbRun` helpers in `app.js` rather than raw sqlite3 callbacks.
-- Client-side pages load shared layout via `fetch('sidebar.html')` and use the global `showToast()` function from `toast.js` for user feedback.
-- Numeric values are normalized through the shared `bersihkanAngka()` helper to handle Indonesian locale formatting (dot-thousands, comma-decimal).
-- Security-sensitive files (`.db`, `.env`, backend `.js`, `package.json`) are explicitly blocked via a path-matching middleware in `app.js`.

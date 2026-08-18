@@ -1,1 +1,0 @@
-Single Node/Express platform that unifies four Indonesian tax modules (VAT Input, VAT Out, Prepaid Tax BPPU, Payable Tax BPPU) behind one SQLite database, session auth, and shared client UI.

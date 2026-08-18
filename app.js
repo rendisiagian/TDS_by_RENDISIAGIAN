@@ -846,7 +846,8 @@ app.get('/api/project-summary/:id', cekAuth, (req, res) => {
 
         const sqlKeluaranJO = `SELECT d.tanggal_faktur as tanggal, d.no_faktur as no_faktur, d.nama_pembeli as client,
                                       COALESCE(p.dpp_porsi, 0) as dpp, COALESCE(p.ppn_porsi, 0) as ppn,
-                                      d.dpp as dpp_full, d.ppn as ppn_full
+                                      d.dpp as dpp_full, d.ppn as ppn_full, d.harga_jual as harga_jual_full,
+                                      CASE WHEN COALESCE(d.dpp, 0) > 0 THEN d.harga_jual * COALESCE(p.dpp_porsi, 0) / d.dpp ELSE 0 END as harga_jual_porsi
                                FROM data_vatout d
                                LEFT JOIN porsi_vatout p ON p.no_faktur = d.no_faktur AND p.anggota = ?
                                WHERE d.entitas = 'JO' AND (d.tgl_batal IS NULL OR d.tgl_batal = '') ORDER BY d.tanggal_faktur ASC`;
@@ -854,7 +855,7 @@ app.get('/api/project-summary/:id', cekAuth, (req, res) => {
         const whereProyek = `(d.kode_cabang = ? OR d.project_id = ?)`;
         const queryKeluaran = isJOProject
             ? (cb) => db.all(sqlKeluaranJO, [proj.nama_cabang], cb)
-            : (cb) => db.all(`SELECT d.tanggal_faktur as tanggal, d.no_faktur as no_faktur, d.nama_pembeli as client, d.dpp, d.ppn, d.kode_vo FROM data_vatout d WHERE ${whereProyek} AND (d.tgl_batal IS NULL OR d.tgl_batal = '')`, [projectId, projectId], cb);
+            : (cb) => db.all(`SELECT d.tanggal_faktur as tanggal, d.no_faktur as no_faktur, d.nama_pembeli as client, d.dpp, d.ppn, d.kode_vo, d.harga_jual FROM data_vatout d WHERE ${whereProyek} AND (d.tgl_batal IS NULL OR d.tgl_batal = '')`, [projectId, projectId], cb);
 
         queryKeluaran((err, keluaran) => {
             if (err) {
@@ -863,7 +864,7 @@ app.get('/api/project-summary/:id', cekAuth, (req, res) => {
             }
 
             // Query faktur masukan
-            db.all(`SELECT d.tanggal_faktur as tanggal, d.no_faktur as no_faktur, d.nama_penjual as supplier, d.dpp, d.ppn, d.tgl_batal, d.status_faktur FROM data_vatin d WHERE ${whereProyek}`, [projectId, projectId], (err, masukanSemua) => {
+            db.all(`SELECT d.tanggal_faktur as tanggal, d.no_faktur as no_faktur, d.nama_penjual as supplier, d.dpp, d.ppn, d.harga_jual, d.tgl_batal, d.status_faktur FROM data_vatin d WHERE ${whereProyek}`, [projectId, projectId], (err, masukanSemua) => {
                 if (err) {
                     console.error('Error querying data_vatin:', err);
                     return res.status(500).json({ error: 'Database error' });

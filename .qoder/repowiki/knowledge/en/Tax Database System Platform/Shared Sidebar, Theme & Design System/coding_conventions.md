@@ -1,5 +1,0 @@
-- All JavaScript logic is wrapped in an IIFE `(function(){ ... })();` to avoid polluting the global scope, exposing only explicitly needed helpers on `window` (e.g. `window.refreshSidebarYears`, `window.__toggleDarkMode`, `window.toggleSidebarGroup`).
-- Theme state is persisted via `localStorage` keys `theme` and `lastEntitas`, applied immediately by setting `document.documentElement.setAttribute('data-theme', ...)`, which drives all dark-mode CSS through `[data-theme="dark"]` selectors.
-- DOM readiness for asynchronously injected content is handled by observing `document.body` with `MutationObserver({ childList: true, subtree: true })` rather than relying solely on `DOMContentLoaded`.
-- Active/sidebar state is communicated purely through CSS class toggles (`expanded`, `open`, `active`) on `.sidebar-group`, `.sidebar-item-nested`, and `.sidebar-link`, keeping behavior decoupled from styling.
-- Server data is fetched with plain `fetch()` returning JSON, with failures falling back to sensible defaults (current year for VAT-out links, silent error handling for user info).

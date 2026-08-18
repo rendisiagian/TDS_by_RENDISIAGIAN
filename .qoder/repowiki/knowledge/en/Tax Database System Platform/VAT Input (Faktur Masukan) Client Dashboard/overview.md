@@ -1,1 +1,0 @@
-Client-side Indonesian VAT input register providing a paginated invoice dashboard, integrity audit view, and period-over-period summary charts backed by vendor PDF archives.

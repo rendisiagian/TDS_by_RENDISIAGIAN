@@ -1,1 +1,0 @@
-Client-side HTML pages for the Tax Payable (Bukti Potong) module, providing a dashboard table with aggregate stats and an inbox workflow for PDF upload, extraction, and verification of withholding tax documents.

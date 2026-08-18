@@ -14,10 +14,10 @@
 
 ## Update Summary
 **Changes Made**
-- Enhanced `/api/project-summary/:id` endpoint to include JO member allocation data via `porsi_anggota` field
-- Updated multiple aggregation endpoints to exclude cancelled invoices (where `tgl_batal` is set) from statistics
-- Added comprehensive cancelled invoice filtering across VAT OUT queries and dashboard summaries
-- Enhanced project summary response structure with JO-specific allocation handling
+- Enhanced `/api/project-summary/:id` endpoint with JO member allocation support including `porsi_anggota` field for JO projects
+- Added comprehensive cancelled invoice exclusion across all aggregation endpoints using `tgl_batal` filtering
+- Improved real-time Socket.IO event handling for cancellation workflows with proper audit logging and UI updates
+- Updated project summary response structure to include JO-specific allocation data via `porsi_vatout` table joins
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -59,6 +59,7 @@ VATOUT["VAT OUT<br/>data_vatout, item_vatout, inbox_vatout"]
 PAYABLE["Tax Payable (BPPU)<br/>data_payable, inbox_payable"]
 PREPAID["Prepaid Tax (BPPU)<br/>data_prepaid, inbox_prepaid"]
 CLIENTLEDGER["Client Ledger<br/>data_client_ledger"]
+JOALLOCATION["JO Allocation<br/>porsi_vatout"]
 end
 Express --> DB
 SocketIO --> DB
@@ -67,6 +68,7 @@ Express --> VATOUT
 Express --> PAYABLE
 Express --> PREPAID
 Express --> CLIENTLEDGER
+Express --> JOALLOCATION
 ```
 
 **Diagram sources**
@@ -82,6 +84,7 @@ Express --> CLIENTLEDGER
 - Socket.io real-time pipeline: Batch PDF ingestion, staging/finalization, and live UI updates
 - Security middleware: Helmet, session-based auth, rate limiting, and RBAC enforcement
 - Export utilities: CSV/XLSX generation for reporting
+- **Enhanced**: JO member allocation system for Joint Venture projects with member-specific DPP/PPN calculations
 
 **Section sources**
 - [app.js](file://app.js)
@@ -93,6 +96,7 @@ The system integrates REST and WebSocket communication:
 - Socket.io handles asynchronous batch processing and emits live updates
 - Role-based access control ensures secure mutation workflows
 - Audit logging tracks sensitive actions
+- **Enhanced**: Comprehensive cancelled invoice filtering across all statistical aggregations
 
 ```mermaid
 sequenceDiagram
@@ -103,7 +107,7 @@ participant DB as "SQLite"
 Client->>REST : GET /login, POST /login
 REST-->>Client : Session cookie
 Client->>REST : GET /api/... (authenticated)
-REST->>DB : Query/Insert/Update
+REST->>DB : Query/Insert/Update (with cancelled invoice filtering)
 DB-->>REST : Rows/Result
 REST-->>Client : JSON response
 Client->>WS : emit upload-pdf-<module>-batch
@@ -195,6 +199,7 @@ WS-->>Client : emit update-tabel-*, data-baru-*
     - For JO projects (entitas='JO'), joins with `porsi_vatout` table to get member-specific allocations
     - Excludes cancelled invoices where `tgl_batal IS NULL OR tgl_batal = ''`
     - Returns `porsi_anggota` field indicating the JO member code for allocation calculations
+    - Uses COALESCE to handle missing allocation data gracefully
   - **Cancelled Invoice Handling**: Both keluaran and masukan arrays exclude cancelled invoices through SQL filters and grouping logic
 
 **Updated** Enhanced project summary endpoint now supports JO member allocation data and excludes cancelled invoices from aggregations
@@ -391,7 +396,7 @@ SQLite["sqlite3"] --> App
 - Database indexing: Indexes on frequently queried columns (e.g., entitas + tanggal_faktur)
 - Bulk processing: Promise wrappers for safe bulk operations
 - Pagination and debounce: Implemented in module dashboards to reduce load
-- **Cancelled Invoice Optimization**: SQL queries now filter out cancelled invoices at database level using `(d.tgl_batal IS NULL OR d.tgl_batal = '')` conditions
+- **Enhanced**: Cancelled invoice optimization with SQL-level filtering using `(d.tgl_batal IS NULL OR d.tgl_batal = '')` conditions across all aggregation queries
 
 [No sources needed since this section provides general guidance]
 
@@ -416,7 +421,7 @@ Common issues and remedies:
 - Migration verification:
   - Symptom: Missing status/masa_pajak after migration
   - Action: Run verify endpoint and review samples
-- **Cancelled Invoice Issues**:
+- **Enhanced**: Cancelled invoice issues:
   - Symptom: Statistics don't match expected values
   - Cause: Cancelled invoices may be excluded from aggregations
   - Action: Check `tgl_batal` field in database and verify cancellation status
@@ -425,7 +430,7 @@ Common issues and remedies:
 - [app.js](file://app.js)
 
 ## Conclusion
-The TDS system combines REST APIs and Socket.io to support batch ingestion, real-time updates, and comprehensive reporting across tax modules. Secure session-based authentication, RBAC, and audit logging protect sensitive operations. The export utilities enable flexible report generation. **Recent enhancements include improved project summary API with JO member allocation support and comprehensive cancelled invoice exclusion from all statistical aggregations.** For production deployments, monitor rate limits, optimize database queries, and ensure proper file permissions for PDF archival.
+The TDS system combines REST APIs and Socket.io to support batch ingestion, real-time updates, and comprehensive reporting across tax modules. Secure session-based authentication, RBAC, and audit logging protect sensitive operations. The export utilities enable flexible report generation. **Recent enhancements include improved project summary API with JO member allocation support, comprehensive cancelled invoice exclusion from all statistical aggregations, and enhanced real-time Socket.IO event handling for cancellation workflows.** For production deployments, monitor rate limits, optimize database queries, and ensure proper file permissions for PDF archival.
 
 [No sources needed since this section summarizes without analyzing specific files]
 
@@ -448,10 +453,11 @@ The TDS system combines REST APIs and Socket.io to support batch ingestion, real
   - After verifying staging, emit simpan-final-<module> with required metadata
 - Export:
   - Use exportTableData with CSV or Excel format to produce downloadable reports
-- **Project Summary Usage**:
+- **Enhanced**: Project Summary Usage:
   - Call `/api/project-summary/:id` to get project data with JO member allocations
   - Handle `porsi_anggota` field for JO-specific allocation calculations
   - Note that cancelled invoices are automatically excluded from results
+  - For JO projects, use the returned member code to query specific allocations
 
 **Section sources**
 - [vat_in/dashboard_vatin.html](file://vat_in/dashboard_vatin.html)
@@ -469,12 +475,36 @@ The system now consistently excludes cancelled invoices from all statistical agg
   - `/api/dashboard-summary` - All module totals and recent items
   - `/api/prepaid-comparison*` - VAT OUT comparisons
   - Module-specific dashboards and summaries
+- **Real-time Updates**: Socket.IO events properly handle cancellation workflow changes
 
 **Section sources**
 - [app.js:852-857](file://app.js#L852-L857)
 - [app.js:872-885](file://app.js#L872-L885)
-- [app.js:1245-1246](file://app.js#L1245-L1246)
-- [app.js:1294](file://app.js#L1294)
+- [app.js:1040](file://app.js#L1040)
 - [app.js:949](file://app.js#L949)
 - [app.js:994](file://app.js#L994)
-- [app.js:1022](file://app.js#L1022)
+
+### JO Member Allocation System
+The enhanced project summary endpoint now supports Joint Venture member allocation:
+
+- **Database Schema**: `porsi_vatout` table stores member-specific DPP/PPN allocations
+- **Query Logic**: LEFT JOIN with `porsi_vatout` table using member code matching
+- **Response Enhancement**: `porsi_anggota` field indicates active member for allocation calculations
+- **Fallback Handling**: COALESCE ensures zero values when allocations are missing
+- **Use Cases**: Enables accurate tax reporting for JO projects with multiple members
+
+**Section sources**
+- [app.js:847-852](file://app.js#L847-L852)
+- [app.js:890-891](file://app.js#L890-L891)
+
+### Socket.IO Cancellation Workflow
+Enhanced real-time handling for invoice cancellation and reactivation:
+
+- **Event Processing**: `BATAL` and `AKTIFKAN` actions update `tgl_batal` field
+- **Audit Logging**: Complete audit trail for all cancellation activities
+- **Real-time Updates**: Proper emission of `data-baru-*` events for affected modules
+- **Validation**: Required date validation for cancellation actions
+- **RBAC**: Supervisor-only permission for cancellation operations
+
+**Section sources**
+- [app.js:2016-2035](file://app.js#L2016-L2035)

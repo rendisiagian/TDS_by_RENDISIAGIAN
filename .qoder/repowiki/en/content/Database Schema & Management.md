@@ -74,7 +74,7 @@ PAG --> DBF
 - Pagination: Server-side LIMIT/OFFSET applied to high-volume tables.
 - Audit Trail: Immutable audit logs capture all data mutations.
 - Backup: Scheduled backups via Cron Job for disaster recovery.
-- **Invoice Cancellation Tracking**: New `tgl_batal` column enables systematic tracking of cancelled invoices across VAT IN/OUT modules.
+- **Invoice Cancellation Tracking**: New `tgl_batal` column enables systematic tracking of cancelled invoices across VAT IN/OUT modules with supervisor approval workflow.
 - **JO Member Allocation**: Enhanced porsi_vatout table with composite primary keys enables granular financial tracking per JO member while maintaining legal invoice validity under JO name.
 
 **Section sources**
@@ -482,7 +482,7 @@ MASTER_CABANG ||--o{ PORSI_VATOUT : "member identity"
 
 **Section sources**
 - [export.js:1-50](file://export.js#L1-L50)
-- [TDS_Sequence_Diagram.md:202-206](file://TDS_Sequence_Diagram.md#L202-L206)
+- [TDS_Sequence_Diagram.md:202-206](file://TDS_Sequence_Diagram.md#L202-206)
 - [app.js:847-852](file://app.js#L847-L852)
 
 ### API Endpoints for Invoice Cancellation and Porsi Management
@@ -572,7 +572,7 @@ The TDS database system employs a robust SQLite schema with clear separation of 
 **Section sources**
 - [PRD_Tax_Database_System.md:12-20](file://PRD_Tax_Database_System.md#L12-L20)
 - [PRD_Tax_Database_System.md:114-160](file://PRD_Tax_Database_System.md#L114-L160)
-- [TDS_Sequence_Diagram.md:202-206](file://TDS_Sequence_Diagram.md#L202-L206)
+- [TDS_Sequence_Diagram.md:202-206](file://TDS_Sequence_Diagram.md#L202-206)
 
 ### Invoice Cancellation Technical Details
 - **Column Addition**: `tgl_batal DATE` column added to both `data_vatin` and `data_vatout` tables
