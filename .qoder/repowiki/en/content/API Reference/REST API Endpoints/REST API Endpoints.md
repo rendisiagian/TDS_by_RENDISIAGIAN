@@ -3,14 +3,17 @@
 <cite>
 **Referenced Files in This Document**
 - [app.js](file://app.js)
-- [TDS_Sequence_Diagram.md](file://TDS_Sequence_Diagram.md)
+- [taxprojectreport.html](file://taxprojectreport.html)
+- [dashboard_vatout.html](file://vat_out/dashboard_vatout.html)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Added new `/api/porsi-vatout/:faktur` endpoint for retrieving internal portion records supporting edit and view operations
-- Enhanced `/api/project-summary/:id` endpoint to include `porsi_anggota` field for JO member perspective display
-- Added `/api/prepaid-comparison-bulk` endpoint for bulk comparison functionality replacing inefficient per-item queries
+- Enhanced `/api/project-summary/:id` endpoint with JO member allocation support and new `harga_jual_porsi` calculated field
+- Added comprehensive JO project handling with proportional revenue splitting based on internal portion records
+- Improved financial calculations for joint venture projects with member-specific DPP/PPN allocation
+- Enhanced response structure with `porsi_anggota` field for JO member perspective display
+- Updated frontend integration to support JO member allocation workflows
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -215,13 +218,20 @@ API-->>Client : "JSON Response"
   - Auth: cekAuth
   - Path: id (required)
   - Response: Aggregated financial summary across related modules
-  - **Updated**: Now includes `porsi_anggota` field for JO member perspective display when dealing with JO projects
-  - Notes: Cross-module aggregation for reporting with enhanced JO project support
+  - **Enhanced**: Now includes comprehensive JO member allocation support with proportional revenue splitting
+  - **New Fields**: 
+    - `harga_jual_porsi`: Calculated proportional selling price for JO members
+    - `porsi_anggota`: JO member identifier for member-specific perspective
+    - Enhanced DPP/PPN allocation based on internal portion records
+  - **JO Project Support**: Automatically detects JO projects and applies member-specific calculations
+  - Notes: Cross-module aggregation for reporting with advanced JO project support and financial calculations
+
+**Updated** The project summary endpoint now provides sophisticated joint venture project handling with proportional revenue distribution among JO members.
 
 **Section sources**
 - [app.js:817-823](file://app.js#L817-L823)
 - [app.js:825-831](file://app.js#L825-L831)
-- [app.js:833-874](file://app.js#L833-L874)
+- [app.js:833-896](file://app.js#L833-L896)
 
 ### Internal Portion Management APIs
 - Endpoint: GET /api/porsi-vatout/:faktur
@@ -422,20 +432,22 @@ Routes --> Export["Export Utils"]
 - Pagination and debounced SQL logic are used for data-vatin listings to reduce load.
 - Indexes are created on frequently queried columns to improve query performance.
 - Rate limiting is applied to login attempts to mitigate brute-force attacks.
-- **Updated**: New bulk comparison endpoint (`/api/prepaid-comparison-bulk`) replaces N+1 query patterns for improved performance.
-- **Updated**: Internal portion management reduces redundant database calls for JO member calculations.
+- **Enhanced**: New bulk comparison endpoint (`/api/prepaid-comparison-bulk`) replaces N+1 query patterns for improved performance.
+- **Enhanced**: Internal portion management reduces redundant database calls for JO member calculations.
+- **Optimized**: JO project queries use efficient LEFT JOINs with portion allocation tables for proportional revenue splitting.
 
 Practical tips:
 - Prefer filtered queries with appropriate LIMIT/OFFSET for large datasets.
 - Use entity and branch filters to minimize result sets.
 - Leverage export endpoints for bulk operations instead of repeated GET calls.
 - Use bulk comparison endpoints for better performance when processing multiple prepaid items.
+- For JO projects, utilize the enhanced project summary endpoint for accurate proportional revenue calculations.
 
 **Section sources**
-- [TDS_Sequence_Diagram.md:107-108](file://TDS_Sequence_Diagram.md#L107-L108)
 - [app.js:485-499](file://app.js#L485-L499)
 - [app.js:91-97](file://app.js#L91-L97)
 - [app.js:966-1013](file://app.js#L966-L1013)
+- [app.js:833-896](file://app.js#L833-L896)
 
 ## Troubleshooting Guide
 Common errors and resolutions:
@@ -448,6 +460,7 @@ Operational checks:
 - Validate that static HTML protection prevents direct access to .html files.
 - Review audit logs for mutation events and approval trails.
 - Monitor bulk comparison endpoints for performance improvements over individual queries.
+- **JO Project Issues**: Verify that `porsi_vatout` table contains proper allocation records for JO member calculations.
 
 **Section sources**
 - [app.js:504-512](file://app.js#L504-L512)
@@ -455,4 +468,4 @@ Operational checks:
 - [app.js:375-379](file://app.js#L375-L379)
 
 ## Conclusion
-The TDS REST API provides comprehensive coverage for master data, audit logs, migrations, project management, items, details, and auxiliary APIs, along with robust authentication and export capabilities. Recent enhancements include improved performance through bulk comparison operations and enhanced JO project support with internal portion management. Adhering to the documented authentication and authorization requirements ensures secure and reliable access to system resources. For production usage, follow the parameter specifications and response formats outlined above, and leverage the optimized endpoints for efficient reporting workflows.
+The TDS REST API provides comprehensive coverage for master data, audit logs, migrations, project management, items, details, and auxiliary APIs, along with robust authentication and export capabilities. Recent enhancements include improved performance through bulk comparison operations and significantly enhanced JO project support with sophisticated member allocation and proportional revenue splitting capabilities. The enhanced `/api/project-summary/:id` endpoint now provides accurate financial calculations for joint venture projects with member-specific DPP/PPN allocation and proportional selling price calculations. Adhering to the documented authentication and authorization requirements ensures secure and reliable access to system resources. For production usage, follow the parameter specifications and response formats outlined above, and leverage the optimized endpoints for efficient reporting workflows.

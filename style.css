@@ -1235,6 +1235,17 @@ textarea:focus {
     vertical-align: middle;
 }
 
+/* FIX: Tabel summary (#tabel-summary) memakai thead dua baris. Aturan global `th { top: 0 }`
+   membuat baris ke-2 (Jml Dokumen / Total PPN) ikut bergerak saat scroll karena memperebutkan
+   offset 0 dengan baris ke-1. Paku baris ke-2 tepat di bawah baris ke-1 (sama seperti konvensi
+   .filter-row th { top: 36px } pada tabel dashboard).
+   border-top: garis pemisah antar-baris header digambar oleh baris ke-2 (elemen yang sticky),
+   bukan mengandalkan border-bottom baris ke-1, agar garis tetap terlihat saat scroll. */
+#tabel-summary thead tr:nth-child(2) th {
+    top: 36px;
+    border-top: 1px solid var(--border-color);
+}
+
 /* Drag and Drop */
 .drop-zone {
     border: 2px dashed var(--primary-500);

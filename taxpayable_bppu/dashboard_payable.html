@@ -292,10 +292,10 @@
             const isSupervisor = ['supervisor', 'administrator'].includes(userRole);
             
             if (actionType === 'DELETE') {
-                showConfirm(isSupervisor ? `Konfirmasi HAPUS BPPU ${noBppu}?` : `Ajukan penghapusan BPPU ${noBppu} ke Supervisor?`, function() {
+                showConfirm(isSupervisor ? `Kembalikan BPPU ${noBppu} ke Inbox untuk verifikasi ulang?` : `Ajukan pengembalian BPPU ${noBppu} ke Inbox ke Supervisor?`, function() {
                     socket.emit('request-action-faktur', { action: 'DELETE', mod: 'payable', faktur: noBppu, id_user: currentUser.id, username: currentUser.username, role: currentUser.role });
-                    if(!isSupervisor) showToast('Permintaan hapus diajukan.', 'info');
-                }, { title: 'Hapus BPPU', danger: true });
+                    if(!isSupervisor) showToast('Permintaan pengembalian ke inbox diajukan.', 'info');
+                }, { title: 'Kembalikan ke Inbox', danger: true });
             } else if (actionType === 'EDIT') {
                 targetEditFaktur = noBppu;
                 document.getElementById('edit-faktur-title').innerText = noBppu;

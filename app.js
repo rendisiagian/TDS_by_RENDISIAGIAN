@@ -1038,7 +1038,9 @@ app.get('/api/prepaid-comparison-bulk', cekAuth, (req, res) => {
 // API: Summary Prepaid Tax
 app.get('/api/summary-prepaid', cekAuth, (req, res) => {
     const entitas = req.query.entitas || 'BBS';
-    db.all(`SELECT v.no_faktur, v.tanggal_faktur, strftime('%d-%m-%Y', v.tanggal_faktur) AS tanggal_faktur_format, strftime('%m-%Y', v.tanggal_faktur) AS masa_pajak_faktur, d.masa_pajak AS masa_pajak_bppu, COUNT(*) AS jumlah_bppu, COALESCE(SUM(d.dpp), 0) AS total_dpp, COALESCE(SUM(d.nilai_pph), 0) AS total_pph FROM data_prepaid d LEFT JOIN data_vatout v ON d.no_invoice_internal = v.no_invoice_internal AND d.entitas = v.entitas AND (v.tgl_batal IS NULL OR v.tgl_batal = '') WHERE d.entitas = ? GROUP BY v.no_faktur, v.tanggal_faktur, d.masa_pajak ORDER BY v.tanggal_faktur DESC, d.masa_pajak`, [entitas], (err, rows) => {
+    // FIX: JOIN dibatasi maksimal 1 faktur per invoice (faktur efektif: Pengganti > Normal, terbaru menang)
+    // agar jumlah_bppu/total_dpp/total_pph tidak ter-fan-out saat satu invoice punya >1 faktur aktif
+    db.all(`SELECT v.no_faktur, v.tanggal_faktur, strftime('%d-%m-%Y', v.tanggal_faktur) AS tanggal_faktur_format, strftime('%m-%Y', v.tanggal_faktur) AS masa_pajak_faktur, d.masa_pajak AS masa_pajak_bppu, COUNT(*) AS jumlah_bppu, COALESCE(SUM(d.dpp), 0) AS total_dpp, COALESCE(SUM(d.nilai_pph), 0) AS total_pph FROM data_prepaid d LEFT JOIN data_vatout v ON v.no_faktur = (SELECT v2.no_faktur FROM data_vatout v2 WHERE v2.no_invoice_internal = d.no_invoice_internal AND v2.entitas = d.entitas AND (v2.tgl_batal IS NULL OR v2.tgl_batal = '') ORDER BY CASE WHEN v2.status_faktur LIKE 'Pengganti%' THEN 10 + CAST(SUBSTR(v2.status_faktur, 11) AS INTEGER) ELSE 1 END DESC, v2.waktu_input DESC LIMIT 1) WHERE d.entitas = ? GROUP BY v.no_faktur, v.tanggal_faktur, d.masa_pajak ORDER BY v.tanggal_faktur DESC, d.masa_pajak`, [entitas], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows || []);
     });
@@ -1142,7 +1144,9 @@ modules.forEach(mod => {
         let baseSql = mod.id.startsWith('vat')
             ? `FROM data_${mod.id} d LEFT JOIN master_cabang c ON d.kode_cabang = c.kode_cabang WHERE d.entitas = ?`
             : mod.id === 'prepaid'
-            ? `FROM data_${mod.id} d LEFT JOIN master_cabang c ON d.kode_cabang = c.kode_cabang LEFT JOIN data_vatout v ON d.no_invoice_internal = v.no_invoice_internal AND d.entitas = v.entitas AND (v.tgl_batal IS NULL OR v.tgl_batal = '') WHERE d.entitas = ?`
+            // FIX: JOIN dibatasi maksimal 1 faktur per invoice (faktur efektif: Pengganti > Normal, terbaru menang)
+            // agar COUNT/SUM statistik dan tampilan tidak ter-fan-out saat satu invoice punya >1 faktur aktif
+            ? `FROM data_${mod.id} d LEFT JOIN master_cabang c ON d.kode_cabang = c.kode_cabang LEFT JOIN data_vatout v ON v.no_faktur = (SELECT v2.no_faktur FROM data_vatout v2 WHERE v2.no_invoice_internal = d.no_invoice_internal AND v2.entitas = d.entitas AND (v2.tgl_batal IS NULL OR v2.tgl_batal = '') ORDER BY CASE WHEN v2.status_faktur LIKE 'Pengganti%' THEN 10 + CAST(SUBSTR(v2.status_faktur, 11) AS INTEGER) ELSE 1 END DESC, v2.waktu_input DESC LIMIT 1) WHERE d.entitas = ?`
             : `FROM data_${mod.id} d LEFT JOIN master_cabang c ON d.kode_cabang = c.kode_cabang WHERE d.entitas = ?`;
 
         let params = [entitas];
@@ -1528,7 +1532,10 @@ app.get('/api/dashboard-summary', cekAuth, (req, res) => {
 app.get('/api/summary', cekAuth, (req, res) => {
     const ent = req.query.entitas || 'BBS';
 
-    const sqlAll = `SELECT no_faktur, no_faktur_normal, status_faktur, tgl_tukar_faktur, tanggal_faktur, ppn, waktu_input, masa_pajak FROM data_vatin WHERE entitas = ?`;
+    // FIX (BUG-1): Sertakan kolom tgl_batal agar deduplicateFakturData() dapat
+    // mengecualikan faktur yang dibatalkan dari rekapitulasi (konsisten dengan Dashboard
+    // dan aturan "Faktur yang dibatalkan tidak dihitung dalam seluruh rekapitulasi DPP/PPN").
+    const sqlAll = `SELECT no_faktur, no_faktur_normal, status_faktur, tgl_tukar_faktur, tanggal_faktur, ppn, waktu_input, masa_pajak, tgl_batal FROM data_vatin WHERE entitas = ?`;
     
     db.all(sqlAll, [ent], (err, allRows) => {
         if (err) {
@@ -1743,14 +1750,18 @@ app.get('/api/available-vatout', cekAuth, (req, res) => {
 
     const sql = `
         SELECT d.no_faktur, d.nama_pembeli, d.harga_jual, d.dpp, d.ppn, d.no_invoice_internal, 
+               d.status_faktur, d.waktu_input, d.tgl_batal,
                strftime('%d-%m-%Y', d.tanggal_faktur) AS tanggal_format
         FROM data_vatout d 
-        WHERE d.entitas = ?
+        WHERE d.entitas = ? AND (d.tgl_batal IS NULL OR d.tgl_batal = '')
         ORDER BY d.waktu_input DESC
     `;
 
     db.all(sql, [entitas], (err, vatoutRows) => {
         if (err) return res.json([]);
+        // ATURAN DEDUP: faktur yg sudah digantikan (Normal/Pengganti lama) tidak ditawarkan lagi;
+        // ranking sama dgn agregasi VAT (Pengganti tertinggi menang, tiebreak waktu_input).
+        const activeRows = deduplicateFakturData(vatoutRows || []);
 
         let usedSql = mode === 'ledger'
             ? `SELECT inv_no AS used_ref FROM data_client_ledger WHERE inv_no IS NOT NULL AND inv_no != '' AND inv_no != '-'`
@@ -1770,7 +1781,7 @@ app.get('/api/available-vatout', cekAuth, (req, res) => {
                 }
             });
 
-            const result = vatoutRows.filter(row => {
+            const result = activeRows.filter(row => {
                 // Jangan tampilkan faktur yang sudah dipakai di list
                 return !(usedInvoices.has(row.no_faktur) || usedInvoices.has(row.no_invoice_internal));
             }).map(row => ({
@@ -1910,6 +1921,41 @@ io.on('connection', (socket) => {
         fsPromises.unlink(path.join(__dirname, modInfo.archive, path.basename(linkPdf))).catch(() => {});
     };
 
+    // Modul BPPU (prepaid/payable) tidak dihapus permanen dari dashboard: dokumen dikembalikan
+    // ke inbox untuk verifikasi ulang. Arsip PDF dipertahankan karena dipakai kembali oleh baris inbox.
+    // Field yang tidak tersimpan di tabel data_* (npwp lawan transaksi, kode pajak, jenis dokumen)
+    // dikembalikan sebagai '-' agar dilengkapi ulang lewat modal Review & Lengkapi.
+    const kembalikanBppuKeInbox = (modId, noBppu, userId, username) => {
+        db.get(`SELECT * FROM data_${modId} WHERE no_bppu = ?`, [noBppu], (err, row) => {
+            if (err || !row) return;
+            const namaKey = modId === 'prepaid' ? 'namaPemotong' : 'namaDipotong';
+            const namaCol = modId === 'prepaid' ? 'nama_pemotong' : 'nama_dipotong';
+            const npwpCol = modId === 'prepaid' ? 'npwp_pemotong' : 'npwp_dipotong';
+            db.serialize(() => {
+                db.run(`DELETE FROM data_${modId} WHERE no_bppu = ?`, [noBppu]);
+                // Cegah baris antrean ganda bila inbox sudah punya dokumen yang sama
+                db.get(`SELECT 1 FROM inbox_${modId} WHERE data_ekstraksi LIKE ?`, [`%"noBppu":"${noBppu}"%`], (errDup, ada) => {
+                    if (!ada) {
+                        const ekstraksi = {
+                            noBppu: row.no_bppu, masaPajak: row.masa_pajak,
+                            [namaKey]: row[namaCol] || '-',
+                            npwpLawan: row[npwpCol] || '-', kodePajak: '-',
+                            dpp: row.dpp, pph: row.nilai_pph, tarif: row.tarif,
+                            jenisDokumen: '-', tanggalDokumen: row.tanggal_dokumen || '-',
+                            nomorDokumen: row.nomor_dokumen || '-',
+                            link_pdf_lokal: row.link_pdf_lokal, entitas: row.entitas
+                        };
+                        db.run(`INSERT INTO inbox_${modId} (entitas, link_pdf_lokal, diinput_oleh, data_ekstraksi) VALUES (?, ?, ?, ?)`,
+                            [row.entitas, row.link_pdf_lokal, row.diinput_oleh, JSON.stringify(ekstraksi)]);
+                    }
+                    insertAuditLog(userId, username, 'HAPUS', modId.toUpperCase(), `Supervisor menghapus BPPU ${noBppu} dari dashboard (dikembalikan ke inbox ${modId} untuk verifikasi ulang)`);
+                    io.emit(`data-baru-${modId}`);
+                    io.emit(`update-tabel-${modId}`);
+                });
+            });
+        });
+    };
+
     const getRole = (socket) => (socket.user?.role || '').toLowerCase();
     const isAdministrator = (socket) => ['administrator', 'superadmin'].includes(getRole(socket));
     const isSupervisorOrAbove = (socket) => ['supervisor', 'administrator', 'superadmin'].includes(getRole(socket));
@@ -1938,21 +1984,24 @@ io.on('connection', (socket) => {
 
         if (d.action === 'DELETE') {
             if (isSupervisor) {
-                // FIX: ambil path arsip PDF sebelum baris dihapus agar file fisiknya ikut dibersihkan
-                db.get(`SELECT link_pdf_lokal FROM data_${d.mod} WHERE ${pkColumn} = ?`, [d.faktur], (errFile, fileRow) => {
-                    db.serialize(() => {
-                        db.run(`DELETE FROM data_${d.mod} WHERE ${pkColumn} = ?`, [d.faktur]);
-                        if (!isBPPU) {
+                if (isBPPU) {
+                    // BPPU tidak dihapus permanen: dikembalikan ke inbox untuk verifikasi ulang
+                    kembalikanBppuKeInbox(d.mod, d.faktur, socket.user.id, socket.user.username);
+                } else {
+                    // FIX: ambil path arsip PDF sebelum baris dihapus agar file fisiknya ikut dibersihkan
+                    db.get(`SELECT link_pdf_lokal FROM data_${d.mod} WHERE ${pkColumn} = ?`, [d.faktur], (errFile, fileRow) => {
+                        db.serialize(() => {
+                            db.run(`DELETE FROM data_${d.mod} WHERE ${pkColumn} = ?`, [d.faktur]);
                             db.run(`DELETE FROM item_${d.mod} WHERE no_faktur = ?`, [d.faktur]);
-                        }
-                        if (d.mod === 'vatout') {
-                            db.run(`DELETE FROM porsi_vatout WHERE no_faktur = ?`, [d.faktur]);
-                        }
-                        insertAuditLog(socket.user.id, socket.user.username, 'HAPUS', d.mod.toUpperCase(), `Supervisor menghapus data ${d.mod}: ${d.faktur}`);
-                        io.emit(`data-baru-${d.mod}`);
+                            if (d.mod === 'vatout') {
+                                db.run(`DELETE FROM porsi_vatout WHERE no_faktur = ?`, [d.faktur]);
+                            }
+                            insertAuditLog(socket.user.id, socket.user.username, 'HAPUS', d.mod.toUpperCase(), `Supervisor menghapus data ${d.mod}: ${d.faktur}`);
+                            io.emit(`data-baru-${d.mod}`);
+                        });
+                        hapusArsipFisik(d.mod, fileRow ? fileRow.link_pdf_lokal : null);
                     });
-                    hapusArsipFisik(d.mod, fileRow ? fileRow.link_pdf_lokal : null);
-                });
+                }
             } else {
                 db.run(`INSERT INTO user_requests (user_id, username, jenis_request, nilai_baru) VALUES (?, ?, ?, ?)`,
                     [d.id_user, d.username, `HAPUS_${d.mod.toUpperCase()}`, d.faktur], () => io.emit('request-updated'));
@@ -2886,26 +2935,28 @@ io.on('connection', (socket) => {
                     let isBPPU = (targetMod === 'payable' || targetMod === 'prepaid');
                     let colKey = isBPPU ? 'no_bppu' : 'no_faktur';
 
-                    // FIX: ambil path arsip PDF sebelum baris dihapus agar file fisiknya ikut dibersihkan
-                    db.get(`SELECT link_pdf_lokal FROM data_${targetMod} WHERE ${colKey} = ?`, [req.nilai_baru], (errFile, fileRow) => {
-                    db.run(`DELETE FROM data_${targetMod} WHERE ${colKey} = ?`, [req.nilai_baru], () => {
-                        hapusArsipFisik(targetMod, fileRow ? fileRow.link_pdf_lokal : null);
-                        if (!isBPPU) {
-                            db.run(`DELETE FROM item_${targetMod} WHERE no_faktur = ?`, [req.nilai_baru], () => {
-                                if (targetMod === 'vatout') {
-                                    db.run(`DELETE FROM porsi_vatout WHERE no_faktur = ?`, [req.nilai_baru]);
-                                }
-                                db.run(`UPDATE user_requests SET status = 'Disetujui' WHERE id = ?`, [d.req_id], () => {
-                                    io.emit('request-updated'); io.emit(`data-baru-${targetMod}`);
+                    if (isBPPU) {
+                        // BPPU tidak dihapus permanen: dikembalikan ke inbox untuk verifikasi ulang
+                        kembalikanBppuKeInbox(targetMod, req.nilai_baru, socket.user.id, socket.user.username);
+                        db.run(`UPDATE user_requests SET status = 'Disetujui' WHERE id = ?`, [d.req_id], () => {
+                            io.emit('request-updated'); io.emit(`data-baru-${targetMod}`);
+                        });
+                    } else {
+                        // FIX: ambil path arsip PDF sebelum baris dihapus agar file fisiknya ikut dibersihkan
+                        db.get(`SELECT link_pdf_lokal FROM data_${targetMod} WHERE ${colKey} = ?`, [req.nilai_baru], (errFile, fileRow) => {
+                            db.run(`DELETE FROM data_${targetMod} WHERE ${colKey} = ?`, [req.nilai_baru], () => {
+                                hapusArsipFisik(targetMod, fileRow ? fileRow.link_pdf_lokal : null);
+                                db.run(`DELETE FROM item_${targetMod} WHERE no_faktur = ?`, [req.nilai_baru], () => {
+                                    if (targetMod === 'vatout') {
+                                        db.run(`DELETE FROM porsi_vatout WHERE no_faktur = ?`, [req.nilai_baru]);
+                                    }
+                                    db.run(`UPDATE user_requests SET status = 'Disetujui' WHERE id = ?`, [d.req_id], () => {
+                                        io.emit('request-updated'); io.emit(`data-baru-${targetMod}`);
+                                    });
                                 });
                             });
-                        } else {
-                            db.run(`UPDATE user_requests SET status = 'Disetujui' WHERE id = ?`, [d.req_id], () => {
-                                io.emit('request-updated'); io.emit(`data-baru-${targetMod}`);
-                            });
-                        }
-                    });
-                    });
+                        });
+                    }
                 }
                 else if (req.jenis_request.startsWith('EDIT_')) {
                     let targetMod = req.jenis_request.split('_')[1].toLowerCase();

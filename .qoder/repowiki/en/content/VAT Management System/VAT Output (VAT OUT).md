@@ -16,12 +16,11 @@
 
 ## Update Summary
 **Changes Made**
-- Added comprehensive invoice cancellation system with `tgl_batal` column for audit trail preservation
-- Enhanced JO member allocation tracking via dedicated `porsi_vatout` table with real-time percentage calculations
-- Upgraded project summary API to handle JO projects differently by fetching VAT out income portions from porsi_vatout table
-- Integrated comprehensive audit trail system with user request workflow for cancellations and reactivations
-- Implemented visual indicators for cancelled invoices with reduced opacity and status badges
-- Enhanced validation mechanisms for JO portion allocations with automatic warnings when totals don't match
+- Enhanced VAT OUT dashboard with improved modal interface for JO member allocations
+- Added new 'Harga Jual Porsi' column showing proportional selling price calculations for JO members
+- Implemented advanced Indonesian number formatting with parseAngkaPorsi and formatAngkaPorsi functions
+- Enhanced real-time calculation updates with automatic percentage calculations and validation feedback
+- Improved input sanitization and error handling for JO portion allocations
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -37,7 +36,7 @@
 ## Introduction
 This document provides comprehensive documentation for the VAT Output (VAT OUT) management module. It covers transaction management workflows for invoice generation, customer billing, and tax calculation; inbox processing for managing incoming VAT output requests, approvals, and status tracking; summary reporting for VAT output analysis, compliance reporting, and financial reconciliation; and user interface components for VAT output processing, customer management integration, and transaction monitoring. It also explains VAT liability calculations, output tax handling, regulatory compliance requirements, practical processing examples, integration scenarios with customer management, and troubleshooting guidance for VAT output-related issues.
 
-**Updated** The system now features comprehensive invoice cancellation capabilities with mandatory audit trails, enhanced JO member allocation system with precise portion tracking, and improved project summary API for accurate revenue attribution in joint venture scenarios. The complete invoice lifecycle is supported including cancellation, reactivation, and detailed audit logging while maintaining data integrity across all reporting modules.
+**Updated** The system now features an enhanced VAT OUT dashboard with improved modal interface for JO member allocations, including a new 'Harga Jual Porsi' column that displays proportional selling price calculations. The system includes advanced Indonesian number formatting capabilities with parseAngkaPorsi and formatAngkaPorsi functions, real-time calculation updates with automatic percentage calculations, and comprehensive validation mechanisms for JO portion allocations.
 
 ## Project Structure
 The VAT OUT module consists of three primary HTML pages under the vat_out directory and supporting backend endpoints in the application server. The backend integrates with database tables for VAT OUT transactions, manages PDF attachments, and exposes APIs for dashboards and summaries. Customer and branch master data are integrated via dedicated pages for contact and branch management. The system includes specialized support for JO (Joint Venture) internal distribution tracking and comprehensive invoice cancellation functionality with audit trail support.
@@ -88,15 +87,16 @@ AL --> APP
   - The VAT OUT module uses a header table for transaction records with comprehensive cancellation tracking via `tgl_batal` column. Fields include invoice number, entity, branch code, project ID, vendor/customer identifiers, invoice date, amounts (DPP and PPN), references, issuing location, signatory, internal invoice number, exchange date, format type, PDF link, input user, timestamp, and cancellation date. These fields support complete invoice lifecycle management including cancellation, reactivation, and detailed audit trails.
 - **Advanced JO Internal Distribution Tracking**
   - **Enhanced**: Dedicated `porsi_vatout` table tracks portion allocations per JO member (BBS/BMP) for joint venture invoices with fields: `no_faktur`, `anggota` (member identifier), `dpp_porsi` (portion of taxable value), `ppn_porsi` (portion of output tax). This enables precise attribution of VAT output income to specific JV partners while maintaining the original invoice structure.
-  - Supports real-time percentage calculations and validation during editing with automatic warnings when allocated portions don't match invoice totals.
-  - Integrates with project reporting to show member-specific income portions with clear indicators.
+  - **New**: Enhanced modal interface with 'Harga Jual Porsi' column that automatically calculates proportional selling prices based on DPP allocations using the formula: `harga_jual * (dpp_porsi / dpp_total)`.
+  - **Enhanced**: Advanced Indonesian number formatting with parseAngkaPorsi and formatAngkaPorsi functions that handle both dot and comma separators, decimal precision preservation, and proper thousand separators.
+  - **Enhanced**: Real-time calculation updates with automatic percentage calculations, color-coded validation feedback, and comprehensive error handling.
 - **Comprehensive Invoice Cancellation System**
-  - **New**: Complete cancellation functionality allowing users to cancel invoices with mandatory cancellation dates and audit trail preservation.
+  - Complete cancellation functionality allowing users to cancel invoices with mandatory cancellation dates and audit trail preservation.
   - Supports invoice reactivation through approval workflow with proper status updates.
   - Automatically excludes cancelled invoices from all statistical calculations, trend analysis, and reporting.
   - Maintains audit trail by preserving cancelled invoices with visual indicators in the UI.
 - **Enhanced Audit Trail Integration**
-  - **New**: Comprehensive audit logging system that records all cancellation and reactivation activities with timestamps, user information, and action details.
+  - Comprehensive audit logging system that records all cancellation and reactivation activities with timestamps, user information, and action details.
   - Real-time audit log viewing through dedicated audit logs page with filtering and search capabilities.
   - Integration with user request system for approval workflow management.
 - **Backend Endpoints**
@@ -106,11 +106,11 @@ AL --> APP
   - PDF Attachment Management: Handles saving, renaming, and cleanup of PDF attachments associated with VAT OUT records.
   - Invoice Action Processing: Socket-based processing for cancellation, reactivation, and edit requests with approval workflow.
 - **UI Pages**
-  - Dashboard: Provides overview metrics and navigation for VAT OUT operations with JO portion editing capabilities and cancellation controls.
+  - Dashboard: Provides overview metrics and navigation for VAT OUT operations with enhanced JO portion editing interface featuring real-time calculations and validation.
   - Inbox: Manages incoming VAT OUT requests, approvals, and status tracking with enhanced filtering and search capabilities.
   - Summary: Delivers analytical reports for VAT output analysis, compliance, and reconciliation with cancelled invoice exclusion.
 
-**Updated** Enhanced with comprehensive invoice cancellation capabilities, improved JO internal distribution tracking system, automated status migration capabilities, and integrated audit trail system.
+**Updated** Enhanced with comprehensive invoice cancellation capabilities, improved JO internal distribution tracking system with advanced modal interface, automated status migration capabilities, and integrated audit trail system.
 
 **Section sources**
 - [PRD_Tax_Database_System.md:34-49](file://PRD_Tax_Database_System.md#L34-L49)
@@ -214,11 +214,12 @@ AuditLog --> End(["Complete"])
   - Dedicated `porsi_vatout` table stores portion allocations with fields: `no_faktur`, `anggota` (member identifier), `dpp_porsi` (portion of taxable value), `ppn_porsi` (portion of output tax).
   - Primary key ensures unique allocation per invoice and member combination with composite indexing.
   - Supports BBS and BMP as standard JO member identifiers with validation and sanitization.
-- **Real-time Editing Interface**
-  - Dashboard edit modal includes dedicated section for JO portion allocation when entity is 'JO'.
-  - Automatic percentage calculation based on total DPP and PPN values with live updates and color-coded feedback.
-  - Validation warnings when allocated portions don't match invoice totals with visual indicators.
-  - Input sanitization prevents invalid member identifiers and numeric overflow with error handling.
+- **Enhanced Modal Interface with Real-time Calculations**
+  - **New**: Dashboard edit modal includes dedicated section for JO portion allocation when entity is 'JO' with enhanced user experience.
+  - **New**: 'Harga Jual Porsi' column automatically calculates proportional selling prices using the formula: `editHjTotal * (dpp / editDppTotal)` for each member.
+  - **Enhanced**: Advanced Indonesian number formatting with parseAngkaPorsi function that handles multiple input formats (dot/comma separators, decimal precision).
+  - **Enhanced**: Real-time percentage calculations with live updates and color-coded validation feedback showing green for valid totals and orange for warnings.
+  - **Enhanced**: Input sanitization prevents invalid member identifiers and numeric overflow with comprehensive error handling.
 - **Enhanced Project Summary API**
   - Detects JO projects by checking `entitas = 'JO'` in master_cabang table.
   - For JO projects, queries `data_vatout` joined with `porsi_vatout` using specific member filter.
@@ -230,11 +231,12 @@ AuditLog --> End(["Complete"])
 flowchart TD
 Start(["Edit VAT OUT Invoice"]) --> CheckEntity{"Is Entity JO?"}
 CheckEntity --> |No| StandardFlow["Standard Edit Flow"]
-CheckEntity --> |Yes| ShowPortion["Show Portion Allocation Section"]
+CheckEntity --> |Yes| ShowPortion["Show Enhanced Portion Allocation Section"]
 ShowPortion --> LoadExisting["Load Existing Allocations"]
-LoadExisting --> EditPortions["Edit BBS/BMP Portions"]
+LoadExisting --> EditPortions["Edit BBS/BMP Portions with Real-time Formatting"]
 EditPortions --> CalcPercent["Calculate Percentages Live"]
-CalcPercent --> ValidateSum{"Total Matches Invoice?"}
+CalcPercent --> CalcHJ["Calculate Harga Jual Porsi<br/>(Proportional Selling Price)"]
+CalcHJ --> ValidateSum{"Total Matches Invoice?"}
 ValidateSum --> |Yes| SavePortions["Save to porsi_vatout"]
 ValidateSum --> |No| WarnUser["Show Warning with Color Feedback"]
 WarnUser --> SavePortions
@@ -253,6 +255,37 @@ UpdateReport --> End
 - [app.js:897-919](file://app.js#L897-L919)
 - [dashboard_vatout.html:166-203](file://vat_out/dashboard_vatout.html#L166-L203)
 - [dashboard_vatout.html:534-557](file://vat_out/dashboard_vatout.html#L534-L557)
+
+### Enhanced Indonesian Number Formatting and Input Handling
+- **Advanced Parse Functions**
+  - **New**: `parseAngkaPorsi` function handles complex Indonesian number formats including dot separators for thousands, comma separators for decimals, and mixed formats.
+  - **New**: `formatAngkaPorsi` function converts numbers back to Indonesian format with proper thousand separators and decimal precision.
+  - **New**: `formatInputPorsi` function provides real-time input formatting as users type, maintaining cursor position and decimal point placement.
+  - **New**: `formatRpPorsi` function formats currency values with proper Rupiah formatting while preserving decimal precision.
+- **Real-time Calculation Updates**
+  - **Enhanced**: `updatePorsiHitung` function provides instant feedback on percentage calculations and total validation.
+  - **Enhanced**: Automatic calculation of 'Harga Jual Porsi' for each member based on their DPP allocation percentage.
+  - **Enhanced**: Color-coded validation feedback with green for valid totals and orange for warnings when allocations don't match invoice totals.
+  - **Enhanced**: Comprehensive error handling with user-friendly messages for invalid inputs and calculation errors.
+
+```mermaid
+flowchart TD
+Input["User Input"] --> Parse["parseAngkaPorsi()<br/>Handle Multiple Formats"]
+Parse --> Format["formatAngkaPorsi()<br/>Indonesian Number Format"]
+Format --> Display["Display Formatted Value"]
+Display --> Calculate["updatePorsiHitung()<br/>Real-time Calculations"]
+Calculate --> Validate["Validate Totals<br/>& Percentage Checks"]
+Validate --> HJ["Calculate Harga Jual Porsi<br/>(Proportional Selling Price)"]
+HJ --> Feedback["Color-coded Validation<br/>Feedback"]
+```
+
+**Diagram sources**
+- [dashboard_vatout.html:242-277](file://vat_out/dashboard_vatout.html#L242-L277)
+- [dashboard_vatout.html:652-678](file://vat_out/dashboard_vatout.html#L652-L678)
+
+**Section sources**
+- [dashboard_vatout.html:242-277](file://vat_out/dashboard_vatout.html#L242-L277)
+- [dashboard_vatout.html:652-678](file://vat_out/dashboard_vatout.html#L652-L678)
 
 ### VAT Liability and Tax Calculation Workflow
 - **Data Model Alignment**
@@ -275,7 +308,7 @@ Collect --> Validate["Validate Data Integrity"]
 Validate --> |Valid| Persist["Persist to data_vatout"]
 Validate --> |Invalid| Error["Return Validation Error"]
 Persist --> CheckJO{"Is JO Project?"}
-CheckJO --> |Yes| AllocatePortions["Allocate Portions to Members"]
+CheckJO --> |Yes| AllocatePortions["Allocate Portions to Members<br/>with Real-time Calculations"]
 CheckJO --> |No| Attach["Attach PDF (Optional)"]
 AllocatePortions --> SaveAllocations["Save to porsi_vatout"]
 SaveAllocations --> Attach
@@ -285,7 +318,7 @@ Report --> End(["Ready for Compliance and Reconciliation"])
 Error --> End
 ```
 
-**Updated** Added invoice cancellation handling and JO portion allocation steps for joint venture invoices with comprehensive audit trail support.
+**Updated** Added invoice cancellation handling and enhanced JO portion allocation steps with real-time calculations for joint venture invoices with comprehensive audit trail support.
 
 **Diagram sources**
 - [app.js:355-503](file://app.js#L355-L503)
@@ -459,7 +492,7 @@ UI-->>User : Render Charts and Tables
 ### User Interface Components and Integrations
 - **Dashboard**
   - Provides overview metrics and navigation links to inbox and summary views.
-  - Enhanced with JO portion allocation editing interface for joint venture invoices.
+  - **Enhanced**: Enhanced JO portion allocation editing interface with real-time calculations, Indonesian number formatting, and 'Harga Jual Porsi' column.
   - Comprehensive invoice cancellation and reactivation controls with visual status indicators.
   - Real-time statistics updates and month-over-month comparisons.
 - **Inbox**
@@ -515,7 +548,7 @@ AL --> DSH
 ### Practical Examples and Integration Scenarios
 - **Example: Generating a VAT OUT Invoice**
   - Use the available VAT OUT endpoint to fetch buyer and amount details, then create an invoice record with DPP and PPN fields aligned to the header table schema.
-  - For JO projects, allocate portions to BBS and BMP members using the enhanced allocation interface.
+  - For JO projects, allocate portions to BBS and BMP members using the enhanced allocation interface with real-time calculations.
 - **Example: Managing Incoming Requests**
   - Review requests in the inbox, approve or reject based on validation rules, and update statuses accordingly.
   - Handle batch PDF uploads with progress tracking and error recovery.
@@ -525,9 +558,10 @@ AL --> DSH
   - For non-supervisors, wait for supervisor approval through user_requests system.
   - Supervisors can directly cancel or reactivate invoices with immediate effect.
   - Verify cancellation through audit logs and visual indicators.
-- **Example: JO Portion Allocation**
-  - For joint venture invoices, use the edit interface to allocate portions to BBS and BMP members.
-  - System automatically calculates percentages and validates that allocations sum to invoice totals.
+- **Example: Enhanced JO Portion Allocation**
+  - For joint venture invoices, use the enhanced edit interface to allocate portions to BBS and BMP members.
+  - System automatically calculates percentages, validates allocations, and displays 'Harga Jual Porsi' for each member.
+  - Advanced Indonesian number formatting handles various input formats seamlessly.
   - View member-specific portions in project reports with clear indicators.
 - **Example: Compliance Reporting**
   - Generate monthly trends and branch-level summaries to support tax filings and reconciliations.
@@ -540,7 +574,7 @@ AL --> DSH
   - Link buyer information to master contact records and branch information to master branch records for accurate invoicing and reporting.
   - Integration with client ledger for comprehensive financial tracking and reconciliation.
 
-**Updated** Added comprehensive examples for invoice cancellation workflow, JO portion allocation, and member-specific reporting with enhanced validation and audit trail support.
+**Updated** Added comprehensive examples for invoice cancellation workflow, enhanced JO portion allocation with real-time calculations and Indonesian number formatting, and member-specific reporting with advanced validation and audit trail support.
 
 **Section sources**
 - [app.js:355-503](file://app.js#L355-L503)
@@ -615,7 +649,8 @@ MASTER --> BACK
   - Support for batch PDF processing with chunked uploads for improved performance.
 - **UI Responsiveness**
   - Paginate large datasets in the inbox and limit report scopes to reduce rendering overhead.
-  - Real-time percentage calculations in JO portion editing are optimized for immediate feedback.
+  - **Enhanced**: Real-time percentage calculations in JO portion editing are optimized for immediate feedback with debounced input handling.
+  - **Enhanced**: Indonesian number formatting functions are optimized for minimal computational overhead during real-time updates.
   - Socket.IO integration provides instant UI updates without full page reloads.
 - **Migration Performance**
   - Batch processing for status migration handles large datasets efficiently with progress tracking.
@@ -623,12 +658,13 @@ MASTER --> BACK
 - **JO Distribution Performance**
   - Efficient LEFT JOIN queries ensure minimal impact when portions are not yet allocated.
   - Indexed primary keys on porsi_vatout table optimize allocation lookups.
+  - **Enhanced**: Real-time calculation functions are optimized for minimal DOM manipulation during user interactions.
 - **Cancellation System Performance**
   - Optimized query patterns for cancelled invoice exclusion across all reporting modules.
   - Minimal performance impact on existing queries through strategic WHERE clause placement.
   - Efficient audit log creation with background processing for non-critical operations.
 
-**Updated** Added performance considerations for invoice cancellation system, batch PDF processing, real-time Socket.IO communication, and optimized audit logging.
+**Updated** Added performance considerations for invoice cancellation system, batch PDF processing, real-time Socket.IO communication, optimized audit logging, and enhanced real-time calculation performance.
 
 ## Troubleshooting Guide
 - **PDF Attachment Issues**
@@ -656,6 +692,8 @@ MASTER --> BACK
   - Check that portion allocations sum correctly to invoice totals when editing.
   - Ensure project reports display member-specific portions for JO projects.
   - Validate that porsi_vatout table has proper indexes for efficient querying.
+  - **New**: Check that 'Harga Jual Porsi' calculations are displaying correctly for each member.
+  - **New**: Verify that Indonesian number formatting is working properly in the enhanced modal interface.
 - **Invoice Cancellation Issues**
   - Verify that cancellation dates are properly recorded in the `tgl_batal` field.
   - Check that cancelled invoices are excluded from all statistical calculations and reporting.
@@ -663,8 +701,13 @@ MASTER --> BACK
   - Verify that visual indicators properly reflect cancellation status in the UI.
   - Check approval workflow for non-supervisor users attempting cancellations.
   - Monitor user_requests table for pending approval items.
+- **Enhanced Modal Interface Issues**
+  - **New**: Verify that parseAngkaPorsi and formatAngkaPorsi functions are handling input correctly.
+  - **New**: Check that real-time calculations are updating properly when users modify JO portion allocations.
+  - **New**: Ensure that 'Harga Jual Porsi' column displays correct proportional selling price calculations.
+  - **New**: Validate that color-coded validation feedback is working for allocation totals.
 
-**Updated** Added troubleshooting guidance for invoice cancellation system, batch PDF processing, enhanced validation mechanisms, and audit trail verification.
+**Updated** Added troubleshooting guidance for invoice cancellation system, batch PDF processing, enhanced validation mechanisms, audit trail verification, and the new enhanced modal interface features including Indonesian number formatting and real-time calculations.
 
 **Section sources**
 - [app.js:355-503](file://app.js#L355-L503)
@@ -672,4 +715,4 @@ MASTER --> BACK
 ## Conclusion
 The VAT Output (VAT OUT) module provides a structured framework for invoice generation, customer billing, tax calculation, inbox processing, and summary reporting. Its integration with master data ensures accurate customer and branch identification, while backend endpoints and filesystem management support efficient operations. By leveraging trend and branch-level summaries, organizations can meet compliance requirements and streamline financial reconciliation processes.
 
-**Updated** The addition of comprehensive invoice cancellation capabilities significantly enhances the system's ability to manage complete invoice lifecycles with proper audit trails and approval workflows. The improved JO member allocation system with porsi_vatout table integration enables precise attribution of VAT output income to specific JV members while maintaining data integrity. The enhanced project summary API provides accurate revenue reporting for complex joint venture structures. The integrated audit trail system ensures complete traceability of all invoice modifications and status changes. Together, these enhancements create a robust, compliant, and user-friendly VAT output management system that supports sophisticated business operations while maintaining regulatory compliance and financial accuracy.
+**Updated** The addition of comprehensive invoice cancellation capabilities significantly enhances the system's ability to manage complete invoice lifecycles with proper audit trails and approval workflows. The enhanced JO member allocation system with advanced modal interface, including the new 'Harga Jual Porsi' column and sophisticated Indonesian number formatting, enables precise attribution of VAT output income to specific JV members while maintaining data integrity. The real-time calculation updates with automatic percentage calculations and validation feedback provide an intuitive user experience for complex joint venture scenarios. The enhanced project summary API provides accurate revenue reporting for sophisticated business operations. Together, these enhancements create a robust, compliant, and user-friendly VAT output management system that supports complex business operations while maintaining regulatory compliance and financial accuracy.
