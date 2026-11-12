@@ -160,8 +160,9 @@
                     return;
                 }
 
-                // Populate table
-                data.forEach(row => {
+                // Populate table (Show latest first) — sama seperti summary_vatout.html:
+                // chart tetap memakai urutan ascending, tabel dibalik agar periode terbaru di atas.
+                [...data].reverse().forEach(row => {
                     const tr = document.createElement('tr');
                     const selisih = row.ppn_tukar - row.ppn_faktur;
                     const classSelisih = selisih >= 0 ? 'diff-pos' : 'diff-neg';

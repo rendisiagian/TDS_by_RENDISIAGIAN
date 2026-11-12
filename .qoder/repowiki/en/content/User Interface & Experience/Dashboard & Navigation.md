@@ -17,6 +17,8 @@
 - [export.js](file://export.js)
 - [pagination.js](file://pagination.js)
 - [theme.js](file://theme.js)
+- [toast.js](file://toast.js)
+- [utils.js](file://utils.js)
 - [vat_out/dashboard_vatout.html](file://vat_out/dashboard_vatout.html)
 - [vat_out/inbox_vatout.html](file://vat_out/inbox_vatout.html)
 - [vat_in/audit_vatin.html](file://vat_in/audit_vatin.html)
@@ -26,11 +28,10 @@
 
 ## Update Summary
 **Changes Made**
-- Enhanced sidebar navigation with new verification queue menus for Tax Payable and Prepaid Tax modules
-- Updated VAT IN audit menu item labeling from "Audit Integritas Faktur" to "Audit Integritas Faktur Masukan"
-- Improved VAT OUT dashboard with enhanced status badge styling and advanced filtering capabilities
-- Integrated new portion tracking system for Joint Venture (JO) entities with DPP/PPN allocation
-- Added comprehensive verification queue functionality across all tax modules
+- Enhanced BPPU workflow with return-to-inbox functionality instead of permanent deletion
+- Updated confirmation dialogs with improved messaging about document re-verification
+- Implemented enhanced supervisor approval workflows for BPPU documents
+- Improved user experience through better feedback mechanisms and audit logging
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -39,16 +40,17 @@
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
 6. [Enhanced Verification Queue System](#enhanced-verification-queue-system)
-7. [Portion Tracking Integration](#portion-tracking-integration)
-8. [Dependency Analysis](#dependency-analysis)
-9. [Performance Considerations](#performance-considerations)
-10. [Troubleshooting Guide](#troubleshooting-guide)
-11. [Conclusion](#conclusion)
+7. [BPPU Workflow Improvements](#bppu-workflow-improvements)
+8. [Portion Tracking Integration](#portion-tracking-integration)
+9. [Dependency Analysis](#dependency-analysis)
+10. [Performance Considerations](#performance-considerations)
+11. [Troubleshooting Guide](#troubleshooting-guide)
+12. [Conclusion](#conclusion)
 
 ## Introduction
 This document describes the dashboard and navigation system of the Tax Database System. It explains the main dashboard layout, component organization, and user interface hierarchy. It documents the navigation sidebar functionality, including menu items, role-based visibility, and dynamic content loading. It details the sidebar.js implementation for menu management, click handlers, and state persistence. It also covers responsive design patterns, mobile navigation adaptation, user workflow optimization, and integration with the authentication system and user permissions.
 
-**Updated** Enhanced with comprehensive verification queue functionality for all tax modules and improved portion tracking for Joint Venture entities.
+**Updated** Enhanced with comprehensive verification queue functionality for all tax modules, improved portion tracking for Joint Venture entities, and advanced BPPU workflow improvements including return-to-inbox functionality and enhanced supervisor approval processes.
 
 ## Project Structure
 The navigation and dashboard system is composed of:
@@ -58,7 +60,7 @@ The navigation and dashboard system is composed of:
 - A global application script that orchestrates navigation and routing
 - A stylesheet that defines responsive and theme-aware UI with enhanced badge styling
 - Supporting pages for roles, profiles, reports, and administrative tasks
-- Dedicated verification queue interfaces for each tax module
+- Dedicated verification queue interfaces for each tax module with improved BPPU workflows
 
 ```mermaid
 graph TB
@@ -78,6 +80,8 @@ VO["vat_out/dashboard_vatout.html<br/>VAT Out Dashboard"]
 VI["vat_in/audit_vatin.html<br/>VAT In Audit"]
 VP["taxpayable_bppu/inbox_payable.html<br/>Payable Inbox"]
 VPRE["prepaidtax_bppu/inbox_prepaid.html<br/>Prepaid Inbox"]
+TOAST["toast.js<br/>Confirmation Dialogs"]
+UTILS["utils.js<br/>Utility Functions"]
 D --> S
 D --> APP
 S --> JS
@@ -93,6 +97,8 @@ APP --> VO
 APP --> VI
 APP --> VP
 APP --> VPRE
+APP --> TOAST
+APP --> UTILS
 ```
 
 **Diagram sources**
@@ -105,6 +111,8 @@ APP --> VPRE
 - [vat_in/audit_vatin.html](file://vat_in/audit_vatin.html)
 - [taxpayable_bppu/inbox_payable.html](file://taxpayable_bppu/inbox_payable.html)
 - [prepaidtax_bppu/inbox_prepaid.html](file://prepaidtax_bppu/inbox_prepaid.html)
+- [toast.js](file://toast.js)
+- [utils.js](file://utils.js)
 
 **Section sources**
 - [dashboard_utama.html](file://dashboard_utama.html)
@@ -117,18 +125,21 @@ APP --> VPRE
 - Main Dashboard Layout: Provides the primary container for the application's content and integrates the sidebar partial with verification queue indicators.
 - Sidebar Partial: Defines the navigation menu structure with enhanced verification queue links for all tax modules and supports role-based visibility.
 - Sidebar Behavior Module: Manages click events, active state persistence, dynamic content loading, and verification queue synchronization.
-- Global Application Orchestrator: Coordinates navigation, route resolution, and integration with authentication and permissions.
+- Global Application Orchestrator: Coordinates navigation, route resolution, and integration with authentication and permissions with enhanced BPPU workflow support.
 - Stylesheet: Implements responsive breakpoints, theme-aware styling, and mobile-first navigation adaptations with enhanced badge styling.
 - Authentication Page: Entry point for login and session initialization.
 - Feature Pages: Role-based dashboards, user management, profile, audit logs, tax reports, and master data screens.
-- Verification Queue Interfaces: Dedicated inbox pages for VAT OUT, Tax Payable, and Prepaid Tax modules with PDF processing capabilities.
+- Verification Queue Interfaces: Dedicated inbox pages for VAT OUT, Tax Payable, and Prepaid Tax modules with PDF processing capabilities and improved BPPU workflows.
+- Toast Notification System: Modern confirmation dialogs with enhanced messaging for document re-verification processes.
+- Utility Functions: Shared functions for number formatting and currency display across all modules.
 
 Key responsibilities:
 - Dashboard layout: Hosts the main content area and ensures proper integration with the sidebar and verification queues.
 - Sidebar: Renders menu items with verification queue indicators, applies role-based visibility, and persists active selection.
 - Behavior: Handles clicks, updates DOM state, loads content dynamically, maintains user preferences, and synchronizes verification queues.
-- App orchestration: Routes navigation, enforces guards, and integrates with authentication and permissions.
+- App orchestration: Routes navigation, enforces guards, and integrates with authentication and permissions with enhanced BPPU workflow handling.
 - Styles: Ensures responsive behavior and adaptive layouts for mobile devices with enhanced visual feedback.
+- Toast system: Provides modern confirmation dialogs with improved user experience for critical operations.
 
 **Section sources**
 - [dashboard_utama.html](file://dashboard_utama.html)
@@ -137,13 +148,16 @@ Key responsibilities:
 - [app.js](file://app.js)
 - [style.css](file://style.css)
 - [login.html](file://login.html)
+- [toast.js](file://toast.js)
+- [utils.js](file://utils.js)
 
 ## Architecture Overview
-The navigation system follows a modular pattern with enhanced verification queue integration:
+The navigation system follows a modular pattern with enhanced verification queue integration and improved BPPU workflows:
 - The dashboard page includes the sidebar partial and initializes the application with verification queue awareness.
 - The sidebar behavior module listens for clicks and manages active states while monitoring verification queue status.
-- The global application orchestrator resolves routes and enforces navigation guards across all tax modules.
+- The global application orchestrator resolves routes and enforces navigation guards across all tax modules with enhanced BPPU workflow support.
 - The stylesheet provides responsive design and theme support with enhanced badge and status styling.
+- The toast notification system provides modern confirmation dialogs with improved messaging for document re-verification processes.
 
 ```mermaid
 graph TB
@@ -151,6 +165,7 @@ subgraph "UI Layer"
 DU["dashboard_utama.html"]
 SB["sidebar.html"]
 ST["style.css"]
+TOAST["toast.js"]
 end
 subgraph "Behavior Layer"
 BJ["sidebar.js"]
@@ -184,6 +199,7 @@ AP --> MK
 AP --> VQ1
 AP --> VQ2
 AP --> VQ3
+AP --> TOAST
 ```
 
 **Diagram sources**
@@ -195,6 +211,7 @@ AP --> VQ3
 - [vat_out/inbox_vatout.html](file://vat_out/inbox_vatout.html)
 - [taxpayable_bppu/inbox_payable.html](file://taxpayable_bppu/inbox_payable.html)
 - [prepaidtax_bppu/inbox_prepaid.html](file://prepaidtax_bppu/inbox_prepaid.html)
+- [toast.js](file://toast.js)
 
 ## Detailed Component Analysis
 
@@ -272,12 +289,14 @@ Responsibilities:
 - Enforces navigation guards based on authentication and permissions across all modules.
 - Integrates with the authentication system to initialize user sessions with queue access.
 - Coordinates with the sidebar behavior module for state synchronization and queue updates.
+- Implements enhanced BPPU workflow with return-to-inbox functionality instead of permanent deletion.
 
 Implementation highlights:
 - Route resolution determines which domain page to load with queue parameters.
 - Guards prevent access to unauthorized pages and verification queues.
 - Session initialization occurs upon successful login with queue permissions.
 - State synchronization ensures sidebar and content remain aligned with queue status.
+- Enhanced BPPU workflow handles supervisor actions and returns documents to inbox for re-verification.
 
 ```mermaid
 flowchart TD
@@ -313,6 +332,36 @@ Implementation highlights:
 
 **Section sources**
 - [style.css](file://style.css)
+
+### Toast Notification System (toast.js)
+Responsibilities:
+- Provides modern confirmation dialogs replacing native alert() and confirm() functions.
+- Enhances user experience with visually appealing notifications and confirmation prompts.
+- Supports various notification types including success, error, warning, and info messages.
+- Implements mobile-friendly interaction patterns for touch devices.
+
+Implementation highlights:
+- Non-blocking confirmation dialogs with customizable options and callbacks.
+- Auto-dismissing notifications with hover pause functionality.
+- Keyboard accessibility support including Escape key handling.
+- Mobile hamburger menu controller for responsive navigation.
+
+**Section sources**
+- [toast.js](file://toast.js)
+
+### Utility Functions (utils.js)
+Responsibilities:
+- Provides shared utility functions for number formatting and currency display.
+- Ensures consistent number parsing and rupiah formatting across all modules.
+- Prevents duplication of formatting logic throughout the application.
+
+Implementation highlights:
+- Centralized number cleaning function for consistent numeric parsing.
+- Standardized rupiah formatting with proper locale handling.
+- Global function exposure for easy access across all components.
+
+**Section sources**
+- [utils.js](file://utils.js)
 
 ### Authentication Integration (login.html)
 Responsibilities:
@@ -383,6 +432,54 @@ Approve --> Complete["Final Processing"]
 - [taxpayable_bppu/inbox_payable.html](file://taxpayable_bppu/inbox_payable.html)
 - [prepaidtax_bppu/inbox_prepaid.html](file://prepaidtax_bppu/inbox_prepaid.html)
 
+## BPPU Workflow Improvements
+
+The system has been enhanced with significant improvements to the BPPU (Bukti Potong) workflow:
+
+### Return-to-Inbox Functionality
+Instead of permanently deleting BPPU documents when supervisors reject them, the system now implements a sophisticated return-to-inbox mechanism:
+
+- **Non-destructive Rejection**: When a supervisor rejects a BPPU document, it is automatically moved back to the inbox queue for re-verification rather than being permanently deleted
+- **Data Preservation**: All extracted data is preserved and made available for re-completion through the review modal
+- **Audit Trail**: Every rejection action is logged with detailed information about who performed the action and why
+- **Duplicate Prevention**: The system prevents duplicate entries in the inbox when returning documents
+
+### Enhanced Supervisor Approval Workflows
+The supervisor approval process has been significantly improved:
+
+- **Role-Based Permissions**: Enhanced role checking for supervisor, administrator, and superadmin levels
+- **Workflow Validation**: Comprehensive validation of target modules against a whitelist for security
+- **Real-time Updates**: Immediate UI updates when supervisor actions are performed
+- **Request Processing**: Improved handling of user requests for non-supervisor users
+
+### Improved Confirmation Dialogs
+The confirmation system has been updated with better messaging:
+
+- **Clear Messaging**: Users receive clear explanations about what will happen when they perform actions
+- **Re-verification Context**: Messages explicitly mention that documents will be returned for re-verification
+- **Modern UI**: Enhanced visual design with better accessibility and mobile support
+- **Callback Support**: Flexible callback system for different action types
+
+```mermaid
+flowchart TD
+Reject["Supervisor Rejects BPPU"] --> CheckRole{"Check Supervisor Role"}
+CheckRole --> |Valid| MoveToInbox["Move to Inbox for Re-verification"]
+CheckRole --> |Invalid| ShowError["Show Error Message"]
+MoveToInbox --> PreserveData["Preserve Extracted Data"]
+PreserveData --> LogAction["Log Action in Audit Trail"]
+LogAction --> NotifyUsers["Notify Users of Changes"]
+NotifyUsers --> Ready["Document Ready for Re-verification"]
+```
+
+**Diagram sources**
+- [app.js:1924-1957](file://app.js#L1924-L1957)
+- [app.js:1972-2086](file://app.js#L1972-L2086)
+
+**Section sources**
+- [app.js:1924-1957](file://app.js#L1924-L1957)
+- [app.js:1972-2086](file://app.js#L1972-L2086)
+- [toast.js:76-140](file://toast.js#L76-L140)
+
 ## Portion Tracking Integration
 
 The system now includes sophisticated portion tracking for Joint Venture (JO) entities:
@@ -417,11 +514,12 @@ Display --> Validate["Validation Check"]
 - [vat_out/dashboard_vatout.html](file://vat_out/dashboard_vatout.html)
 
 ## Dependency Analysis
-The navigation system exhibits low coupling and high cohesion with enhanced verification queue integration:
+The navigation system exhibits low coupling and high cohesion with enhanced verification queue integration and improved BPPU workflows:
 - The dashboard depends on the sidebar partial and the application orchestrator with queue awareness.
 - The sidebar behavior module depends on the sidebar partial and the application orchestrator for queue synchronization.
-- The application orchestrator coordinates navigation, guards, and queue status updates.
+- The application orchestrator coordinates navigation, guards, and queue status updates with enhanced BPPU workflow support.
 - Stylesheet supports responsive behavior across all pages with enhanced queue styling.
+- Toast notification system provides modern confirmation dialogs with improved user experience.
 
 ```mermaid
 graph LR
@@ -437,6 +535,7 @@ AP --> TR["taxprojectreport.html"]
 AP --> MC["master_cabang.html"]
 AP --> MK["master_kontak.html"]
 AP --> VQ["Verification Queues"]
+AP --> TOAST["toast.js"]
 VQ --> VO["vat_out/inbox_vatout.html"]
 VQ --> VP["taxpayable_bppu/inbox_payable.html"]
 VQ --> VPRE["prepaidtax_bppu/inbox_prepaid.html"]
@@ -451,6 +550,7 @@ VQ --> VPRE["prepaidtax_bppu/inbox_prepaid.html"]
 - [vat_out/inbox_vatout.html](file://vat_out/inbox_vatout.html)
 - [taxpayable_bppu/inbox_payable.html](file://taxpayable_bppu/inbox_payable.html)
 - [prepaidtax_bppu/inbox_prepaid.html](file://prepaidtax_bppu/inbox_prepaid.html)
+- [toast.js](file://toast.js)
 
 **Section sources**
 - [dashboard_utama.html](file://dashboard_utama.html)
@@ -458,6 +558,7 @@ VQ --> VPRE["prepaidtax_bppu/inbox_prepaid.html"]
 - [sidebar.js](file://sidebar.js)
 - [app.js](file://app.js)
 - [style.css](file://style.css)
+- [toast.js](file://toast.js)
 
 ## Performance Considerations
 - Lazy loading: Load content on demand to minimize initial payload with queue optimization.
@@ -466,6 +567,7 @@ VQ --> VPRE["prepaidtax_bppu/inbox_prepaid.html"]
 - Responsive design: Minimize layout thrashing by leveraging CSS transforms and media queries.
 - Caching: Cache frequently accessed pages and queue data to improve perceived performance.
 - Queue optimization: Implement efficient PDF processing and batch operations for large file uploads.
+- BPPU workflow optimization: Efficient database operations for return-to-inbox functionality with minimal overhead.
 
 ## Troubleshooting Guide
 Common issues and resolutions:
@@ -476,14 +578,17 @@ Common issues and resolutions:
 - Authentication redirects: Ensure login integration and session initialization occur before navigation.
 - Queue sync issues: Verify WebSocket connections and real-time queue updates.
 - Portion calculation errors: Check JO entity configuration and portion validation logic.
+- BPPU workflow issues: Verify supervisor role permissions and return-to-inbox functionality.
+- Confirmation dialog problems: Check toast.js integration and callback function implementations.
 
 **Section sources**
 - [sidebar.js](file://sidebar.js)
 - [app.js](file://app.js)
 - [style.css](file://style.css)
 - [login.html](file://login.html)
+- [toast.js](file://toast.js)
 
 ## Conclusion
-The dashboard and navigation system is structured around a clean separation of concerns with enhanced verification queue functionality: a reusable sidebar partial, a focused behavior module, and a global orchestrator that coordinates navigation, guards, content loading, and queue synchronization. The stylesheet ensures responsive and theme-aware experiences with improved visual feedback. Together, these components deliver a scalable, maintainable, and user-friendly navigation solution integrated with authentication, permission handling, and comprehensive verification queue management across all tax modules.
+The dashboard and navigation system is structured around a clean separation of concerns with enhanced verification queue functionality and improved BPPU workflows: a reusable sidebar partial, a focused behavior module, and a global orchestrator that coordinates navigation, guards, content loading, queue synchronization, and enhanced BPPU workflow management. The stylesheet ensures responsive and theme-aware experiences with improved visual feedback, while the toast notification system provides modern confirmation dialogs with better user experience. Together, these components deliver a scalable, maintainable, and user-friendly navigation solution integrated with authentication, permission handling, comprehensive verification queue management, and advanced BPPU workflow improvements including return-to-inbox functionality and enhanced supervisor approval processes.
 
-**Updated** The system now provides complete verification queue functionality for VAT OUT, Tax Payable, and Prepaid Tax modules with intelligent cross-referencing, portion tracking for Joint Venture entities, and enhanced user experience through real-time updates and improved visual indicators.
+**Updated** The system now provides complete verification queue functionality for VAT OUT, Tax Payable, and Prepaid Tax modules with intelligent cross-referencing, portion tracking for Joint Venture entities, enhanced user experience through real-time updates and improved visual indicators, and advanced BPPU workflow improvements including non-destructive rejection with return-to-inbox functionality, enhanced supervisor approval workflows, and improved confirmation dialogs with better messaging about document re-verification processes.

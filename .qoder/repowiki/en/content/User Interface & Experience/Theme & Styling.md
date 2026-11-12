@@ -8,7 +8,15 @@
 - [sidebar.html](file://sidebar.html)
 - [app.js](file://app.js)
 - [package.json](file://package.json)
+- [summary_vatin.html](file://vat_in/summary_vatin.html)
+- [summary_vatout.html](file://vat_out/summary_vatout.html)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Updated Table Components section to document the sticky header positioning fix for #tabel-summary
+- Added detailed explanation of multi-row header handling and scroll behavior
+- Enhanced troubleshooting guide with sticky header-specific issues
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -34,6 +42,8 @@ subgraph "HTML Pages"
 L["login.html"]
 S["sidebar.html"]
 Dash["dashboard_utama.html"]
+SummaryVATIn["vat_in/summary_vatin.html"]
+SummaryVATOut["vat_out/summary_vatout.html"]
 Other["Other .html pages"]
 end
 subgraph "Styling Layer"
@@ -47,10 +57,14 @@ end
 L --> ThemeJS
 S --> ThemeJS
 Dash --> ThemeJS
+SummaryVATIn --> ThemeJS
+SummaryVATOut --> ThemeJS
 Other --> ThemeJS
 L --> CSS
 S --> CSS
 Dash --> CSS
+SummaryVATIn --> CSS
+SummaryVATOut --> CSS
 Other --> CSS
 AppJS --> |"Static serving"| CSS
 AppJS --> |"Static serving"| ThemeJS
@@ -60,16 +74,20 @@ Pkg --> AppJS
 **Diagram sources**
 - [login.html:1-51](file://login.html#L1-L51)
 - [sidebar.html:1-101](file://sidebar.html#L1-L101)
-- [style.css:1-2887](file://style.css#L1-L2887)
+- [summary_vatin.html:55-72](file://vat_in/summary_vatin.html#L55-L72)
+- [summary_vatout.html:56-67](file://vat_out/summary_vatout.html#L56-L67)
+- [style.css:1-3221](file://style.css#L1-L3221)
 - [theme.js:1-107](file://theme.js#L1-L107)
 - [app.js:1-800](file://app.js#L1-L800)
 - [package.json:1-20](file://package.json#L1-L20)
 
 **Section sources**
-- [style.css:1-2887](file://style.css#L1-L2887)
+- [style.css:1-3221](file://style.css#L1-L3221)
 - [theme.js:1-107](file://theme.js#L1-L107)
 - [login.html:1-51](file://login.html#L1-L51)
 - [sidebar.html:1-101](file://sidebar.html#L1-L101)
+- [summary_vatin.html:55-72](file://vat_in/summary_vatin.html#L55-L72)
+- [summary_vatout.html:56-67](file://vat_out/summary_vatout.html#L56-L67)
 - [app.js:1-800](file://app.js#L1-L800)
 - [package.json:1-20](file://package.json#L1-L20)
 
@@ -79,6 +97,7 @@ Pkg --> AppJS
 - Utility classes and component-specific styles (sidebar, cards, tables, forms, buttons, modals, toasts) leverage variables for consistent theming.
 - Responsive breakpoints adapt layout and typography for desktop, tablet, and mobile experiences.
 - Accessibility focus styles and print media queries ensure inclusive and printable output.
+- **Updated**: Specialized table components handle complex multi-row headers with proper sticky positioning to prevent overlap during scrolling.
 
 **Section sources**
 - [style.css:8-100](file://style.css#L8-L100)
@@ -86,6 +105,7 @@ Pkg --> AppJS
 - [style.css:1488-1563](file://style.css#L1488-L1563)
 - [style.css:1565-2399](file://style.css#L1565-L2399)
 - [style.css:2429-2887](file://style.css#L2429-L2887)
+- [style.css:1238-1247](file://style.css#L1238-L1247)
 
 ## Architecture Overview
 The theme system follows a data-attribute-driven approach:
@@ -138,7 +158,7 @@ Practical usage:
 ### Dark Mode Implementation
 - Light/dark modes are toggled by setting the data-theme attribute on the root element.
 - Overrides in the stylesheet target [data-theme="dark"] to invert backgrounds, borders, and text colors.
-- Local storage persists the user’s choice across sessions.
+- Local storage persists the user's choice across sessions.
 
 ```mermaid
 flowchart TD
@@ -179,6 +199,30 @@ Reapply --> Render
 - [style.css:536-611](file://style.css#L536-L611)
 - [style.css:649-798](file://style.css#L649-L798)
 - [style.css:1914-1927](file://style.css#L1914-L1927)
+
+### Advanced Table Components with Sticky Headers
+- **Updated**: The #tabel-summary component implements sophisticated multi-row header handling with proper sticky positioning.
+- Multi-row headers use `thead tr:nth-child(2)` selector to position secondary header rows at `top: 36px` to prevent overlap with primary headers.
+- Border-top properties ensure visual separation between header rows remains visible during scrolling.
+- Consistent with `.filter-row th` convention using `top: 36px` offset for secondary sticky elements.
+- Prevents the second header row (containing "Jml Dokumen / Total PPN") from competing for the same `offset: 0` position as the first header row.
+
+```mermaid
+flowchart TD
+Table["#tabel-summary Table"] --> HeaderRow1["Header Row 1<br/>Primary Headers<br/>top: 0"]
+Table --> HeaderRow2["Header Row 2<br/>Secondary Headers<br/>top: 36px"]
+HeaderRow1 --> ScrollBehavior["Scroll Behavior<br/>Fixed Position"]
+HeaderRow2 --> ScrollBehavior
+HeaderRow2 --> BorderSep["Border Top<br/>Visual Separation"]
+```
+
+**Diagram sources**
+- [style.css:1238-1247](file://style.css#L1238-L1247)
+- [summary_vatin.html:55-72](file://vat_in/summary_vatin.html#L55-L72)
+
+**Section sources**
+- [style.css:1238-1247](file://style.css#L1238-L1247)
+- [summary_vatin.html:55-72](file://vat_in/summary_vatin.html#L55-L72)
 
 ### Modals, Tooltips, and Notifications
 - Modals and toasts use theme-aware backgrounds, borders, and subtle animations.
@@ -227,6 +271,7 @@ The styling system depends on:
 - Data-attribute selectors for theme switching.
 - Local storage for persistence.
 - HTML pages for initialization and UI triggers.
+- **Updated**: Complex table structures require specific CSS rules for proper sticky header behavior.
 
 ```mermaid
 graph LR
@@ -237,16 +282,20 @@ RootAttr --> UIElements["UI Elements<br/>login.html, sidebar.html"]
 UIElements --> ThemeJS
 ThemeJS --> LocalStorage["localStorage<br/>persisted theme"]
 LocalStorage --> ThemeJS
+TableComponents["Table Components<br/>#tabel-summary"] --> StickyRules["Sticky Header Rules<br/>top: 36px positioning"]
+StickyRules --> CSSVars
 ```
 
 **Diagram sources**
 - [style.css:8-100](file://style.css#L8-L100)
+- [style.css:1238-1247](file://style.css#L1238-L1247)
 - [theme.js:1-19](file://theme.js#L1-L19)
 - [login.html:13-19](file://login.html#L13-L19)
 - [sidebar.html:96-100](file://sidebar.html#L96-L100)
 
 **Section sources**
 - [style.css:8-100](file://style.css#L8-L100)
+- [style.css:1238-1247](file://style.css#L1238-L1247)
 - [theme.js:1-19](file://theme.js#L1-L19)
 - [login.html:13-19](file://login.html#L13-L19)
 - [sidebar.html:96-100](file://sidebar.html#L96-L100)
@@ -257,6 +306,7 @@ LocalStorage --> ThemeJS
 - Use transitions sparingly; keep durations short for smooth yet snappy UI.
 - Avoid excessive repaints by leveraging transform and opacity for animations.
 - Keep media queries focused on essential breakpoints to prevent layout thrashing.
+- **Updated**: Sticky header positioning uses optimized CSS selectors to minimize reflow during scrolling operations.
 
 [No sources needed since this section provides general guidance]
 
@@ -279,13 +329,20 @@ Common issues and resolutions:
   - Ensure print media queries are not overridden by higher specificity rules.
   - Test print preview in supported browsers.
 
+- **Updated**: Sticky header overlap issues in tables
+  - Verify that multi-row headers use proper `top` positioning (e.g., `top: 36px` for secondary rows).
+  - Check that border-top properties are set for visual separation between header rows.
+  - Ensure the table structure uses `thead tr:nth-child(2)` selectors for secondary header rows.
+  - Confirm that the table has proper `position: sticky` and `z-index` values.
+
 **Section sources**
 - [theme.js:1-19](file://theme.js#L1-L19)
 - [style.css:87-100](file://style.css#L87-L100)
+- [style.css:1238-1247](file://style.css#L1238-L1247)
 - [style.css:1403-1486](file://style.css#L1403-L1486)
 
 ## Conclusion
-The theme and styling system leverages CSS custom properties and a data-attribute-driven approach to deliver a cohesive, maintainable design system. With robust dark mode support, responsive design, and accessibility considerations, the system scales across modules and pages. Extending the theme involves updating variables and selectors, ensuring consistent application across components.
+The theme and styling system leverages CSS custom properties and a data-attribute-driven approach to deliver a cohesive, maintainable design system. With robust dark mode support, responsive design, accessibility considerations, and specialized table components with proper sticky header handling, the system scales across modules and pages. Extending the theme involves updating variables and selectors, ensuring consistent application across components.
 
 [No sources needed since this section summarizes without analyzing specific files]
 
@@ -313,10 +370,12 @@ The theme and styling system leverages CSS custom properties and a data-attribut
 - Use utility classes for common layouts and text styles.
 - Encapsulate component-specific styles with scoped selectors and theme-aware variables.
 - Maintain consistent spacing and border radius tokens across components.
+- **Updated**: For complex table structures, implement proper sticky header positioning with appropriate `top` offsets and border properties to prevent overlap during scrolling.
 
 **Section sources**
 - [style.css:1143-1199](file://style.css#L1143-L1199)
 - [style.css:1565-1637](file://style.css#L1565-L1637)
+- [style.css:1238-1247](file://style.css#L1238-L1247)
 
 ### Alternatives to CSS-in-JS
 - Prefer CSS modules or styled-components if adopting a component-scoped styling approach.
@@ -329,6 +388,8 @@ The theme and styling system leverages CSS custom properties and a data-attribut
 - CSS variables are widely supported; provide sensible fallbacks for older browsers.
 - Use prefixed properties where necessary and test across major browsers.
 - Ensure print styles degrade gracefully and remain readable.
+- **Updated**: Sticky positioning features work in modern browsers; test thoroughly for edge cases with complex table layouts.
 
 **Section sources**
 - [style.css:1403-1486](file://style.css#L1403-L1486)
+- [style.css:1238-1247](file://style.css#L1238-L1247)

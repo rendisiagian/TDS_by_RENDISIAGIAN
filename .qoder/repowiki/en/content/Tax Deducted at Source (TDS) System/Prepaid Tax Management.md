@@ -12,6 +12,13 @@
 - [dashboard_utama.html](file://dashboard_utama.html)
 </cite>
 
+## Update Summary
+**Changes Made**
+- Updated database join logic with subquery prioritization for 'Pengganti' fakturs to prevent fan-out issues
+- Enhanced cancellation date handling in VAT queries with improved tgl_batal filtering
+- Improved deduplication logic across multiple endpoints including /api/summary-prepaid and JO project summary API
+- Fixed performance issues in prepaid tax summary queries by limiting JOIN results to single effective faktur per invoice
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Project Structure](#project-structure)
@@ -198,11 +205,13 @@ The summary page compares VAT OUT invoices with Prepaid Tax records:
 - Counts BPPU entries, aggregates DPP and tax amounts
 - Supports export and print
 
+**Updated** Enhanced with improved database join logic that prevents fan-out issues by using subquery prioritization for 'Pengganti' fakturs and better cancellation date handling.
+
 ```mermaid
 flowchart TD
-Start(["Load Summary"]) --> Query["Query data_prepaid joined with data_vatout"]
+Start(["Load Summary"]) --> Query["Query data_prepaid joined with data_vatout<br/>using optimized subquery for faktur selection"]
 Query --> Group["Group by invoice date and tax period"]
-Group --> Aggregate["Aggregate counts and sums"]
+Group --> Aggregate["Aggregate counts and sums<br/>with deduplicated faktur data"]
 Aggregate --> Render["Render table with totals"]
 Render --> End(["Done"])
 ```
@@ -315,6 +324,8 @@ DB --> Tables["Tables: data_prepaid, inbox_prepaid, master_cabang"]
 - Server-side pagination and debounced filtering reduce client load and API spam
 - Efficient database indexing on entity and date columns improves query performance
 - Chunked PDF uploads minimize UI blocking and enable progress feedback
+- **Updated** Optimized database joins with subquery prioritization prevent fan-out issues in summary queries
+- **Updated** Enhanced cancellation date handling improves query efficiency by properly filtering cancelled fakturs
 
 [No sources needed since this section provides general guidance]
 
@@ -324,6 +335,7 @@ Common issues and resolutions:
 - Discrepancy in DPP comparison: Confirm invoice linkage and branch assignment; re-run comparison after corrections
 - Upload progress not updating: Check browser console for Socket.IO connection errors; ensure server is reachable
 - Export failures: Confirm Excel library availability; fall back to CSV export
+- **Updated** Summary query performance issues: The system now uses optimized subqueries to prevent fan-out when multiple fakturs exist for the same invoice
 
 **Section sources**
 - [dashboard_prepaid.html](file://prepaidtax_bppu/dashboard_prepaid.html)
@@ -331,4 +343,4 @@ Common issues and resolutions:
 - [export.js](file://export.js)
 
 ## Conclusion
-The prepaid tax management module provides a robust, real-time solution for managing tax deducted at source. Its dashboard enables efficient monitoring and reconciliation, the inbox streamlines document verification and approval, and the summary offers insightful reporting for compliance and tax filings. Integration with master data and client ledger supports end-to-end financial tracking, while export and pagination utilities enhance usability and performance.
+The prepaid tax management module provides a robust, real-time solution for managing tax deducted at source. Its dashboard enables efficient monitoring and reconciliation, the inbox streamlines document verification and approval, and the summary offers insightful reporting for compliance and tax filings. Integration with master data and client ledger supports end-to-end financial tracking, while export and pagination utilities enhance usability and performance. Recent enhancements include improved database join logic with subquery prioritization for 'Pengganti' fakturs, enhanced cancellation date handling, and better deduplication logic across multiple endpoints, ensuring optimal performance and accurate reporting even with complex faktur hierarchies.

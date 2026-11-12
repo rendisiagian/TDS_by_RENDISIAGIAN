@@ -16,11 +16,11 @@
 
 ## Update Summary
 **Changes Made**
-- Enhanced VAT OUT dashboard with improved modal interface for JO member allocations
-- Added new 'Harga Jual Porsi' column showing proportional selling price calculations for JO members
-- Implemented advanced Indonesian number formatting with parseAngkaPorsi and formatAngkaPorsi functions
-- Enhanced real-time calculation updates with automatic percentage calculations and validation feedback
-- Improved input sanitization and error handling for JO portion allocations
+- Enhanced VAT query functionality with comprehensive tgl_batal (cancellation date) support across all endpoints
+- Improved available-vatout endpoint with better deduplication logic that filters canceled fakturs and applies ranking rules consistent with aggregation logic
+- Updated deduplicateFakturData function to exclude cancelled invoices from aggregation when highest-priority invoice is cancelled
+- Enhanced database schema with tgl_batal DATE column for proper cancellation tracking
+- Improved query optimization with WHERE clauses excluding cancelled invoices throughout the system
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -36,7 +36,7 @@
 ## Introduction
 This document provides comprehensive documentation for the VAT Output (VAT OUT) management module. It covers transaction management workflows for invoice generation, customer billing, and tax calculation; inbox processing for managing incoming VAT output requests, approvals, and status tracking; summary reporting for VAT output analysis, compliance reporting, and financial reconciliation; and user interface components for VAT output processing, customer management integration, and transaction monitoring. It also explains VAT liability calculations, output tax handling, regulatory compliance requirements, practical processing examples, integration scenarios with customer management, and troubleshooting guidance for VAT output-related issues.
 
-**Updated** The system now features an enhanced VAT OUT dashboard with improved modal interface for JO member allocations, including a new 'Harga Jual Porsi' column that displays proportional selling price calculations. The system includes advanced Indonesian number formatting capabilities with parseAngkaPorsi and formatAngkaPorsi functions, real-time calculation updates with automatic percentage calculations, and comprehensive validation mechanisms for JO portion allocations.
+**Updated** The system now features enhanced VAT query functionality with comprehensive tgl_batal (cancellation date) support, improved available-vatout endpoint with better deduplication logic that filters canceled fakturs and applies ranking rules consistent with aggregation logic. The system includes advanced cancellation tracking, automated exclusion of cancelled invoices from all statistical calculations, and robust audit trail preservation for complete invoice lifecycle management.
 
 ## Project Structure
 The VAT OUT module consists of three primary HTML pages under the vat_out directory and supporting backend endpoints in the application server. The backend integrates with database tables for VAT OUT transactions, manages PDF attachments, and exposes APIs for dashboards and summaries. Customer and branch master data are integrated via dedicated pages for contact and branch management. The system includes specialized support for JO (Joint Venture) internal distribution tracking and comprehensive invoice cancellation functionality with audit trail support.
@@ -54,6 +54,7 @@ DB["SQLite Database"]
 JO_TRACK["JO Distribution Tracking"]
 CANCEL["Invoice Cancellation System"]
 AUDIT["Audit Trail System"]
+DEDUP["Enhanced Deduplication Logic"]
 end
 subgraph "Master Data"
 MC["master_cabang.html"]
@@ -70,6 +71,7 @@ APP --> DB
 APP --> JO_TRACK
 APP --> CANCEL
 APP --> AUDIT
+APP --> DEDUP
 MC --> APP
 MK --> APP
 TPR --> APP
@@ -83,13 +85,14 @@ AL --> APP
 - [summary_vatout.html:73-88](file://vat_out/summary_vatout.html#L73-L88)
 
 ## Core Components
-- **Enhanced Invoice Management with Cancellation Support**
-  - The VAT OUT module uses a header table for transaction records with comprehensive cancellation tracking via `tgl_batal` column. Fields include invoice number, entity, branch code, project ID, vendor/customer identifiers, invoice date, amounts (DPP and PPN), references, issuing location, signatory, internal invoice number, exchange date, format type, PDF link, input user, timestamp, and cancellation date. These fields support complete invoice lifecycle management including cancellation, reactivation, and detailed audit trails.
+- **Enhanced Invoice Management with Comprehensive Cancellation Support**
+  - The VAT OUT module uses a header table for transaction records with comprehensive cancellation tracking via `tgl_batal` DATE column. Fields include invoice number, entity, branch code, project ID, vendor/customer identifiers, invoice date, amounts (DPP and PPN), references, issuing location, signatory, internal invoice number, exchange date, format type, PDF link, input user, timestamp, and cancellation date. These fields support complete invoice lifecycle management including cancellation, reactivation, and detailed audit trails.
+  - **Enhanced**: All database queries automatically exclude cancelled invoices using `(d.tgl_batal IS NULL OR d.tgl_batal = '')` conditions throughout the system, ensuring data consistency across all modules.
 - **Advanced JO Internal Distribution Tracking**
-  - **Enhanced**: Dedicated `porsi_vatout` table tracks portion allocations per JO member (BBS/BMP) for joint venture invoices with fields: `no_faktur`, `anggota` (member identifier), `dpp_porsi` (portion of taxable value), `ppn_porsi` (portion of output tax). This enables precise attribution of VAT output income to specific JV partners while maintaining the original invoice structure.
-  - **New**: Enhanced modal interface with 'Harga Jual Porsi' column that automatically calculates proportional selling prices based on DPP allocations using the formula: `harga_jual * (dpp_porsi / dpp_total)`.
-  - **Enhanced**: Advanced Indonesian number formatting with parseAngkaPorsi and formatAngkaPorsi functions that handle both dot and comma separators, decimal precision preservation, and proper thousand separators.
-  - **Enhanced**: Real-time calculation updates with automatic percentage calculations, color-coded validation feedback, and comprehensive error handling.
+  - Dedicated `porsi_vatout` table tracks portion allocations per JO member (BBS/BMP) for joint venture invoices with fields: `no_faktur`, `anggota` (member identifier), `dpp_porsi` (portion of taxable value), `ppn_porsi` (portion of output tax). This enables precise attribution of VAT output income to specific JV partners while maintaining the original invoice structure.
+  - Enhanced modal interface with 'Harga Jual Porsi' column that automatically calculates proportional selling prices based on DPP allocations using the formula: `harga_jual * (dpp_porsi / dpp_total)`.
+  - Advanced Indonesian number formatting with parseAngkaPorsi and formatAngkaPorsi functions that handle both dot and comma separators, decimal precision preservation, and proper thousand separators.
+  - Real-time calculation updates with automatic percentage calculations, color-coded validation feedback, and comprehensive error handling.
 - **Comprehensive Invoice Cancellation System**
   - Complete cancellation functionality allowing users to cancel invoices with mandatory cancellation dates and audit trail preservation.
   - Supports invoice reactivation through approval workflow with proper status updates.
@@ -99,10 +102,10 @@ AL --> APP
   - Comprehensive audit logging system that records all cancellation and reactivation activities with timestamps, user information, and action details.
   - Real-time audit log viewing through dedicated audit logs page with filtering and search capabilities.
   - Integration with user request system for approval workflow management.
-- **Backend Endpoints**
+- **Enhanced Backend Endpoints**
   - Status Migration Endpoint: Automated processing of missing status fields including status_faktur, masa_pajak, and no_faktur_normal through `/api/migrate-vatout-status`.
   - Enhanced Project Summary Endpoint: Handles JO projects differently by fetching VAT out income portions from porsi_vatout table instead of full branch amounts.
-  - Available VAT OUT Endpoint: Retrieves available VAT OUT records filtered by entity and optionally by client name and mode, excluding cancelled invoices.
+  - **Enhanced Available VAT OUT Endpoint**: Retrieves available VAT OUT records filtered by entity and optionally by client name and mode, excluding cancelled invoices with improved deduplication logic.
   - PDF Attachment Management: Handles saving, renaming, and cleanup of PDF attachments associated with VAT OUT records.
   - Invoice Action Processing: Socket-based processing for cancellation, reactivation, and edit requests with approval workflow.
 - **UI Pages**
@@ -110,7 +113,7 @@ AL --> APP
   - Inbox: Manages incoming VAT OUT requests, approvals, and status tracking with enhanced filtering and search capabilities.
   - Summary: Delivers analytical reports for VAT output analysis, compliance, and reconciliation with cancelled invoice exclusion.
 
-**Updated** Enhanced with comprehensive invoice cancellation capabilities, improved JO internal distribution tracking system with advanced modal interface, automated status migration capabilities, and integrated audit trail system.
+**Updated** Enhanced with comprehensive invoice cancellation capabilities, improved JO internal distribution tracking system with advanced modal interface, automated status migration capabilities, integrated audit trail system, and enhanced deduplication logic with proper cancellation date handling.
 
 **Section sources**
 - [PRD_Tax_Database_System.md:34-49](file://PRD_Tax_Database_System.md#L34-L49)
@@ -126,7 +129,7 @@ UI_Dashboard["dashboard_vatout.html"]
 UI_Inbox["inbox_vatout.html"]
 UI_Summary["summary_vatout.html"]
 BE_App["app.js"]
-DB_SQLite["SQLite Database"]
+DB_SQLite["SQLite Database<br/>with tgl_batal support"]
 FS_Attachments["Local Filesystem<br/>PDF Attachments"]
 Master_Cabang["master_cabang.html"]
 Master_Kontak["master_kontak.html"]
@@ -134,6 +137,7 @@ Audit_Logs["audit_logs.html"]
 JO_Tracking["JO Distribution<br/>Tracking System"]
 Tax_Report["taxprojectreport.html"]
 Cancel_System["Invoice Cancellation<br/>System"]
+Enhanced_Dedup["Enhanced Deduplication<br/>Logic"]
 UI_Dashboard --> BE_App
 UI_Inbox --> BE_App
 UI_Summary --> BE_App
@@ -142,6 +146,7 @@ BE_App --> DB_SQLite
 BE_App --> FS_Attachments
 BE_App --> JO_Tracking
 BE_App --> Cancel_System
+BE_App --> Enhanced_Dedup
 Master_Cabang --> BE_App
 Master_Kontak --> BE_App
 Tax_Report --> BE_App
@@ -158,7 +163,7 @@ Tax_Report --> BE_App
 
 ### Enhanced Invoice Cancellation and Reactivation System
 - **Database Schema Enhancement**
-  - New `tgl_batal` column in `data_vatout` table stores cancellation dates for audit trail purposes with DATE data type.
+  - New `tgl_batal` DATE column in `data_vatout` table stores cancellation dates for audit trail purposes with proper date data type.
   - Visual indicators in UI show cancelled invoices with reduced opacity (0.55) and status badges for easy identification.
   - All queries automatically exclude cancelled invoices using `(d.tgl_batal IS NULL OR d.tgl_batal = '')` conditions throughout the system.
 - **Cancellation Workflow**
@@ -209,17 +214,87 @@ AuditLog --> End(["Complete"])
 - [dashboard_vatout.html:561-582](file://vat_out/dashboard_vatout.html#L561-L582)
 - [app.js:664-743](file://app.js#L664-L743)
 
+### Enhanced Deduplication Function with Cancellation Support
+- **Comprehensive Deduplication Logic**
+  - The `deduplicateFakturData` function provides robust deduplication capabilities for VAT IN and VAT OUT data with enhanced cancellation support.
+  - Groups records by serial number (ignoring first 4 digits: transaction code & status).
+  - Selects highest priority record from each group based on status ranking.
+  - Priority order: Pengganti N > ... > Pengganti 2 > Pengganti 1 > Normal.
+  - Synchronizes masa pajak between replacement and normal invoices.
+  - Uses time_input as tiebreaker when status is equal.
+  - **Enhanced**: Automatically excludes cancelled invoices from aggregation when the highest-priority invoice in a group has been cancelled (checks `chosen.tgl_batal`).
+  - **Enhanced**: Integrated with invoice cancellation system for complete lifecycle management.
+
+- **Enhanced Features**:
+  - Cross-module applicability for both VAT IN and VAT OUT processing.
+  - Automatic synchronization of tax periods between related invoices.
+  - Improved error handling and performance optimization.
+  - Integration with invoice cancellation system for complete lifecycle management.
+  - Proper handling of cancelled invoices in deduplication process.
+
+```mermaid
+flowchart TD
+Input["Raw Data Rows"] --> Group["Group by Serial Number<br/>(ignore first 4 digits)"]
+Group --> Sort["Sort by Status Priority<br/>(Pengganti N > Normal)"]
+Sort --> Select["Select Highest Priority<br/>Record per Group"]
+Select --> CheckCancel{"Highest Priority<br/>Cancelled?"}
+CheckCancel --> |Yes| Exclude["Exclude Entire Group<br/>(check chosen.tgl_batal)"]
+CheckCancel --> |No| Sync["Sync Masa Pajak<br/>for Replacement Invoices"]
+Exclude --> Output["Deduplicated Results"]
+Sync --> Output
+```
+
+**Diagram sources**
+- [app.js:172-223](file://app.js#L172-L223)
+
+**Section sources**
+- [app.js:172-223](file://app.js#L172-L223)
+
+### Enhanced Available VAT OUT Endpoint
+- **Improved Query Logic**
+  - The `/api/available-vatout` endpoint now includes comprehensive cancellation date support with proper WHERE clause filtering.
+  - SQL query includes `WHERE d.entitas = ? AND (d.tgl_batal IS NULL OR d.tgl_batal = '')` to automatically exclude cancelled invoices.
+  - Enhanced deduplication logic applied after initial filtering to ensure only valid, non-cancelled invoices are processed.
+  - Returns structured response with matching and other categories for improved user experience.
+
+- **Enhanced Features**:
+  - Better integration with existing deduplication logic for consistent ranking rules.
+  - Proper handling of used invoice filtering to avoid conflicts with other modules.
+  - Client name filtering with case-insensitive matching.
+  - Support for different modes (ledger vs prepaid) with appropriate field selection.
+
+```mermaid
+sequenceDiagram
+participant Client as "Client Application"
+participant API as "/api/available-vatout"
+participant DB as "Database"
+participant Dedup as "Deduplication Logic"
+Client->>API : GET /api/available-vatout?entitas=BBS&client=Name
+API->>DB : SELECT with tgl_batal filter<br/>(WHERE entitas=? AND tgl_batal IS NULL)
+DB-->>API : Return rows with cancellation status
+API->>Dedup : Apply enhanced deduplication logic
+Dedup-->>API : Return deduplicated results
+API->>API : Filter used invoices and apply client filtering
+API-->>Client : Return {matching : [], others : []}
+```
+
+**Diagram sources**
+- [app.js:1745-1813](file://app.js#L1745-L1813)
+
+**Section sources**
+- [app.js:1745-1813](file://app.js#L1745-L1813)
+
 ### Enhanced JO Internal Distribution Tracking System
 - **Database Schema**
   - Dedicated `porsi_vatout` table stores portion allocations with fields: `no_faktur`, `anggota` (member identifier), `dpp_porsi` (portion of taxable value), `ppn_porsi` (portion of output tax).
   - Primary key ensures unique allocation per invoice and member combination with composite indexing.
   - Supports BBS and BMP as standard JO member identifiers with validation and sanitization.
 - **Enhanced Modal Interface with Real-time Calculations**
-  - **New**: Dashboard edit modal includes dedicated section for JO portion allocation when entity is 'JO' with enhanced user experience.
-  - **New**: 'Harga Jual Porsi' column automatically calculates proportional selling prices using the formula: `editHjTotal * (dpp / editDppTotal)` for each member.
-  - **Enhanced**: Advanced Indonesian number formatting with parseAngkaPorsi function that handles multiple input formats (dot/comma separators, decimal precision).
-  - **Enhanced**: Real-time percentage calculations with live updates and color-coded validation feedback showing green for valid totals and orange for warnings.
-  - **Enhanced**: Input sanitization prevents invalid member identifiers and numeric overflow with comprehensive error handling.
+  - Dashboard edit modal includes dedicated section for JO portion allocation when entity is 'JO' with enhanced user experience.
+  - 'Harga Jual Porsi' column automatically calculates proportional selling prices using the formula: `editHjTotal * (dpp / editDppTotal)` for each member.
+  - Advanced Indonesian number formatting with parseAngkaPorsi function that handles multiple input formats (dot/comma separators, decimal precision).
+  - Real-time percentage calculations with live updates and color-coded validation feedback showing green for valid totals and orange for warnings.
+  - Input sanitization prevents invalid member identifiers and numeric overflow with comprehensive error handling.
 - **Enhanced Project Summary API**
   - Detects JO projects by checking `entitas = 'JO'` in master_cabang table.
   - For JO projects, queries `data_vatout` joined with `porsi_vatout` using specific member filter.
@@ -258,15 +333,15 @@ UpdateReport --> End
 
 ### Enhanced Indonesian Number Formatting and Input Handling
 - **Advanced Parse Functions**
-  - **New**: `parseAngkaPorsi` function handles complex Indonesian number formats including dot separators for thousands, comma separators for decimals, and mixed formats.
-  - **New**: `formatAngkaPorsi` function converts numbers back to Indonesian format with proper thousand separators and decimal precision.
-  - **New**: `formatInputPorsi` function provides real-time input formatting as users type, maintaining cursor position and decimal point placement.
-  - **New**: `formatRpPorsi` function formats currency values with proper Rupiah formatting while preserving decimal precision.
+  - `parseAngkaPorsi` function handles complex Indonesian number formats including dot separators for thousands, comma separators for decimals, and mixed formats.
+  - `formatAngkaPorsi` function converts numbers back to Indonesian format with proper thousand separators and decimal precision.
+  - `formatInputPorsi` function provides real-time input formatting as users type, maintaining cursor position and decimal point placement.
+  - `formatRpPorsi` function formats currency values with proper Rupiah formatting while preserving decimal precision.
 - **Real-time Calculation Updates**
-  - **Enhanced**: `updatePorsiHitung` function provides instant feedback on percentage calculations and total validation.
-  - **Enhanced**: Automatic calculation of 'Harga Jual Porsi' for each member based on their DPP allocation percentage.
-  - **Enhanced**: Color-coded validation feedback with green for valid totals and orange for warnings when allocations don't match invoice totals.
-  - **Enhanced**: Comprehensive error handling with user-friendly messages for invalid inputs and calculation errors.
+  - `updatePorsiHitung` function provides instant feedback on percentage calculations and total validation.
+  - Automatic calculation of 'Harga Jual Porsi' for each member based on their DPP allocation percentage.
+  - Color-coded validation feedback with green for valid totals and orange for warnings when allocations don't match invoice totals.
+  - Comprehensive error handling with user-friendly messages for invalid inputs and calculation errors.
 
 ```mermaid
 flowchart TD
@@ -327,40 +402,6 @@ Error --> End
 **Section sources**
 - [PRD_Tax_Database_System.md:34-49](file://PRD_Tax_Database_System.md#L34-L49)
 - [app.js:355-503](file://app.js#L355-L503)
-
-### Enhanced Deduplication Function
-- **Comprehensive Deduplication Logic**
-  - The `deduplicateFakturData` function provides robust deduplication capabilities for VAT IN and VAT OUT data.
-  - Groups records by serial number (ignoring first 4 digits: transaction code & status).
-  - Selects highest priority record from each group based on status ranking.
-  - Priority order: Pengganti N > ... > Pengganti 2 > Pengganti 1 > Normal.
-  - Synchronizes masa pajak between replacement and normal invoices.
-  - Uses time_input as tiebreaker when status is equal.
-  - **Enhanced**: Automatically excludes cancelled invoices from aggregation when the highest-priority invoice in a group has been cancelled.
-
-- **Enhanced Features**:
-  - Cross-module applicability for both VAT IN and VAT OUT processing.
-  - Automatic synchronization of tax periods between related invoices.
-  - Improved error handling and performance optimization.
-  - Integration with invoice cancellation system for complete lifecycle management.
-
-```mermaid
-flowchart TD
-Input["Raw Data Rows"] --> Group["Group by Serial Number<br/>(ignore first 4 digits)"]
-Group --> Sort["Sort by Status Priority<br/>(Pengganti N > Normal)"]
-Sort --> Select["Select Highest Priority<br/>Record per Group"]
-Select --> CheckCancel{"Highest Priority<br/>Cancelled?"}
-CheckCancel --> |Yes| Exclude["Exclude Entire Group"]
-CheckCancel --> |No| Sync["Sync Masa Pajak<br/>for Replacement Invoices"]
-Exclude --> Output["Deduplicated Results"]
-Sync --> Output
-```
-
-**Diagram sources**
-- [app.js:172-223](file://app.js#L172-L223)
-
-**Section sources**
-- [app.js:172-223](file://app.js#L172-L223)
 
 ### Status Migration and Data Consistency
 - **Automated Status Migration Endpoint**
@@ -473,13 +514,13 @@ participant DB as "SQLite Database"
 User->>UI : Open Summary
 UI->>API : GET /api/summary-vatout
 API->>DB : Execute Trend and Branch Queries<br/>(Exclude Cancelled Invoices)
-API->>API : Apply Deduplication Logic
+API->>API : Apply Enhanced Deduplication Logic
 DB-->>API : Aggregated Results
 API-->>UI : Trend and Branch Data
 UI-->>User : Render Charts and Tables
 ```
 
-**Updated** Enhanced with JO member-specific reporting, deduplication logic for accurate reporting, and comprehensive cancelled invoice exclusion.
+**Updated** Enhanced with JO member-specific reporting, enhanced deduplication logic for accurate reporting with cancellation support, and comprehensive cancelled invoice exclusion.
 
 **Diagram sources**
 - [summary_vatout.html:115-138](file://vat_out/summary_vatout.html#L115-L138)
@@ -492,7 +533,7 @@ UI-->>User : Render Charts and Tables
 ### User Interface Components and Integrations
 - **Dashboard**
   - Provides overview metrics and navigation links to inbox and summary views.
-  - **Enhanced**: Enhanced JO portion allocation editing interface with real-time calculations, Indonesian number formatting, and 'Harga Jual Porsi' column.
+  - Enhanced JO portion allocation editing interface with real-time calculations, Indonesian number formatting, and 'Harga Jual Porsi' column.
   - Comprehensive invoice cancellation and reactivation controls with visual status indicators.
   - Real-time statistics updates and month-over-month comparisons.
 - **Inbox**
@@ -585,7 +626,7 @@ AL --> DSH
 - **Internal Dependencies**
   - UI pages depend on backend endpoints for data retrieval and updates.
   - PDF attachment management depends on filesystem operations coordinated by the backend.
-  - Deduplication function is shared across multiple endpoints for consistent data processing.
+  - Enhanced deduplication function is shared across multiple endpoints for consistent data processing.
   - JO distribution tracking depends on master_cabang table for entity identification.
   - Invoice cancellation system integrates with audit logging and user request management.
 - **External Dependencies**
@@ -602,10 +643,10 @@ AL --> DSH
 graph TB
 UI["VAT OUT UI Pages"]
 BACK["Backend (app.js)"]
-DB["SQLite Database"]
+DB["SQLite Database<br/>with tgl_batal"]
 FS["Filesystem"]
 MASTER["Master Data Pages"]
-DEDUP["Deduplication Function"]
+DEDUP["Enhanced Deduplication Function"]
 MIGRATION["Status Migration"]
 JO_TRACK["JO Distribution Tracking"]
 CANCEL["Invoice Cancellation System"]
@@ -625,7 +666,7 @@ BACK --> AUDIT
 MASTER --> BACK
 ```
 
-**Updated** Added invoice cancellation system, Socket.IO integration, Chart.js dependencies, and comprehensive audit logging system.
+**Updated** Added invoice cancellation system, Socket.IO integration, Chart.js dependencies, comprehensive audit logging system, and enhanced deduplication function with cancellation support.
 
 **Diagram sources**
 - [app.js:355-503](file://app.js#L355-L503)
@@ -641,16 +682,17 @@ MASTER --> BACK
 ## Performance Considerations
 - **Query Efficiency**
   - Use indexed columns (entity, invoice date) in queries to optimize trend and branch aggregation.
-  - Deduplication function optimizes data processing by grouping and sorting efficiently.
+  - Enhanced deduplication function optimizes data processing by grouping and sorting efficiently.
   - JO distribution queries use LEFT JOIN for optimal performance when member portions are not present.
   - **Enhanced**: All queries automatically exclude cancelled invoices using optimized WHERE clauses with proper indexing.
+  - **Enhanced**: Database-level filtering with `tgl_batal` checks reduces unnecessary data processing.
 - **Attachment Management**
   - Minimize unnecessary file operations by consolidating save/rename/cleanup steps during updates.
   - Support for batch PDF processing with chunked uploads for improved performance.
 - **UI Responsiveness**
   - Paginate large datasets in the inbox and limit report scopes to reduce rendering overhead.
-  - **Enhanced**: Real-time percentage calculations in JO portion editing are optimized for immediate feedback with debounced input handling.
-  - **Enhanced**: Indonesian number formatting functions are optimized for minimal computational overhead during real-time updates.
+  - Real-time percentage calculations in JO portion editing are optimized for immediate feedback with debounced input handling.
+  - Indonesian number formatting functions are optimized for minimal computational overhead during real-time updates.
   - Socket.IO integration provides instant UI updates without full page reloads.
 - **Migration Performance**
   - Batch processing for status migration handles large datasets efficiently with progress tracking.
@@ -658,13 +700,14 @@ MASTER --> BACK
 - **JO Distribution Performance**
   - Efficient LEFT JOIN queries ensure minimal impact when portions are not yet allocated.
   - Indexed primary keys on porsi_vatout table optimize allocation lookups.
-  - **Enhanced**: Real-time calculation functions are optimized for minimal DOM manipulation during user interactions.
+  - Real-time calculation functions are optimized for minimal DOM manipulation during user interactions.
 - **Cancellation System Performance**
   - Optimized query patterns for cancelled invoice exclusion across all reporting modules.
   - Minimal performance impact on existing queries through strategic WHERE clause placement.
   - Efficient audit log creation with background processing for non-critical operations.
+  - **Enhanced**: Database-level filtering reduces memory usage and improves query performance.
 
-**Updated** Added performance considerations for invoice cancellation system, batch PDF processing, real-time Socket.IO communication, optimized audit logging, and enhanced real-time calculation performance.
+**Updated** Added performance considerations for invoice cancellation system, batch PDF processing, real-time Socket.IO communication, optimized audit logging, enhanced real-time calculation performance, and database-level cancellation filtering.
 
 ## Troubleshooting Guide
 - **PDF Attachment Issues**
@@ -673,12 +716,15 @@ MASTER --> BACK
 - **Data Retrieval Problems**
   - Confirm that the available VAT OUT endpoint filters by entity and applies proper ordering for timely retrieval.
   - Verify that cancelled invoice exclusion is working correctly in all reporting modules.
+  - Check that `tgl_batal` field is properly populated for cancelled invoices.
 - **Trend and Branch Report Errors**
   - Ensure that aggregation queries group by period and branch codes correctly and handle missing data gracefully.
   - Check that cancelled invoices are properly excluded from statistical calculations.
+  - Verify that WHERE clauses include `(d.tgl_batal IS NULL OR d.tgl_batal = '')` conditions.
 - **Audit and Reconciliation Discrepancies**
   - Cross-check invoice counts and totals against the header table fields and confirm that master data links are intact.
   - Verify audit logs for cancellation and reactivation activities through the audit logs page.
+  - Check that cancelled invoices are properly preserved in audit trail with correct timestamps.
 - **Status Migration Issues**
   - Check if records have valid invoice numbers and dates for status extraction.
   - Verify database permissions for write operations during migration.
@@ -686,28 +732,35 @@ MASTER --> BACK
 - **Deduplication Problems**
   - Ensure invoice numbers follow the expected format for proper grouping.
   - Verify that status fields are correctly populated before running deduplication.
-  - Check that cancelled invoices are properly handled in deduplication logic.
+  - Check that cancelled invoices are properly handled in enhanced deduplication logic.
+  - Verify that `chosen.tgl_batal` check is working correctly in deduplicateFakturData function.
 - **JO Distribution Issues**
   - Verify that master_cabang entries have correct `entitas = 'JO'` designation for joint venture projects.
   - Check that portion allocations sum correctly to invoice totals when editing.
   - Ensure project reports display member-specific portions for JO projects.
   - Validate that porsi_vatout table has proper indexes for efficient querying.
-  - **New**: Check that 'Harga Jual Porsi' calculations are displaying correctly for each member.
-  - **New**: Verify that Indonesian number formatting is working properly in the enhanced modal interface.
+  - Check that 'Harga Jual Porsi' calculations are displaying correctly for each member.
+  - Verify that Indonesian number formatting is working properly in the enhanced modal interface.
 - **Invoice Cancellation Issues**
-  - Verify that cancellation dates are properly recorded in the `tgl_batal` field.
+  - Verify that cancellation dates are properly recorded in the `tgl_batal` field with correct DATE format.
   - Check that cancelled invoices are excluded from all statistical calculations and reporting.
   - Ensure audit logs are created for all cancellation and reactivation activities.
   - Verify that visual indicators properly reflect cancellation status in the UI.
   - Check approval workflow for non-supervisor users attempting cancellations.
   - Monitor user_requests table for pending approval items.
+  - Verify that WHERE clauses in all queries include proper cancellation date filtering.
 - **Enhanced Modal Interface Issues**
-  - **New**: Verify that parseAngkaPorsi and formatAngkaPorsi functions are handling input correctly.
-  - **New**: Check that real-time calculations are updating properly when users modify JO portion allocations.
-  - **New**: Ensure that 'Harga Jual Porsi' column displays correct proportional selling price calculations.
-  - **New**: Validate that color-coded validation feedback is working for allocation totals.
+  - Verify that parseAngkaPorsi and formatAngkaPorsi functions are handling input correctly.
+  - Check that real-time calculations are updating properly when users modify JO portion allocations.
+  - Ensure that 'Harga Jual Porsi' column displays correct proportional selling price calculations.
+  - Validate that color-coded validation feedback is working for allocation totals.
+- **Available VAT OUT Endpoint Issues**
+  - Check that the endpoint properly filters by entity and applies cancellation date filtering.
+  - Verify that enhanced deduplication logic is working correctly with cancellation support.
+  - Ensure that used invoice filtering doesn't conflict with cancellation status.
+  - Check that client name filtering works correctly with case-insensitive matching.
 
-**Updated** Added troubleshooting guidance for invoice cancellation system, batch PDF processing, enhanced validation mechanisms, audit trail verification, and the new enhanced modal interface features including Indonesian number formatting and real-time calculations.
+**Updated** Added troubleshooting guidance for invoice cancellation system, enhanced deduplication logic with cancellation support, available-vatout endpoint improvements, batch PDF processing, enhanced validation mechanisms, audit trail verification, and the new enhanced modal interface features including Indonesian number formatting and real-time calculations.
 
 **Section sources**
 - [app.js:355-503](file://app.js#L355-L503)
@@ -715,4 +768,4 @@ MASTER --> BACK
 ## Conclusion
 The VAT Output (VAT OUT) module provides a structured framework for invoice generation, customer billing, tax calculation, inbox processing, and summary reporting. Its integration with master data ensures accurate customer and branch identification, while backend endpoints and filesystem management support efficient operations. By leveraging trend and branch-level summaries, organizations can meet compliance requirements and streamline financial reconciliation processes.
 
-**Updated** The addition of comprehensive invoice cancellation capabilities significantly enhances the system's ability to manage complete invoice lifecycles with proper audit trails and approval workflows. The enhanced JO member allocation system with advanced modal interface, including the new 'Harga Jual Porsi' column and sophisticated Indonesian number formatting, enables precise attribution of VAT output income to specific JV members while maintaining data integrity. The real-time calculation updates with automatic percentage calculations and validation feedback provide an intuitive user experience for complex joint venture scenarios. The enhanced project summary API provides accurate revenue reporting for sophisticated business operations. Together, these enhancements create a robust, compliant, and user-friendly VAT output management system that supports complex business operations while maintaining regulatory compliance and financial accuracy.
+**Updated** The addition of comprehensive invoice cancellation capabilities with enhanced tgl_batal support significantly enhances the system's ability to manage complete invoice lifecycles with proper audit trails and approval workflows. The enhanced available-vatout endpoint with improved deduplication logic ensures data consistency and accuracy across all modules. The enhanced deduplicateFakturData function now properly handles cancelled invoices, automatically excluding them from aggregation when the highest-priority invoice is cancelled. Together with the sophisticated Indonesian number formatting, real-time calculation updates, and comprehensive validation mechanisms, these enhancements create a robust, compliant, and user-friendly VAT output management system that supports complex business operations while maintaining regulatory compliance and financial accuracy. The system now provides complete lifecycle management for VAT invoices with proper cancellation handling, audit trail preservation, and consistent data processing across all endpoints and reporting modules.
