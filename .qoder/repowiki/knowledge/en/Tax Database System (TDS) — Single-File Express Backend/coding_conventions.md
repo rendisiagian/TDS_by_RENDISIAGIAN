@@ -1,0 +1,6 @@
+- Business modules are declared once in the `modules` array (`id`, `path`, `archive`) and every per-module artifact (inbox/data/item tables, static archive routes, dashboard filenames) is derived from that list rather than hand-coded.
+- Database access goes through the Promise-wrapped `dbGet`/`dbRun` helpers instead of raw callbacks, and schema evolution uses `ALTER TABLE ... ADD COLUMN` inside `db.serialize` to stay idempotent across restarts.
+- Route handlers use two middleware factories — `cekAuth` (session check) and `cekRoleAPI(roles)` (RBAC) — applied uniformly to every API endpoint instead of ad-hoc checks.
+- Audit logging is funneled through the global `insertAuditLog(user_id, username, action, module, details)` helper attached during DB init, keeping write paths consistent.
+- Sensitive files (.db, .env, backend .js, package manifests) are explicitly blocked via a path-matching middleware before any static file serving.
+- PDF archives are stored per module under `<module>/arsip_<type>/<PREFIX_*.pdf>` and exposed through `express.static` mounted at `/<archive>`.

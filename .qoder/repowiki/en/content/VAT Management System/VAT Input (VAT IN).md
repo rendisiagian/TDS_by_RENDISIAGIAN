@@ -18,6 +18,7 @@
 - Consistent cancellation filtering across all reporting modules using `tgl_batal` column
 - Updated audit trail functionality to track cancellation activities and maintain audit integrity
 - Enhanced user interface components with visual indicators for cancelled invoices
+- **Updated**: Enhanced VAT input summary interface now displays latest entries first by reversing data array before rendering, providing consistent user experience with VAT output summary module
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -45,7 +46,7 @@ graph TB
 subgraph "VAT IN Module"
 A["dashboard_vatin.html<br/>+ Cancellation UI"]
 B["audit_vatin.html"]
-C["summary_vatin.html"]
+C["summary_vatin.html<br/>+ Latest Entries First"]
 end
 subgraph "Backend"
 D["app.js<br/>Express + Socket.io<br/>+ Cancellation Logic"]
@@ -60,13 +61,13 @@ D --> E
 **Diagram sources**
 - [dashboard_vatin.html:192-204](file://vat_in/dashboard_vatin.html#L192-L204)
 - [audit_vatin.html:1-263](file://vat_in/audit_vatin.html#L1-L263)
-- [summary_vatin.html:1-266](file://vat_in/summary_vatin.html#L1-L266)
+- [summary_vatin.html:1-267](file://vat_in/summary_vatin.html#L1-L267)
 - [app.js:2962-2982](file://app.js#L2962-L2982)
 
 **Section sources**
 - [dashboard_vatin.html:192-204](file://vat_in/dashboard_vatin.html#L192-L204)
 - [audit_vatin.html:1-263](file://vat_in/audit_vatin.html#L1-L263)
-- [summary_vatin.html:1-266](file://vat_in/summary_vatin.html#L1-L266)
+- [summary_vatin.html:1-267](file://vat_in/summary_vatin.html#L1-L267)
 - [app.js:2962-2982](file://app.js#L2962-L2982)
 
 ## Core Components
@@ -83,6 +84,7 @@ D --> E
   - Presents comparative tax trends grouped by period based on invoice exchange date versus invoice date.
   - Renders interactive charts and supports CSV export.
   - **Updated**: Excludes cancelled invoices from all calculations and reports using consistent `tgl_batal` filtering.
+  - **Enhanced**: Now displays latest entries first in the table view while maintaining chronological order in charts for consistent user experience.
 
 **Section sources**
 - [dashboard_vatin.html:95-99](file://vat_in/dashboard_vatin.html#L95-L99)
@@ -118,6 +120,7 @@ U->>SUM : Open Summary page
 SUM->>API : GET "/api/summary"
 API->>DB : Aggregate PPN by period (exchange vs invoice date)<br/>+ Exclude cancelled invoices
 API-->>SUM : Return trend data and charts
+SUM->>SUM : Reverse data array for table display<br/>(latest entries first)
 ```
 
 **Diagram sources**
@@ -125,6 +128,7 @@ API-->>SUM : Return trend data and charts
 - [app.js:2962-2982](file://app.js#L2962-L2982)
 - [app.js:1289-1295](file://app.js#L1289-L1295)
 - [dashboard_vatin.html:547-554](file://vat_in/dashboard_vatin.html#L547-L554)
+- [summary_vatin.html:163-177](file://vat_in/summary_vatin.html#L163-L177)
 
 ## Detailed Component Analysis
 
@@ -236,6 +240,10 @@ G --> H["Maintain Audit Integrity"]
 - **Export**
   - CSV export of the comparison table for external reporting.
   - **Improved**: Consistent exclusion of cancelled invoices in exports.
+- **Enhanced Display Order**
+  - **New**: Table view now displays latest entries first by reversing the data array before rendering, while charts maintain chronological ascending order.
+  - Provides consistent user experience with VAT output summary module.
+  - Charts continue to show time-series data in proper chronological sequence.
 
 ```mermaid
 sequenceDiagram
@@ -248,12 +256,15 @@ UI->>API : GET "/api/summary?entitas=..."
 API->>DB : Aggregate PPN by period (exchange vs invoice date)<br/>+ WHERE tgl_batal IS NULL OR tgl_batal = ''
 DB-->>API : Trend data (excluding cancelled)
 API-->>UI : Return structured rows
-UI-->>U : Render charts + table + export
+UI->>UI : Sort data chronologically for charts
+UI->>UI : Reverse data array for table display
+UI-->>U : Render charts (chronological) + table (latest first) + export
 ```
 
 **Diagram sources**
 - [summary_vatin.html:118-235](file://vat_in/summary_vatin.html#L118-L235)
 - [app.js:1289-1295](file://app.js#L1289-L1295)
+- [summary_vatin.html:163-177](file://vat_in/summary_vatin.html#L163-L177)
 
 **Section sources**
 - [summary_vatin.html:32-72](file://vat_in/summary_vatin.html#L32-L72)
@@ -328,7 +339,7 @@ UI-->>U : Render charts + table + export
 graph LR
 UI["dashboard_vatin.html<br/>+ Cancellation UI"] --> API["app.js<br/>+ Cancellation Logic"]
 AUD["audit_vatin.html"] --> API
-SUM["summary_vatin.html"] --> API
+SUM["summary_vatin.html<br/>+ Latest Entries First"] --> API
 API --> DB["tax_database.db<br/>+ tgl_batal Column"]
 API --> VENDOR["master_vendor"]
 API --> LOGS["audit_logs"]
@@ -349,6 +360,7 @@ API --> LOGS["audit_logs"]
 - Database indexing on frequently queried columns (entity + date) enhances query performance.
 - Client-side PDF parsing uses chunked uploads and workers to prevent UI blocking during batch processing.
 - **Optimized**: Cancellation status queries use indexed `tgl_batal` column for efficient filtering.
+- **Enhanced**: Table rendering optimization with array reversal for latest-first display without affecting chart performance.
 
 ## Troubleshooting Guide
 - **Upload Issues**
@@ -366,6 +378,10 @@ API --> LOGS["audit_logs"]
 - **Export Failures**
   - Confirm HTTP status checks and error messages returned by summary API; retry after resolving underlying data issues.
   - Verify cancelled invoices are properly excluded from exported data.
+- **Summary Display Issues**
+  - Check that data array reversal is working correctly for latest-first display.
+  - Verify charts maintain chronological order while tables show reverse order.
+  - Ensure consistent behavior with VAT output summary module.
 
 **Section sources**
 - [dashboard_vatin.html:532-565](file://vat_in/dashboard_vatin.html#L532-L565)
@@ -374,7 +390,7 @@ API --> LOGS["audit_logs"]
 - [app.js:2962-2982](file://app.js#L2962-L2982)
 
 ## Conclusion
-The VAT IN module provides a robust, real-time pipeline for invoice ingestion, validation, approval, and cancellation, supported by integrity auditing and comparative reporting. The enhanced cancellation system with supervisor approval workflows ensures proper control over invoice lifecycle management while maintaining complete audit trails. Its design ensures compliance with replacement invoice logic and integrates seamlessly with vendor master data and broader accounting analytics.
+The VAT IN module provides a robust, real-time pipeline for invoice ingestion, validation, approval, and cancellation, supported by integrity auditing and comparative reporting. The enhanced cancellation system with supervisor approval workflows ensures proper control over invoice lifecycle management while maintaining complete audit trails. Its design ensures compliance with replacement invoice logic and integrates seamlessly with vendor master data and broader accounting analytics. The latest enhancement to display summary entries in reverse chronological order improves user experience while maintaining data integrity for both table and chart visualizations.
 
 ## Appendices
 
@@ -389,6 +405,8 @@ The VAT IN module provides a robust, real-time pipeline for invoice ingestion, v
   - Reactivate a previously cancelled invoice; submit supervisor approval; verify invoice returns to active status.
 - **Example 5: Compliance Reporting**
   - Generate comparative reports by period; export CSV for external submission; monitor audit anomalies and resolve flagged records.
+- **Example 6: Summary Interface Usage**
+  - Open summary page to view latest entries first in table while charts maintain chronological order; verify consistent behavior with VAT output module.
 
 **Section sources**
 - [PRD_Tax_Database_System.md:77-111](file://PRD_Tax_Database_System.md#L77-L111)

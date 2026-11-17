@@ -2,7 +2,6 @@
 
 <cite>
 **Referenced Files in This Document**
-- [README.md](file://README.md)
 - [PRD_Tax_Database_System.md](file://PRD_Tax_Database_System.md)
 - [TDS_Sequence_Diagram.md](file://TDS_Sequence_Diagram.md)
 - [TODO.md](file://TODO.md)
@@ -12,16 +11,15 @@
 - [export.js](file://export.js)
 - [pagination.js](file://pagination.js)
 - [start.bat](file://start.bat)
-- [migrate_vatout.js](file://migrate_vatout.js)
+- [.gitignore](file://.gitignore)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Removed references to dropped temporary development scripts `fix_masa_pajak.js` and `test_query.js`
-- Updated debugging section to reflect built-in migration and verification endpoints
-- Enhanced troubleshooting procedures with current diagnostic utilities
-- Updated security configuration to show blocked files list without temporary scripts
-- Refined development practices to emphasize built-in functionality over external scripts
+- Enhanced environment configuration management with .env file creation and SESSION_SECRET/PORT variables
+- Updated deployment security practices with improved gitignore configuration for environment files
+- Added comprehensive environment setup instructions and security validation procedures
+- Updated troubleshooting section with environment-related error handling and debugging guidance
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -63,6 +61,7 @@ Auth["Auth & RBAC Middleware"]
 API["REST API Routes"]
 WS["Socket.io Handlers"]
 DB["SQLite Database"]
+Env[".env Configuration"]
 end
 UI --> Express
 Sidebar --> UI
@@ -73,6 +72,7 @@ Express --> API
 Express --> WS
 API --> DB
 WS --> DB
+Env --> Express
 ```
 
 **Diagram sources**
@@ -94,6 +94,7 @@ WS --> DB
 - Data extraction helpers for parsing invoice texts and deduplicating VAT IN records.
 - Frontend utilities for server-side pagination, export to CSV/XLSX, and dynamic sidebar generation.
 - Built-in migration and verification endpoints replacing temporary development scripts.
+- **Enhanced**: Environment configuration management with .env file support and security validation.
 
 **Section sources**
 - [app.js](file://app.js)
@@ -107,6 +108,7 @@ The system follows a layered architecture:
 - Application Layer: Express routes, middleware, and Socket.io handlers.
 - Data Layer: SQLite database with relational tables and indexes.
 - Security Layer: Helmet, rate limiting, session management, and RBAC.
+- **Enhanced**: Environment Configuration Layer: Secure .env file management with mandatory SESSION_SECRET validation.
 
 ```mermaid
 graph TB
@@ -117,6 +119,8 @@ Routes["Route Handlers"]
 API["API Endpoints"]
 Socket["Socket.io Handlers"]
 DB["SQLite Database"]
+EnvConfig["Environment Config (.env)"]
+Security["Security Validation"]
 Client --> AuthMW
 AuthMW --> Routes
 Routes --> RoleMW
@@ -124,6 +128,8 @@ Routes --> API
 Client --> Socket
 Socket --> DB
 API --> DB
+EnvConfig --> Security
+Security --> Routes
 ```
 
 **Diagram sources**
@@ -141,6 +147,7 @@ API --> DB
 - Role-based access control enforced via middleware for sensitive routes and APIs.
 - Rate limiting applied to login attempts to mitigate brute-force attacks.
 - Security headers configured via Helmet; inline script allowance temporarily disabled for compatibility.
+- **Enhanced**: Mandatory SESSION_SECRET validation with security warnings for weak secrets.
 
 ```mermaid
 sequenceDiagram
@@ -334,19 +341,41 @@ Recommended practices:
 - [app.js](file://app.js)
 
 ## Deployment and Environment Configuration
-- Start script launches the server with a local IP detection utility.
-- Environment variables include port and session secret; the latter is mandatory for startup.
-- Production readiness requires:
-  - Strong session secret management.
-  - HTTPS termination at the edge or reverse proxy.
-  - Database backup automation and disaster recovery procedures.
-  - Strict Content Security Policy and hardened headers.
+
+### Environment Setup Requirements
+**Updated** Enhanced environment configuration management with mandatory .env file creation and security validation.
+
+#### Required Environment Variables
+Create a `.env` file in the project root with the following variables:
+
+```env
+# Server Configuration
+PORT=3000
+
+# Security Configuration
+SESSION_SECRET=your-secure-random-string-minimum-32-characters-long
+```
+
+#### Security Validation
+The application enforces strict security measures:
+- **Mandatory SESSION_SECRET**: Server will not start without a valid SESSION_SECRET
+- **Weak Secret Detection**: Warning if SESSION_SECRET contains default placeholders or is shorter than 32 characters
+- **Environment File Protection**: .env files are automatically blocked from direct web access
+
+#### Production Readiness Checklist
+- Generate cryptographically secure SESSION_SECRET (minimum 32 characters)
+- Configure PORT for your deployment environment
+- Set up HTTPS termination at edge/reverse proxy
+- Implement database backup automation
+- Configure Content Security Policy and hardened headers
+- Set up proper logging and monitoring
 
 ```mermaid
 flowchart TD
-Dev(["Developer Machine"]) --> Build["Install Dependencies"]
-Build --> Config["Configure .env<br/>PORT, SESSION_SECRET"]
-Config --> Start["Run start.bat"]
+Dev(["Developer Machine"]) --> EnvFile["Create .env file<br/>PORT, SESSION_SECRET"]
+EnvFile --> Install["Install Dependencies"]
+Install --> Validate["Validate Environment<br/>SESSION_SECRET Security"]
+Validate --> Start["Run start.bat"]
 Start --> Serve["Express Server on Port"]
 Serve --> Users["Internal Users Access"]
 ```
@@ -355,16 +384,31 @@ Serve --> Users["Internal Users Access"]
 - [start.bat](file://start.bat)
 - [app.js](file://app.js)
 
+#### Git Security Configuration
+**Updated** Enhanced .gitignore configuration to protect sensitive environment files:
+
+```gitignore
+# Tax Document Archives (Private Data)
+vat_in/arsip_vatin/
+vat_out/arsip_vatout/
+prepaidtax_bppu/arsip_prepaid/
+taxpayable_bppu/arsip_payable/
+```
+
+**Note**: The .env file should be added to .gitignore manually to prevent accidental commits of sensitive configuration.
+
 **Section sources**
 - [start.bat](file://start.bat)
 - [PRD_Tax_Database_System.md](file://PRD_Tax_Database_System.md)
 - [app.js](file://app.js)
+- [.gitignore](file://.gitignore)
 
 ## Version Control and Release Management
 - Use Git for source control with clear commit messages and feature branches.
 - Maintain a changelog and semantic versioning for releases.
 - Enforce pull requests with mandatory reviews before merging to main.
 - Tag releases and document breaking changes and migration steps.
+- **Enhanced**: Ensure .env files are never committed to version control.
 
 [No sources needed since this section provides general guidance]
 
@@ -379,34 +423,62 @@ Serve --> Users["Internal Users Access"]
   - Migrating existing data on startup with safe fallbacks.
   - Keeping UI labels and statuses consistent across modules.
 - Replace temporary development scripts with built-in API endpoints for better maintainability.
+- **Enhanced**: When adding new environment variables, ensure proper validation and documentation.
 
 **Section sources**
 - [app.js](file://app.js)
 
 ## Debugging and Troubleshooting
-Common areas to inspect:
+
+### Environment Configuration Issues
+**Updated** Common environment-related issues and solutions:
+
+#### Missing SESSION_SECRET
+**Error**: `[SECURITY ERROR] SESSION_SECRET tidak ditemukan di file .env! Server dihentikan.`
+**Solution**: 
+1. Create `.env` file in project root
+2. Add `SESSION_SECRET=your-secure-random-string`
+3. Restart the server
+
+#### Weak SESSION_SECRET
+**Warning**: `[SECURITY WARNING] SESSION_SECRET terlalu pendek atau masih default! Segera ganti dengan string acak minimal 32 karakter.`
+**Solution**: 
+1. Generate a cryptographically secure random string (minimum 32 characters)
+2. Replace placeholder values like 'CHANGE-THIS'
+3. Restart the server
+
+#### Port Configuration
+**Issue**: Server starts on unexpected port
+**Solution**: 
+1. Check `.env` file for PORT variable
+2. Verify no other process is using the desired port
+3. Update PORT value in `.env` if needed
+
+### Common Areas to Inspect
 - Authentication failures: verify session secret and login limiter thresholds.
 - Database errors: check migrations and index creation logs.
 - Socket.io connection issues: confirm shared session middleware and handshake.
 - Export problems: validate presence of XLSX library and column exclusions.
 
-Diagnostic utilities:
+### Diagnostic Utilities
 - Audit logs endpoint for immutable activity tracking.
 - Migration verification endpoints for VAT IN status and masa_pajak synchronization (`/api/verify-vatin-migration`, `/api/migrate-vatin-status`, `/api/migrate-vatout-status`).
-- Built-in data integrity checks replacing temporary development scripts like `fix_masa_pajak.js` and `test_query.js`.
+- Built-in data integrity checks replacing temporary development scripts.
 - Security configuration blocks access to sensitive files including `.env`, backend scripts, and configuration files.
 
-Security Configuration:
+### Security Configuration
+**Updated** Enhanced security blocking includes protection for environment files:
 - Blocked files list includes `.env`, `app.js`, `package.json`, and `package-lock.json` to prevent direct access.
-- Temporary development scripts are no longer referenced in security configurations.
+- Environment files are automatically protected from web exposure.
 
-Migration and Maintenance:
+### Migration and Maintenance
 - Use built-in API endpoints for data migration instead of external scripts.
 - Leverage verification endpoints to validate data integrity post-migration.
 - Monitor audit logs for all administrative actions and data modifications.
+- **Enhanced**: Regularly rotate SESSION_SECRET and monitor for security warnings.
 
 **Section sources**
 - [app.js](file://app.js)
 
 ## Conclusion
-These guidelines consolidate the current architecture, workflows, and best practices for TDS development. By adhering to the outlined standards—security-first design, modular extensions, rigorous testing, and robust deployment—you can ensure a scalable, maintainable, and compliant tax database system tailored for internal corporate use. The removal of temporary development scripts in favor of built-in functionality demonstrates the system's evolution toward a more robust and maintainable architecture.
+These guidelines consolidate the current architecture, workflows, and best practices for TDS development. By adhering to the outlined standards—security-first design, modular extensions, rigorous testing, and robust deployment—you can ensure a scalable, maintainable, and compliant tax database system tailored for internal corporate use. The enhanced environment configuration management with mandatory SESSION_SECRET validation demonstrates the system's commitment to security best practices and operational reliability. The removal of temporary development scripts in favor of built-in functionality further demonstrates the system's evolution toward a more robust and maintainable architecture.

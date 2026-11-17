@@ -1,0 +1,1 @@
+Copy `.env.example` to `.env` and set `SESSION_SECRET` (≥32 chars; startup aborts otherwise) before running `npm start` (`node app.js`). The server auto-creates default users `admin`/`rendisiagian` (password `Emergent@2024!`) on first run and auto-migrates legacy columns via `ALTER TABLE ... ADD COLUMN` inside `db.serialize`.

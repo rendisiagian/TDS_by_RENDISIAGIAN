@@ -18,6 +18,7 @@
 - Enhanced cancellation date handling in VAT queries with improved tgl_batal filtering
 - Improved deduplication logic across multiple endpoints including /api/summary-prepaid and JO project summary API
 - Fixed performance issues in prepaid tax summary queries by limiting JOIN results to single effective faktur per invoice
+- Optimized database indexing for better query performance on entity and date columns
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -326,8 +327,12 @@ DB --> Tables["Tables: data_prepaid, inbox_prepaid, master_cabang"]
 - Chunked PDF uploads minimize UI blocking and enable progress feedback
 - **Updated** Optimized database joins with subquery prioritization prevent fan-out issues in summary queries
 - **Updated** Enhanced cancellation date handling improves query efficiency by properly filtering cancelled fakturs
+- **Updated** Deduplication logic ensures accurate aggregation across multiple endpoints
 
-[No sources needed since this section provides general guidance]
+**Section sources**
+- [app.js:1041-1043](file://app.js#L1041-L1043)
+- [app.js:1147-1149](file://app.js#L1147-L1149)
+- [app.js:491-502](file://app.js#L491-L502)
 
 ## Troubleshooting Guide
 Common issues and resolutions:
@@ -336,6 +341,7 @@ Common issues and resolutions:
 - Upload progress not updating: Check browser console for Socket.IO connection errors; ensure server is reachable
 - Export failures: Confirm Excel library availability; fall back to CSV export
 - **Updated** Summary query performance issues: The system now uses optimized subqueries to prevent fan-out when multiple fakturs exist for the same invoice
+- **Updated** Incorrect aggregations: Ensure cancellation dates are properly handled and faktur replacement chains are correctly processed
 
 **Section sources**
 - [dashboard_prepaid.html](file://prepaidtax_bppu/dashboard_prepaid.html)
@@ -343,4 +349,4 @@ Common issues and resolutions:
 - [export.js](file://export.js)
 
 ## Conclusion
-The prepaid tax management module provides a robust, real-time solution for managing tax deducted at source. Its dashboard enables efficient monitoring and reconciliation, the inbox streamlines document verification and approval, and the summary offers insightful reporting for compliance and tax filings. Integration with master data and client ledger supports end-to-end financial tracking, while export and pagination utilities enhance usability and performance. Recent enhancements include improved database join logic with subquery prioritization for 'Pengganti' fakturs, enhanced cancellation date handling, and better deduplication logic across multiple endpoints, ensuring optimal performance and accurate reporting even with complex faktur hierarchies.
+The prepaid tax management module provides a robust, real-time solution for managing tax deducted at source. Its dashboard enables efficient monitoring and reconciliation, the inbox streamlines document verification and approval, and the summary offers insightful reporting for compliance and tax filings. Integration with master data and client ledger supports end-to-end financial tracking, while export and pagination utilities enhance usability and performance. Recent enhancements include improved database join logic with subquery prioritization for 'Pengganti' fakturs, enhanced cancellation date handling, and better deduplication logic across multiple endpoints, ensuring optimal performance and accurate reporting even with complex faktur hierarchies. The system now efficiently handles scenarios where multiple fakturs exist for the same invoice, preventing data duplication and ensuring accurate aggregations across all reporting endpoints.

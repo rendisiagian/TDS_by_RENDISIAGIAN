@@ -1,0 +1,1 @@
+Node.js + Express 5, sqlite3 (file-backed), socket.io 4.x for real-time bulk upload, bcryptjs for password hashing, express-session with httpOnly+sameSite cookies, helmet for security headers, express-rate-limit for login brute-force protection, dotenv for env config.

@@ -1,0 +1,1 @@
+Single-process Node/Express server that ingests Indonesian tax PDFs, parses them into SQLite tables, and serves the VAT-in/out, prepaid, payable, accounting, and project-report dashboards.
